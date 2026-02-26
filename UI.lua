@@ -46,6 +46,7 @@ local function ApplyWidth(newW)
     if MR.content then MR.content:SetWidth(newW - 13) end
     MR:RefreshUI()
 end
+MR.ApplyWidth = ApplyWidth
 
 local function WC(rrggbb, text)
     return string.format("|cff%s%s|r", rrggbb, text)
@@ -269,43 +270,78 @@ function MR:BuildUI()
     end)
     cfgBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local lockBtn = CreateFrame("Button", nil, titleBar)
-    lockBtn:SetSize(16, 16)
-    lockBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-    self.lockBtn = lockBtn
+    local minBtn = CreateFrame("Button", nil, titleBar, "BackdropTemplate")
+    minBtn:SetSize(16, 14)
+    minBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
+    minBtn:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    minBtn:SetBackdropColor(0.08, 0.22, 0.32, 0.9)
+    minBtn:SetBackdropBorderColor(0.18, 0.65, 0.62, 0.8)
+    self.minBtn = minBtn
 
-    local lockTex = lockBtn:CreateTexture(nil, "ARTWORK")
-    lockTex:SetAllPoints()
-    lockTex:SetTexture(TEX_LOCK)
+    local minLabel = minBtn:CreateFontString(nil, "OVERLAY")
+    minLabel:SetFont(FONT_HEADERS, 13, "OUTLINE")
+    minLabel:SetPoint("CENTER", minBtn, "CENTER", 0, 1)
+    minLabel:SetText("-")
+    minLabel:SetTextColor(0.25, 0.90, 0.75)
 
-    local function UpdateLockIcon()
-        if MidnightRoutineDB.locked then
-            lockTex:SetVertexColor(1, 0.6, 0.1)
+    local function UpdateMinimizeVisual()
+        if MidnightRoutineDB.minimized then
+            minLabel:SetText("+")
+            minLabel:SetTextColor(0.25, 0.90, 0.75)
+            minBtn:SetBackdropBorderColor(0.18, 0.65, 0.62, 0.8)
         else
-            lockTex:SetVertexColor(0.35, 0.35, 0.4)
+            minLabel:SetText("-")
+            minLabel:SetTextColor(0.25, 0.90, 0.75)
+            minBtn:SetBackdropBorderColor(0.18, 0.65, 0.62, 0.8)
         end
     end
-    UpdateLockIcon()
-    self.UpdateLockIcon = UpdateLockIcon
+    UpdateMinimizeVisual()
+    self.UpdateMinimizeVisual = UpdateMinimizeVisual
 
-    lockBtn:SetScript("OnClick", function()
-        MidnightRoutineDB.locked = not MidnightRoutineDB.locked
-        f:SetMovable(not MidnightRoutineDB.locked)
-        UpdateLockIcon()
-    end)
-    lockBtn:SetScript("OnEnter", function(s)
-        GameTooltip:SetOwner(s, "ANCHOR_LEFT")
-        if MidnightRoutineDB.locked then
-            GameTooltip:SetText("|cffff8000Frame Locked|r")
-            GameTooltip:AddLine("Click to unlock and allow dragging.", 0.7,0.7,0.7)
+    local function ApplyMinimizeState()
+        if MidnightRoutineDB.minimized then
+            if MR.scroll       then MR.scroll:Hide()       end
+            if MR._scrollBg    then MR._scrollBg:Hide()    end
+            if MR._scrollTrack then MR._scrollTrack:Hide() end
+            f:SetHeight(20)
         else
-            GameTooltip:SetText("|cff00ff96Frame Unlocked|r")
-            GameTooltip:AddLine("Click to lock in place.", 0.7,0.7,0.7)
-            GameTooltip:AddLine("Drag title bar to move.", 0.5,0.5,0.5)
+            if MR.scroll       then MR.scroll:Show()       end
+            if MR._scrollBg    then MR._scrollBg:Show()    end
+            if MR._scrollTrack then MR._scrollTrack:Show() end
+            MR:RefreshUI()
+        end
+        UpdateMinimizeVisual()
+    end
+    self.ApplyMinimizeState = ApplyMinimizeState
+
+    minBtn:SetScript("OnClick", function()
+        MidnightRoutineDB.minimized = not MidnightRoutineDB.minimized
+        ApplyMinimizeState()
+    end)
+    minBtn:SetScript("OnEnter", function(s)
+        minBtn:SetBackdropColor(0.12, 0.38, 0.45, 1)
+        minBtn:SetBackdropBorderColor(0.25, 0.90, 0.75, 1)
+        minLabel:SetTextColor(1, 1, 1)
+        GameTooltip:SetOwner(s, "ANCHOR_LEFT")
+        if MidnightRoutineDB.minimized then
+            GameTooltip:SetText("|cff00ff96Minimized|r")
+            GameTooltip:AddLine("Click to restore.", 0.7, 0.7, 0.7)
+        else
+            GameTooltip:SetText("|cffaaaaааMinimize|r")
+            GameTooltip:AddLine("Click to collapse to header.", 0.7, 0.7, 0.7)
         end
         GameTooltip:Show()
     end)
-    lockBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    minBtn:SetScript("OnLeave", function()
+        minBtn:SetBackdropColor(0.08, 0.22, 0.32, 0.9)
+        minBtn:SetBackdropBorderColor(0.18, 0.65, 0.62, 0.8)
+        minLabel:SetTextColor(0.25, 0.90, 0.75)
+        GameTooltip:Hide()
+    end)
 
     local scroll = CreateFrame("ScrollFrame", "MRScrollFrame", f)
     scroll:SetPoint("TOPLEFT",     titleBar, "BOTTOMLEFT",  0,  -1)
@@ -320,6 +356,7 @@ function MR:BuildUI()
     self.content = content
 
     local track = CreateFrame("Frame", nil, f)
+    self._scrollTrack = track
     track:SetPoint("TOPLEFT",    scroll, "TOPRIGHT",    1, 0)
     track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 1, 0)
     track:SetWidth(5)
@@ -393,6 +430,15 @@ function MR:RefreshUI()
     self.frame:SetHeight(math.max(math.min(20 + yOff + 6, 600), 26))
 
     if self.UpdateScrollBar then self.UpdateScrollBar() end
+
+    -- Re-apply minimized state after a refresh
+    if MidnightRoutineDB.minimized then
+        if self.scroll       then self.scroll:Hide()       end
+        if self._scrollBg    then self._scrollBg:Hide()    end
+        if self._scrollTrack then self._scrollTrack:Hide() end
+        self.frame:SetHeight(20)
+        if self.UpdateMinimizeVisual then self.UpdateMinimizeVisual() end
+    end
 end
 
 function MR:BuildSection(mod, yOff)
@@ -740,7 +786,7 @@ function MR:PopulateConfigFrame(f)
         function(v)
             MidnightRoutineDB.locked = v
             MR.frame:SetMovable(not v)
-            if MR.UpdateLockIcon then MR.UpdateLockIcon() end
+            -- (lock icon removed; minimize button is now in its place)
         end)
     Checkbox("Transparent Mode",
         function() return MidnightRoutineDB.transparentMode end,
@@ -842,6 +888,17 @@ function MR:PopulateConfigFrame(f)
                 mod.labelColor)
         end
     end
+
+    Gap(4); Divider()
+    SectionLabel("SIZE")
+    Btn("Max Width", function()
+        ApplyWidth(PANEL_MAX_WIDTH)
+        MR:PopulateConfigFrame(f)
+    end)
+    Btn("Min Width", function()
+        ApplyWidth(PANEL_MIN_WIDTH)
+        MR:PopulateConfigFrame(f)
+    end)
 
     Gap(4); Divider()
     SectionLabel("RESETS")

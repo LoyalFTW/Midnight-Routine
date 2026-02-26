@@ -209,8 +209,14 @@ SlashCmdList["MIDROUTE"] = function(msg)
             MidnightRoutineDB.scale = s
             MR.frame:SetScale(s)
         end
+    elseif msg == "big" then
+        if MR.ApplyWidth then MR.ApplyWidth(500) end
+        print("|cff2ae7c6MidnightRoutine:|r Max width applied.")
+    elseif msg == "small" then
+        if MR.ApplyWidth then MR.ApplyWidth(200) end
+        print("|cff2ae7c6MidnightRoutine:|r Min width applied.")
     else
-        print("|cff2ae7c6/mr|r commands: show, hide, lock, unlock, reset, scale <0.5-2>")
+        print("|cff2ae7c6/mr|r commands: show, hide, lock, unlock, reset, scale <0.5-2>, big, small")
     end
 end
 

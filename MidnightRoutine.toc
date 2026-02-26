@@ -21,6 +21,7 @@ Core.lua
 Modules/WeeklyTasks.lua
 Modules/GreatVault.lua
 Modules/Crests.lua
+Modules/CofferKeyShards.lua
 Modules/Professions.lua
 Modules/Delves.lua
 Modules/StoryCampaign.lua
