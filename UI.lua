@@ -636,7 +636,7 @@ function MR:BuildSection(mod, yOff)
         for _, row in ipairs(mod.rows) do
             if MR:IsRowEnabled(mod.key, row.key) then
                 local done = MR:GetProgress(mod.key, row.key)
-                if not (MR.db.profile.hideComplete and done >= row.max) then
+                if not (MR.db.profile.hideComplete and not row.noMax and done >= row.max) then
                     yOff = self:BuildRow(mod, row, done, yOff)
                 end
             end
@@ -650,7 +650,7 @@ end
 
 function MR:BuildRow(mod, row, done, yOff)
     local isAutoTracked = (row.questIds ~= nil) or (row.liveKey ~= nil) or (row.spellTracked == true)
-    local isComplete    = done >= row.max
+    local isComplete    = not row.noMax and done >= row.max
 
     local rowFrame = CreateFrame("Frame", nil, self.content)
     rowFrame:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -yOff)
@@ -734,7 +734,7 @@ function MR:BuildRow(mod, row, done, yOff)
     countFS:SetFont(FONT_ROWS, GetFontSize(), "OUTLINE")
     countFS:SetPoint("RIGHT", rowFrame, "RIGHT", -4, 0)
     countFS:SetJustifyH("RIGHT")
-    countFS:SetText(string.format("%d / %d", done, row.max))
+    countFS:SetText(row.noMax and tostring(done) or string.format("%d / %d", done, row.max))
     countFS:SetTextColor(countColor(done, row.max))
 
     if row.vaultLabel then
@@ -806,11 +806,26 @@ function MR:PopulateConfigFrame(f)
     if f.body then
         local children = { f.body:GetChildren() }
         for _, child in ipairs(children) do
-            child:Hide()
+            local grandchildren = { child:GetChildren() }
+            for _, gc in ipairs(grandchildren) do
+                if gc:GetObjectType() == "Button" then
+                    gc:SetScript("OnClick", nil)
+                    gc:SetScript("OnEnter", nil)
+                    gc:SetScript("OnLeave", nil)
+                end
+                gc:EnableMouse(false)
+                gc:Hide()
+            end
+            if child:GetObjectType() == "Button" then
+                child:SetScript("OnClick", nil)
+                child:SetScript("OnEnter", nil)
+                child:SetScript("OnLeave", nil)
+            end
             child:EnableMouse(false)
+            child:Hide()
         end
         f.body:Hide()
-        f.body:SetParent(nil)
+        f.body:SetParent(UIParent)
         f.body = nil
     end
 

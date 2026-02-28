@@ -107,7 +107,9 @@ end
 
 function MR:IsRowEnabled(modKey, rowKey)
     local s = self.db.profile.modules[modKey]
-    return not (s and s.hiddenRows and s.hiddenRows[rowKey] == false)
+    if not s or not s.hiddenRows then return true end
+    local v = s.hiddenRows[rowKey]
+    return v ~= false
 end
 
 function MR:SetRowEnabled(modKey, rowKey, enabled)
@@ -115,7 +117,7 @@ function MR:SetRowEnabled(modKey, rowKey, enabled)
     if not self.db.profile.modules[modKey].hiddenRows then
         self.db.profile.modules[modKey].hiddenRows = {}
     end
-    self.db.profile.modules[modKey].hiddenRows[rowKey] = enabled and nil or false
+    self.db.profile.modules[modKey].hiddenRows[rowKey] = enabled and true or false
 end
 
 

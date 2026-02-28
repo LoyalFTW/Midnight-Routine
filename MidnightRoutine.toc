@@ -29,6 +29,7 @@ Modules/Crests.lua
 Modules/CofferKeyShards.lua
 Modules/Professions.lua
 Modules/Delves.lua
+Modules/Prey.lua
 Modules/StoryCampaign.lua
 Modules/LFR.lua
 
