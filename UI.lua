@@ -415,7 +415,50 @@ function MR:BuildUI()
         "/mr for chat commands"
     )
     cfgBtn:SetPoint("RIGHT", minBtn, "LEFT", -BTN_PAD, 0)
-    cfgBtn:SetScript("OnClick", function() MR:ToggleConfig() end)
+    cfgBtn:SetScript("OnClick", function()
+        MR:ToggleConfig()
+        MR:DismissFirstTimeGlow()
+    end)
+
+    local origCfgEnter = cfgBtn:GetScript("OnEnter")
+    cfgBtn:SetScript("OnEnter", function(s)
+        origCfgEnter(s)
+        if MR.db and not MR.db.profile.firstSeen then
+            GameTooltip:AddLine("|cff2ae7c6Click here for Options!|r", 1, 1, 1)
+            GameTooltip:AddLine("Everything is fully modular", 0.9, 0.85, 0.3)
+            GameTooltip:Show()
+        end
+    end)
+
+    local cfgShine = CreateFrame("Frame", nil, cfgBtn)
+    cfgShine:SetSize(28, 28)
+    cfgShine:SetPoint("CENTER", cfgBtn, "CENTER", 0, 0)
+    cfgShine:Hide()
+    local function MakeSparkle(parent, x, y)
+        local t = parent:CreateTexture(nil, "OVERLAY")
+        t:SetTexture("Interface\\ItemSocketingFrame\\UI-ItemSockingFrame-Glow")
+        t:SetSize(10, 10)
+        t:SetPoint("CENTER", parent, "CENTER", x, y)
+        t:SetBlendMode("ADD")
+        return t
+    end
+    cfgShine._sparks = {
+        MakeSparkle(cfgShine, -9,  9),
+        MakeSparkle(cfgShine,  9,  9),
+        MakeSparkle(cfgShine, -9, -9),
+        MakeSparkle(cfgShine,  9, -9),
+    }
+    local elapsed = 0
+    cfgShine:SetScript("OnUpdate", function(self, dt)
+        elapsed = elapsed + dt
+        local alpha = 0.5 + 0.5 * math.sin(elapsed * 4)
+        for _, s in ipairs(self._sparks) do s:SetAlpha(alpha) end
+    end)
+    cfgShine.Play = function(self) self:Show() end
+    cfgShine.Stop = function(self) self:Hide() end
+    self.cfgShine = cfgShine
+
+    self.cfgBtn = cfgBtn
 
     titleCount:SetPoint("RIGHT", cfgBtn, "LEFT", -6, 0)
 
@@ -467,7 +510,6 @@ function MR:BuildUI()
     scroll:SetScript("OnVerticalScroll",     function() UpdateScrollBar() end)
     self.UpdateScrollBar = UpdateScrollBar
 
-
     self.widgets         = {}
     self.sectionRegistry = {}
 
@@ -476,7 +518,7 @@ function MR:BuildUI()
 end
 
 function MR:RefreshUI()
-    if not self.frame then return end
+    if not self.frame or not self.content then return end
 
     RecalcLayout()
 
@@ -633,12 +675,13 @@ function MR:BuildSection(mod, yOff)
     table.insert(self.widgets, div)
 
     if isOpen then
+        local hideComplete = MR:IsModuleHideComplete(mod.key)
         for _, row in ipairs(mod.rows) do
             if MR:IsRowEnabled(mod.key, row.key) then
-                local done = MR:GetProgress(mod.key, row.key)
-                if not (MR.db.profile.hideComplete and not row.noMax and done >= row.max) then
-                    yOff = self:BuildRow(mod, row, done, yOff)
-                end
+                local done      = MR:GetProgress(mod.key, row.key)
+                local isComplete = not row.noMax and done >= row.max
+                local collapsed  = hideComplete and isComplete
+                yOff = self:BuildRow(mod, row, done, yOff, collapsed)
             end
         end
     end
@@ -648,14 +691,40 @@ function MR:BuildSection(mod, yOff)
     return yOff
 end
 
-function MR:BuildRow(mod, row, done, yOff)
-    local isAutoTracked = (row.questIds ~= nil) or (row.liveKey ~= nil) or (row.spellTracked == true)
+function MR:BuildRow(mod, row, done, yOff, collapsed)
+    local isAutoTracked = (row.questIds ~= nil) or (row.liveKey ~= nil) or (row.spellId ~= nil) or (row.currencyId ~= nil)
     local isComplete    = not row.noMax and done >= row.max
+    local GHOST_H       = 8
+    local rowH          = collapsed and GHOST_H or ROW_HEIGHT
 
     local rowFrame = CreateFrame("Frame", nil, self.content)
     rowFrame:SetPoint("TOPLEFT", self.content, "TOPLEFT", 0, -yOff)
-    rowFrame:SetSize((MR.db.profile.width or 260) - 13, ROW_HEIGHT)
+    rowFrame:SetSize((MR.db.profile.width or 260) - 13, rowH)
     rowFrame:EnableMouse(true)
+
+    if collapsed then
+        local line = rowFrame:CreateTexture(nil, "ARTWORK")
+        line:SetPoint("LEFT",  rowFrame, "LEFT",  PADDING + 10, 0)
+        line:SetPoint("RIGHT", rowFrame, "RIGHT", -4, 0)
+        line:SetHeight(1)
+        line:SetColorTexture(0.25, 0.25, 0.25, 0.5)
+
+        local dot = rowFrame:CreateTexture(nil, "ARTWORK")
+        dot:SetSize(4, 4)
+        dot:SetPoint("LEFT", rowFrame, "LEFT", PADDING, 0)
+        dot:SetColorTexture(0.25, 0.55, 0.25, 0.6)
+
+        rowFrame:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(rowFrame, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Done: " .. row.label, 0.4, 0.85, 0.4, 1, true)
+            GameTooltip:AddLine("Completed this week", 0.3, 0.6, 0.3)
+            GameTooltip:Show()
+        end)
+        rowFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        table.insert(self.widgets, rowFrame)
+        return yOff + rowH
+    end
 
     local hover = rowFrame:CreateTexture(nil, "BACKGROUND")
     hover:SetAllPoints()
@@ -670,13 +739,12 @@ function MR:BuildRow(mod, row, done, yOff)
             GameTooltip:AddLine("Auto-tracked via Blizzard API", 0.4, 0.8, 1)
         elseif row.questIds then
             GameTooltip:AddLine("Auto-tracked via quest log", 0.4, 1, 0.6)
-        elseif row.spellTracked then
+        elseif row.spellId then
             GameTooltip:AddLine("Auto-tracked via item use", 0.9, 0.6, 1)
+        elseif row.currencyId then
+            GameTooltip:AddLine("Auto-tracked via currency", 1, 0.8, 0.2)
         else
             GameTooltip:AddLine("Left-click: +1   Right-click: -1", 0.5, 0.5, 0.5)
-        end
-        if row.resetType then
-            GameTooltip:AddLine("Resets: " .. row.resetType, 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -713,12 +781,19 @@ function MR:BuildRow(mod, row, done, yOff)
         star:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
         star:SetVertexColor(0.2, 0.6, 1)
         star:SetAlpha(0.55)
-    elseif row.spellTracked then
+    elseif row.spellId then
         local star = rowFrame:CreateTexture(nil, "OVERLAY")
         star:SetSize(7, 7)
         star:SetPoint("LEFT", rowFrame, "LEFT", PADDING, 4)
         star:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
         star:SetVertexColor(0.8, 0.4, 1)
+        star:SetAlpha(0.55)
+    elseif row.currencyId then
+        local star = rowFrame:CreateTexture(nil, "OVERLAY")
+        star:SetSize(7, 7)
+        star:SetPoint("LEFT", rowFrame, "LEFT", PADDING, 4)
+        star:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+        star:SetVertexColor(1, 0.8, 0.2)
         star:SetAlpha(0.55)
     end
 
@@ -729,6 +804,14 @@ function MR:BuildRow(mod, row, done, yOff)
     lbl:SetJustifyH("LEFT")
     lbl:SetText(row.label)
     if isComplete then lbl:SetTextColor(0.38, 0.38, 0.38) end
+
+    if isComplete then
+        local strike = rowFrame:CreateTexture(nil, "OVERLAY")
+        strike:SetHeight(1)
+        strike:SetPoint("LEFT",  lbl, "LEFT",  0, 0)
+        strike:SetPoint("RIGHT", lbl, "RIGHT", 0, 0)
+        strike:SetColorTexture(0.35, 0.35, 0.35, 0.7)
+    end
 
     local countFS = rowFrame:CreateFontString(nil, "OVERLAY")
     countFS:SetFont(FONT_ROWS, GetFontSize(), "OUTLINE")
@@ -746,7 +829,7 @@ function MR:BuildRow(mod, row, done, yOff)
     end
 
     table.insert(self.widgets, rowFrame)
-    return yOff + ROW_HEIGHT
+    return yOff + rowH
 end
 
 local cfgFrame
@@ -903,7 +986,7 @@ function MR:PopulateConfigFrame(f)
     end
 
     SectionLabel("OPTIONS")
-    Checkbox("Hide Completed",
+    Checkbox("Collapse Completed (Global)",
         function() return MR.db.profile.hideComplete end,
         function(v) MR.db.profile.hideComplete = v; MR:RefreshUI() end)
     Checkbox("Lock Frame",
@@ -1081,30 +1164,78 @@ function MR:PopulateConfigFrame(f)
 
     if not MR._cfgExpanded then MR._cfgExpanded = {} end
 
+    local function BuildHideCompleteBtn(parent, key, anchorRight)
+        local hideActive = MR:IsModuleHideComplete(key)
+        local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+        btn:SetSize(16, 16)
+        if anchorRight == parent then
+            btn:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+        else
+            btn:SetPoint("RIGHT", anchorRight, "LEFT", -2, 0)
+        end
+        btn:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        btn:SetBackdropColor(0.05, 0.10, 0.18, 1)
+        btn:SetBackdropBorderColor(
+            hideActive and 0.15 or 0.35,
+            hideActive and 0.32 or 0.12,
+            hideActive and 0.38 or 0.12, 1)
+        local fs = btn:CreateFontString(nil, "OVERLAY")
+        fs:SetFont(FONT_ROWS, 8, "OUTLINE")
+        fs:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        fs:SetText(hideActive and "H" or "S")
+        fs:SetTextColor(hideActive and 0.45 or 0.55, hideActive and 0.75 or 0.25, hideActive and 0.70 or 0.25)
+        btn:SetScript("OnClick", function()
+            MR:SetModuleHideComplete(key, not MR:IsModuleHideComplete(key))
+            MR:PopulateConfigFrame(f)
+        end)
+        btn:SetScript("OnEnter", function()
+            btn:SetBackdropColor(0.08, 0.22, 0.32, 1)
+            btn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
+            fs:SetTextColor(1, 1, 1)
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            GameTooltip:SetText(MR:IsModuleHideComplete(key) and "Completed rows collapsed — click to expand" or "Completed rows shown — click to collapse", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function()
+            local active = MR:IsModuleHideComplete(key)
+            btn:SetBackdropColor(0.05, 0.10, 0.18, 1)
+            btn:SetBackdropBorderColor(active and 0.15 or 0.35, active and 0.32 or 0.12, active and 0.38 or 0.12, 1)
+            fs:SetTextColor(active and 0.45 or 0.55, active and 0.75 or 0.25, active and 0.70 or 0.25)
+            GameTooltip:Hide()
+        end)
+        return btn
+    end
+
     for _, mod in ipairs(self.modules) do
         local key = mod.key
         local optVisible = not mod.isVisible or mod:isVisible()
 
         if mod.profSkillLine then
             if MR.playerProfessions[mod.profSkillLine] then
-                local fr = CreateFrame("Frame", nil, body)
-                fr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
-                fr:SetSize(192, 20)
-                local dot = fr:CreateTexture(nil, "ARTWORK")
-                dot:SetSize(8, 8)
-                dot:SetPoint("LEFT", fr, "LEFT", 6, 0)
-                dot:SetColorTexture(0.16, 0.78, 0.75, 1)
-                local lbl = fr:CreateFontString(nil, "OVERLAY")
+                local ROW_H = 22
+                local headerFr = CreateFrame("Frame", nil, body)
+                headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
+                headerFr:SetSize(196, ROW_H)
+
+                local cb = CreateFrame("CheckButton", nil, headerFr, "UICheckButtonTemplate")
+                cb:SetSize(20, 20)
+                cb:SetPoint("LEFT", headerFr, "LEFT", 0, 0)
+                cb:SetChecked(MR:IsModuleEnabled(key))
+                cb:SetScript("OnClick", function(s)
+                    MR:SetModuleEnabled(key, s:GetChecked())
+                end)
+
+                local hideBtn = BuildHideCompleteBtn(headerFr, key, headerFr)
+
+                local lbl = headerFr:CreateFontString(nil, "OVERLAY")
                 lbl:SetFont(FONT_ROWS, 10, "OUTLINE")
-                lbl:SetPoint("LEFT", fr, "LEFT", 20, 0)
+                lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+                lbl:SetPoint("RIGHT", hideBtn, "LEFT", -2, 0)
                 lbl:SetText(mod.label)
+                lbl:SetJustifyH("LEFT")
                 if mod.labelColor then lbl:SetTextColor(hex(mod.labelColor)) else lbl:SetTextColor(0.88, 0.88, 0.88) end
-                local note = fr:CreateFontString(nil, "OVERLAY")
-                note:SetFont(FONT_ROWS, 8, "OUTLINE")
-                note:SetPoint("RIGHT", fr, "RIGHT", -4, 0)
-                note:SetText("auto")
-                note:SetTextColor(0.4, 0.4, 0.4)
-                yOff = yOff - 22
+
+                yOff = yOff - ROW_H
             end
 
         elseif optVisible then
@@ -1124,7 +1255,7 @@ function MR:PopulateConfigFrame(f)
             local lbl = headerFr:CreateFontString(nil, "OVERLAY")
             lbl:SetFont(FONT_ROWS, 10, "OUTLINE")
             lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-            lbl:SetPoint("RIGHT", headerFr, "RIGHT", -20, 0)
+            lbl:SetPoint("RIGHT", headerFr, "RIGHT", -40, 0)
             lbl:SetText(mod.label)
             lbl:SetJustifyH("LEFT")
             if mod.labelColor then lbl:SetTextColor(hex(mod.labelColor)) else lbl:SetTextColor(0.88, 0.88, 0.88) end
@@ -1149,12 +1280,18 @@ function MR:PopulateConfigFrame(f)
                 arrowBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
                 arrowBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
                 arrowLbl:SetTextColor(1, 1, 1)
+                GameTooltip:SetOwner(arrowBtn, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Expand/collapse rows", 1, 1, 1)
+                GameTooltip:Show()
             end)
             arrowBtn:SetScript("OnLeave", function()
                 arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                 arrowBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
                 arrowLbl:SetTextColor(0.45, 0.75, 0.70)
+                GameTooltip:Hide()
             end)
+
+            BuildHideCompleteBtn(headerFr, key, arrowBtn)
 
             yOff = yOff - ROW_H
 
@@ -1255,7 +1392,7 @@ function MR:PopulateConfigFrame(f)
     end)
     Btn("Reset Everything", function()
         MR.db.char.progress = {}
-        MR:ScanQuests()
+        MR:Scan()
         MR:PopulateConfigFrame(f)
     end)
     Btn("Reset Section Order", function()

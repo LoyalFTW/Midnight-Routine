@@ -1,25 +1,11 @@
 local PREY_COLOR = "|cffcc2244"
-local PREY_REMNANTS_CURRENCY = 3392
 
 MR:RegisterModule({
-    key             = "prey",
-    label           = "Prey System",
-    labelColor      = "#cc2244",
-    resetType       = "weekly",
-    defaultOpen     = true,
-    currencyTracked = true,
-
-    onScan = function(mod)
-        local db = MR.db.char.progress
-        if not db[mod.key] then db[mod.key] = {} end
-        local p = db[mod.key]
-
-        if PREY_REMNANTS_CURRENCY ~= 0 then
-            local info = C_CurrencyInfo.GetCurrencyInfo(PREY_REMNANTS_CURRENCY)
-            if info then p["prey_remnants"] = info.quantity or 0 end
-        end
-    end,
-
+    key         = "prey",
+    label       = "Prey System",
+    labelColor  = "#cc2244",
+    resetType   = "weekly",
+    defaultOpen = true,
     rows = {
         {
             key      = "prey_weekly_bounty",
@@ -33,12 +19,12 @@ MR:RegisterModule({
             },
         },
         {
-            key          = "prey_remnants",
-            label        = PREY_COLOR .. "Remnants of Anguish:|r",
-            max          = 99999,
-            noMax        = true,
-            note         = "Current Remnants of Anguish",
-            spellTracked = true,
+            key        = "prey_remnants",
+            label      = PREY_COLOR .. "Remnants of Anguish:|r",
+            currencyId = 3392,
+            max        = 99999,
+            noMax      = true,
+            note       = "Current Remnants of Anguish",
         },
     },
 })

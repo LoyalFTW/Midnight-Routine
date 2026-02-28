@@ -1,7 +1,34 @@
-
-
 local LDB     = LibStub("LibDataBroker-1.1")
 local LDBIcon = LibStub("LibDBIcon-1.0")
+
+local GLOW_PULSE_INTERVAL = 1.5
+
+local glowTimer
+
+local function StartGlow()
+    local shine = MR.cfgShine
+    if not shine then return end
+    shine:Play()
+    if glowTimer then glowTimer:Cancel() end
+    glowTimer = C_Timer.NewTicker(GLOW_PULSE_INTERVAL, function()
+        if not MR.db or MR.db.profile.firstSeen then
+            MR:DismissFirstTimeGlow()
+        end
+    end)
+end
+
+function MR:DismissFirstTimeGlow()
+    if not self.db or self.db.profile.firstSeen then return end
+    self.db.profile.firstSeen = true
+    if glowTimer then
+        glowTimer:Cancel()
+        glowTimer = nil
+    end
+    local shine = self.cfgShine
+    if shine then
+        shine:Stop()
+    end
+end
 
 local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     type = "launcher",
@@ -32,7 +59,6 @@ local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     end,
 })
 
-
 local mmLoader = CreateFrame("Frame")
 mmLoader:RegisterEvent("PLAYER_LOGIN")
 mmLoader:SetScript("OnEvent", function(self)
@@ -40,6 +66,12 @@ mmLoader:SetScript("OnEvent", function(self)
 
     if not LDBIcon:IsRegistered("MidnightRoutine") then
         LDBIcon:Register("MidnightRoutine", minimapObject, MR.db.profile.minimap)
+    end
+
+    if not MR.db.profile.firstSeen then
+        C_Timer.After(2.0, function()
+            StartGlow()
+        end)
     end
 end)
 
