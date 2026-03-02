@@ -298,11 +298,13 @@ end
 
 function MR:GetCurrentWeekKey()
     local secondsUntilReset = C_DateAndTime.GetSecondsUntilWeeklyReset()
+    if not secondsUntilReset or secondsUntilReset <= 0 then return nil end
     return math.floor((GetServerTime() + secondsUntilReset) / 604800)
 end
 
 function MR:CheckWeeklyReset()
     local currentWeek = self:GetCurrentWeekKey()
+    if not currentWeek then return end
     if self.db.char.lastWeek ~= currentWeek then
         self.db.char.lastWeek = currentWeek
         self:DoWeeklyReset()
@@ -353,7 +355,6 @@ function MR:OnEnable()
 end
 
 function MR:OnEnteringWorld()
-    self:CheckWeeklyReset()
     self:RefreshPlayerProfessions()
     self:BuildSpellIndex()
 
@@ -382,6 +383,7 @@ function MR:OnEnteringWorld()
         self:ScheduleTimer(function() self:ToggleRenown() end, 1.5)
     end
     self:ScheduleTimer(function()
+        self:CheckWeeklyReset()
         self:RefreshPlayerProfessions()
         self:RefreshUI()
     end, 0.5)
