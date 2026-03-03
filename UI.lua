@@ -385,7 +385,6 @@ function MR:BuildUI()
     self.widgets         = {}
     self.sectionRegistry = {}
 
-    -- Resize dragger (bottom-right corner)
     local dragger = CreateFrame("Frame", nil, f)
     dragger:SetSize(12, 12)
     dragger:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
