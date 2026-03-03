@@ -723,6 +723,9 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
         GameTooltip:SetOwner(rowFrame, "ANCHOR_RIGHT")
         GameTooltip:SetText(row.label, 1, 1, 1, 1, true)
         if row.note then GameTooltip:AddLine(row.note, 0.7, 0.7, 0.7, true) end
+        if row.tooltipFunc then
+            row.tooltipFunc(GameTooltip)
+        end
         if row.liveKey then
             GameTooltip:AddLine("Auto-tracked via Blizzard API", 0.4, 0.8, 1)
         elseif row.questIds then

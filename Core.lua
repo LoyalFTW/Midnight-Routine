@@ -281,7 +281,7 @@ function MR:Scan()
         if mdb then
             for _, row in ipairs(mod.rows) do
                 if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
-                    local capped = math.min(mdb[row.liveKey], row.max)
+                    local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
                     if mdb[row.key] ~= capped then mdb[row.key] = capped; dirty = true end
                 end
                 if row.liveTierLabelKey and mdb[row.liveTierLabelKey] then
@@ -336,6 +336,10 @@ function MR:OnEnable()
     }, 1, "Scan")
 
     self:RegisterBucketEvent({
+        "AREA_POIS_UPDATED",
+    }, 2, "Scan")
+
+    self:RegisterBucketEvent({
         "SKILL_LINES_CHANGED",
         "TRADE_SKILL_LIST_UPDATE",
         "SKILL_LINE_SPECS_RANKS_CHANGED",
@@ -388,6 +392,7 @@ function MR:OnEnteringWorld()
         self:RefreshPlayerProfessions()
         self:RefreshUI()
     end, 0.5)
+    self:ScheduleTimer(function() self:Scan() end, 5)
     self:Scan()
 end
 
@@ -408,6 +413,7 @@ function MR:OnVaultEvent()
 end
 
 function MR:OnZoneChanged()
+    self:Scan()
     self:RefreshUI()
 end
 
