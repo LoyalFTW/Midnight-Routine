@@ -706,9 +706,20 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
             GameTooltip:SetOwner(rowFrame, "ANCHOR_RIGHT")
             GameTooltip:SetText("Done: " .. row.label, 0.4, 0.85, 0.4, 1, true)
             GameTooltip:AddLine("Completed this week", 0.3, 0.6, 0.3)
+            if not isAutoTracked then
+                GameTooltip:AddLine("Right-click: -1", 0.5, 0.5, 0.5)
+            end
             GameTooltip:Show()
         end)
         rowFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        if not isAutoTracked then
+            rowFrame:SetScript("OnMouseDown", function(_, button)
+                if button == "RightButton" then
+                    MR:BumpProgress(mod.key, row.key, -1, row.max)
+                end
+            end)
+        end
 
         table.insert(self.widgets, rowFrame)
         return yOff + rowH
