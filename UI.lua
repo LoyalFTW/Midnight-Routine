@@ -766,6 +766,7 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
     lbl:SetPoint("LEFT",  rowFrame, "LEFT",  PADDING + 10, 0)
     lbl:SetPoint("RIGHT", rowFrame, "RIGHT", -52, 0)
     lbl:SetJustifyH("LEFT")
+    lbl:SetWordWrap(false)
     lbl:SetText(row.label)
     if isComplete then lbl:SetTextColor(0.38, 0.38, 0.38) end
 
