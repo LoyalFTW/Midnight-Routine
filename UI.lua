@@ -250,12 +250,18 @@ function MR:BuildUI()
 
     local function ApplyMinimizeState()
         if MR.db.profile.minimized then
-            local left = f:GetLeft()
-            local top  = f:GetTop()
-            if left and top then
+            local left   = f:GetLeft()
+            local top    = f:GetTop()
+            local bottom = f:GetBottom()
+            if left and top and bottom then
                 f:ClearAllPoints()
-                f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
-                MR.db.profile.position = { point = "TOPLEFT", relPoint = "BOTTOMLEFT", x = left, y = top }
+                if MR.db.profile.minimizeDown then
+                    f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+                    MR.db.profile.position = { point = "BOTTOMLEFT", relPoint = "BOTTOMLEFT", x = left, y = bottom }
+                else
+                    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+                    MR.db.profile.position = { point = "TOPLEFT", relPoint = "BOTTOMLEFT", x = left, y = top }
+                end
             end
             if MR.scroll       then MR.scroll:Hide()       end
             if MR._scrollBg    then MR._scrollBg:Hide()    end
@@ -921,6 +927,9 @@ function MR:PopulateConfigFrame(f)
     Checkbox("Hide Minimap Icon",
         function() return MR.db.profile.minimap and MR.db.profile.minimap.hide or false end,
         function(v) MR:SetMinimapHidden(v) end)
+    Checkbox("Minimize Down",
+        function() return MR.db.profile.minimizeDown end,
+        function(v) MR.db.profile.minimizeDown = v end)
 
     Gap(6)
     yOff = MR_OptionsSlider(body, yOff, "WIDTH", PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, 10,

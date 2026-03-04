@@ -18,6 +18,7 @@ local DEFAULTS = {
         fontSize        = 11,
         panelOpen       = true,
         minimap         = { hide = false },
+        minimizeDown    = false,
         firstSeen       = false,
         modules         = {},
         moduleOrder     = {},
