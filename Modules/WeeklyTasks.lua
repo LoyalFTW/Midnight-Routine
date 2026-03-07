@@ -177,7 +177,7 @@ MR:RegisterModule({
             key      = "stand_your_ground",
             label    = L["Weekly_Stand_Label"],
             max      = 1,
-            questIds = { 94581 },
+            questIds = { 92365, 94581 },
         },
         {
             key      = "unity_against_void",

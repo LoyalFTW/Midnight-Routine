@@ -106,6 +106,10 @@ function MR:BuildUI()
     f:SetScale(MR.db.profile.scale or 1)
     self.frame = f
 
+    f:SetScript("OnShow", function()
+        MR:Scan()
+    end)
+
     local HEADER_H = 24
 
     local scrollBg = f:CreateTexture(nil, "BACKGROUND")
