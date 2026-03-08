@@ -94,7 +94,7 @@ MR:RegisterModule({
             label    = L["Weekly_Favor_Label"],
             max      = 1,
             note     = L["Weekly_Favor_Note"],
-            questIds = { 89289 },
+            questIds = { 89289, 90573, 90574, 90575, 90576 },
             tooltipFunc = function(tip)
                 local SUBFACTIONS = {
                     { quest = 90573, name = L["Magisters"]       },
@@ -104,15 +104,19 @@ MR:RegisterModule({
                 }
 
                 local chosenFaction = nil
+                local factionDone   = false
                 for _, f in ipairs(SUBFACTIONS) do
-                    if C_QuestLog.IsQuestFlaggedCompleted(f.quest) or C_QuestLog.IsOnQuest(f.quest) then
+                    if C_QuestLog.IsQuestFlaggedCompleted(f.quest) then
                         chosenFaction = f.name
+                        factionDone   = true
                         break
+                    elseif not chosenFaction and C_QuestLog.IsOnQuest(f.quest) then
+                        chosenFaction = f.name
                     end
                 end
 
                 tip:AddLine(" ")
-                if C_QuestLog.IsQuestFlaggedCompleted(89289) then
+                if C_QuestLog.IsQuestFlaggedCompleted(89289) or factionDone then
                     tip:AddLine(L["Tooltip_Done_Choice"], 1, 1, 1)
                     tip:AddLine("  " .. (chosenFaction or L["Tooltip_SubfactionSelected"]), 0.4, 0.85, 0.4)
                 elseif chosenFaction then
