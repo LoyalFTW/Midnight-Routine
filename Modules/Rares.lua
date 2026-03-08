@@ -870,7 +870,7 @@ PopulateRaresConfig = function(f)
         yOff = yOff - 22
     end
 
-    Slider(L["BACKGROUND"], 0.3, 1, 0.05,
+    Slider(L["BACKGROUND"], 0, 1, 0.05,
         function() return db.raresAlpha or 1.0 end,
         function(v)
             db.raresAlpha = v
