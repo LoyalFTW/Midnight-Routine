@@ -191,7 +191,7 @@ L["Leatherworking"] = "Lederverarbeitung"
 L["Mining"] = "Bergbau"
 L["Skinning"] = "Kürschnerei"
 L["Tailoring"] = "Schneiderei"
-
+L["Prof_Catchup"] = "|cff33bbffCatch-Up Knowledge:|r"
 L["Alch_Quest"] = "|cff33bbffWöchentliche Quest:|r"
 L["Alch_Drops"] = "|cff33bbffWöchentliche Drops - Spore/Cruor:|r"
 L["Alch_Treatise"] = "|cff33bbffThalassische abhandlung:|r"
