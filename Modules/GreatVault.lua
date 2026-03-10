@@ -32,9 +32,9 @@ end
 
 local function SlotLine(tt, slotNum, count, threshold)
     if count >= threshold then
-        tt:AddLine(string.format("  Slot %d  |cff40e080\xe2\x9c\x93 Unlocked|r", slotNum), 1, 1, 1)
+        tt:AddLine(string.format(L["Vault_TT_Slot_Unlocked"], slotNum), 1, 1, 1)
     else
-        tt:AddLine(string.format("  Slot %d  %d / %d needed", slotNum, count, threshold), 0.55, 0.55, 0.55)
+        tt:AddLine(string.format(L["Vault_TT_Slot_Needed"], slotNum, count, threshold), 0.55, 0.55, 0.55)
     end
 end
 
