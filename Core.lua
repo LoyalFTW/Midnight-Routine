@@ -449,15 +449,20 @@ end
 
 local TURN_IN_COMPLETIONS = {
     [89268] = { mod = "s1_weekly",           row = "lost_legends"        },
-    [91629] = { mod = "s1_weekly",           row = "high_esteem"          },
-    [93889] = { mod = "s1_weekly",           row = "saltherils_soiree"    },
-    [91966] = { mod = "s1_weekly",           row = "saltherils_soiree"    },
-    [93909] = { mod = "s1_weekly",           row = "unity_against_void"   },
-    [93911] = { mod = "s1_weekly",           row = "unity_against_void"   },
-    [93912] = { mod = "s1_weekly",           row = "unity_against_void"   },
-    [93910] = { mod = "s1_weekly",           row = "unity_against_void"   },
-    [92365] = { mod = "midnight_activities", row = "stormarion_assault"   },
-    [94581] = { mod = "midnight_activities", row = "stormarion_assault"   },
+    [89289] = { mod = "s1_weekly",           row = "saltherils_soiree"   },
+    [93889] = { mod = "s1_weekly",           row = "saltherils_soiree"   },
+    [91966] = { mod = "s1_weekly",           row = "saltherils_soiree"   },
+    [90573] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+    [90574] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+    [90575] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+    [90576] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+    [93744] = { mod = "s1_weekly",           row = "unity_against_void"  },
+    [93909] = { mod = "s1_weekly",           row = "unity_against_void"  },
+    [93911] = { mod = "s1_weekly",           row = "unity_against_void"  },
+    [93912] = { mod = "s1_weekly",           row = "unity_against_void"  },
+    [93910] = { mod = "s1_weekly",           row = "unity_against_void"  },
+    [90962] = { mod = "midnight_activities", row = "stormarion_assault"  },
+    [94835] = { mod = "pvp_weeklies",        row = "early_training"      },
 }
 
 local WEEKLY_RESET_SCHEDULE = {

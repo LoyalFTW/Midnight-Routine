@@ -65,20 +65,17 @@ MR:RegisterModule({
             questIds = { 89507 },
         },
         {
-            key   = "lost_legends",
-            label = L["Weekly_Legends_Label"],
-            max   = 1,
-        },
-        {
-            key   = "high_esteem",
-            label = L["Weekly_Esteem_Label"],
-            max   = 1,
+            key      = "lost_legends",
+            label    = L["Weekly_Legends_Label"],
+            max      = 1,
+            questIds = { 89268 }, 
         },
         {
             key      = "saltherils_soiree",
             label    = L["Weekly_Soiree_Label"],
             max      = 1,
             note     = L["Weekly_Soiree_Note"],
+            questIds = { 89289 }, 
             tooltipFunc = function(tip)
                 local variants = {
                     { quest = 93889, name = "Midnight: Saltheril's Soiree" },
@@ -117,12 +114,58 @@ MR:RegisterModule({
             end,
         },
         {
+            key      = "fortify_runestones",
+            label    = L["Weekly_Fortify_Label"],
+            max      = 1,
+            note     = L["Weekly_Fortify_Note"],
+            questIds = { 90573, 90574, 90575, 90576 },
+
+            tooltipFunc = function(tip)
+                local variants = {
+                    { quest = 90573, name = L["Magisters"]                },
+                    { quest = 90574, name = L["Subfaction_BloodKnights"]  },
+                    { quest = 90575, name = L["Farstriders"]              },
+                    { quest = 90576, name = L["Subfaction_ShadesOfTheRow"] },
+                }
+                local completedName, activeName = nil, nil
+                for _, v in ipairs(variants) do
+                    if C_QuestLog.IsQuestFlaggedCompleted(v.quest) then
+                        completedName = v.name; break
+                    end
+                end
+                if not completedName then
+                    for _, v in ipairs(variants) do
+                        if C_QuestLog.IsOnQuest(v.quest) then
+                            activeName = v.name; break
+                        end
+                    end
+                end
+                tip:AddLine(" ")
+                if completedName then
+                    tip:AddLine(L["Tooltip_Done_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. completedName, 0.4, 0.85, 0.4)
+                elseif activeName then
+                    tip:AddLine(L["Tooltip_Active_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. activeName, 1, 0.9, 0.3)
+                else
+                    tip:AddLine(L["Tooltip_No_Subfaction"], 1, 1, 1)
+                    tip:AddLine(L["Tooltip_Visit_Haven"], 0.7, 0.7, 0.7)
+                end
+            end,
+        },
+        {
             key      = "unity_against_void",
             label    = L["Weekly_Unity_Label"],
             max      = 1,
             note     = L["Weekly_Unity_Note"],
+            questIds = { 93744 },
+
+            isVisible = function()
+                return C_QuestLog.IsOnQuest(93744) or C_QuestLog.IsQuestFlaggedCompleted(93744)
+            end,
 
             tooltipFunc = function(tip)
+                local metaDone = C_QuestLog.IsQuestFlaggedCompleted(93744)
                 local activeName = nil
                 for _, b in ipairs({
                     { quest = 93909, name = L["Unity_Delves"]   },
@@ -137,7 +180,9 @@ MR:RegisterModule({
                 end
 
                 tip:AddLine(" ")
-                if activeName then
+                if metaDone then
+                    tip:AddLine(L["Tooltip_Done_Variant"], 1, 1, 1)
+                elseif activeName then
                     tip:AddLine(L["Tooltip_Active_Progress"], 1, 1, 1)
                     tip:AddLine("  " .. activeName, 1, 0.9, 0.3)
                 else

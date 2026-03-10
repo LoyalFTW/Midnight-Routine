@@ -14,6 +14,7 @@ local QUEST_PRESERVING_BATTLE     = 80184
 local QUEST_PRESERVING_SOLO       = 80185
 local QUEST_PRESERVING_SKIRMISHES = 80187
 local QUEST_PRESERVING_ARENAS     = 80188
+local QUEST_EARLY_TRAINING        = 94835
 
 MR:RegisterModule({
     key         = "pvp_currencies",
@@ -123,6 +124,13 @@ MR:RegisterModule({
             max      = 1,
             note     = L["PvP_Battle_Note"],
             questIds = { QUEST_PRESERVING_BATTLE },
+        },
+        {
+            key      = "early_training",
+            label    = L["PvP_Training_Label"],
+            max      = 1,
+            note     = L["PvP_Training_Note"],
+            questIds = { QUEST_EARLY_TRAINING },
         },
     },
 })
