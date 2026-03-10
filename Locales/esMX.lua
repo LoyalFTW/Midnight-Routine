@@ -446,3 +446,7 @@ L["WB_Echo_Note"] = "Jefe de Mundo — Azj-Kahet"
 L["TW_DungeonTitle"] = "Mazmorra"
 L["TW_Weekly_Label"] = "|cff66ccffSemanal de Paseo en el Tiempo:|r"
 L["TW_Weekly_Note"] = "Completa 5 mazmorras de Paseo en el Tiempo para el alijo semanal"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

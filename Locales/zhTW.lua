@@ -446,3 +446,7 @@ L["WB_Echo_Note"] = "世界首領 — 阿茲卡罕特"
 L["TW_DungeonTitle"] = "地下城"
 L["TW_Weekly_Label"] = "|cff66ccff時光漫遊每週任務：|r"
 L["TW_Weekly_Note"] = "完成5個時光漫遊地下城以獲取每週任務寶箱"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

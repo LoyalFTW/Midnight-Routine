@@ -458,3 +458,7 @@ L["WB_Echo_Note"] = "Weltboss - Azj-Kahet"
 L["TW_DungeonTitle"] = "Dungeon"
 L["TW_Weekly_Label"] = "|cff66ccffZeitwanderungs-Woche:|r"
 L["TW_Weekly_Note"] = "Schließe 5 Zeitwanderungs-Dungeons für die wöchentliche Truhe ab"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

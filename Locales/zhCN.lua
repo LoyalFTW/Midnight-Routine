@@ -446,3 +446,7 @@ L["WB_Echo_Note"] = "世界首领 — 艾基-卡赫特"
 L["TW_DungeonTitle"] = "地下城"
 L["TW_Weekly_Label"] = "|cff66ccff时空漫游周常：|r"
 L["TW_Weekly_Note"] = "完成5个时空漫游地下城以获取周常宝箱"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

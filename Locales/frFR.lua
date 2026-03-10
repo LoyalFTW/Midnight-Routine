@@ -444,3 +444,7 @@ L["WB_Echo_Note"] = "Boss mondial — Azj-Kahet"
 L["TW_DungeonTitle"] = "Donjon"
 L["TW_Weekly_Label"] = "|cff66ccffHebdomadaire des Marcheurs du temps :|r"
 L["TW_Weekly_Note"] = "Terminer 5 donjons des Marcheurs du temps pour la cache hebdomadaire"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

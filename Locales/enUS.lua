@@ -453,3 +453,7 @@ L["WB_Echo_Note"] = "World Boss — Azj-Kahet"
 L["TW_DungeonTitle"] = "Dungeon"
 L["TW_Weekly_Label"] = "|cff66ccffTimewalking Weekly:|r"
 L["TW_Weekly_Note"] = "Complete 5 Timewalking dungeons for the weekly cache"
+
+-- UI Timer Labels
+L["Timer_Live"] = "LIVE · "
+L["Timer_Next"] = "Next · "

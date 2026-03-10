@@ -893,7 +893,6 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
     lbl:SetPoint("LEFT",  rowFrame, "LEFT",  PADDING + 10, 0)
     lbl:SetPoint("RIGHT", rowFrame, "RIGHT", lblRightOff, 0)
     lbl:SetJustifyH("LEFT")
-
     local rowCustom    = MR:GetRowColor(mod.key, row.key)
     local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local effectiveColor = rowCustom or headerCustom
@@ -954,15 +953,15 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
             local offset = (now - row.timerEpoch) % row.timerInterval
             if offset < row.timerDuration then
                 local rem = row.timerDuration - offset
-                countFS:SetText("LIVE \xc2\xb7 " .. FormatMMSS(rem))
+                countFS:SetText(L["Timer_Live"] .. FormatMMSS(rem))
                 countFS:SetTextColor(0.25, 0.88, 0.50, 1)
             else
                 local rem = row.timerInterval - offset
-                countFS:SetText("Next \xc2\xb7 " .. FormatMMSS(rem))
+                countFS:SetText(L["Timer_Next"] .. FormatMMSS(rem))
                 countFS:SetTextColor(0.55, 0.55, 0.55, 1)
             end
         end
-        UpdateTimer()  
+        UpdateTimer() 
         rowFrame._timerUpdate = UpdateTimer
         table.insert(MR._timerRows, rowFrame)
     end
