@@ -688,7 +688,8 @@ function MR:BuildSection(mod, yOff, xOff, colW, col)
     lbl:SetFont(FONT_HEADERS, GetFontSize(), "OUTLINE")
     lbl:SetPoint("LEFT", hdrFrame, "LEFT", 8, 0)
     local customColor = MR:GetHeaderColor(mod.key)
-    lbl:SetText(allDone
+    local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
+    lbl:SetText((allDone and not explicitColor)
         and WC("00ff96", mod.label)
         or  WC((customColor or mod.labelColor or "#ffffff"):gsub("#",""), mod.label))
 
@@ -892,8 +893,27 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW)
     lbl:SetPoint("LEFT",  rowFrame, "LEFT",  PADDING + 10, 0)
     lbl:SetPoint("RIGHT", rowFrame, "RIGHT", lblRightOff, 0)
     lbl:SetJustifyH("LEFT")
-    lbl:SetText(row.label)
-    if isComplete then lbl:SetTextColor(0.38, 0.38, 0.38) end
+
+    local rowCustom    = MR:GetRowColor(mod.key, row.key)
+    local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
+    local effectiveColor = rowCustom or headerCustom
+
+    if isComplete then
+        local cleanLabel = row.label:gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
+        lbl:SetText(cleanLabel)
+        if effectiveColor then
+            local cr, cg, cb = hex(effectiveColor)
+            lbl:SetTextColor(cr * 0.45, cg * 0.45, cb * 0.45)
+        else
+            lbl:SetTextColor(0.38, 0.38, 0.38)
+        end
+    elseif effectiveColor then
+        local cleanLabel = row.label:gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
+        lbl:SetText(cleanLabel)
+        lbl:SetTextColor(hex(effectiveColor))
+    else
+        lbl:SetText(row.label)
+    end
 
     local countFS = rowFrame:CreateFontString(nil, "OVERLAY")
     countFS:SetFont(FONT_ROWS, GetFontSize(), "OUTLINE")
@@ -1615,22 +1635,28 @@ function MR:PopulateConfigFrame(f)
                     local rdot = rowFr:CreateTexture(nil, "ARTWORK")
                     rdot:SetSize(5, 5)
                     rdot:SetPoint("LEFT", rowFr, "LEFT", 0, 0)
-                    local customColor = MR:GetHeaderColor(key)
-                    if customColor or mod.labelColor then
-                        rdot:SetColorTexture(hex(customColor or mod.labelColor))
-                    else
-                        rdot:SetColorTexture(0.4, 0.4, 0.4, 1)
-                    end
+                    rdot:SetColorTexture(hex(MR:GetRowColor(key, rkey) or MR:GetHeaderColor(key)))
                     rdot:SetAlpha(enabled and 0.8 or 0.25)
 
                     local cleanLabel = row.label:gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
                     local rlbl = rowFr:CreateFontString(nil, "OVERLAY")
                     rlbl:SetFont(FONT_ROWS, 9, "OUTLINE")
                     rlbl:SetPoint("LEFT", rowFr, "LEFT", 10, 0)
-                    rlbl:SetPoint("RIGHT", rowFr, "RIGHT", -20, 0)
+                    rlbl:SetPoint("RIGHT", rowFr, "RIGHT", -32, 0)
                     rlbl:SetJustifyH("LEFT")
                     rlbl:SetText(cleanLabel)
-                    rlbl:SetTextColor(enabled and 0.80 or 0.35, enabled and 0.80 or 0.35, enabled and 0.80 or 0.35)
+                    if not enabled then
+                        rlbl:SetTextColor(0.35, 0.35, 0.35)
+                    else
+                        local rRowCustom    = MR:GetRowColor(key, rkey)
+                        local rHeaderCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[key]
+                        local rEffective    = rRowCustom or rHeaderCustom
+                        if rEffective then
+                            rlbl:SetTextColor(hex(rEffective))
+                        else
+                            rlbl:SetTextColor(0.80, 0.80, 0.80)
+                        end
+                    end
 
                     local eyeBtn = CreateFrame("Button", nil, rowFr, "BackdropTemplate")
                     eyeBtn:SetSize(14, 14)
@@ -1676,6 +1702,20 @@ function MR:PopulateConfigFrame(f)
                         GameTooltip:Hide()
                     end)
 
+                    local rsr, rsg, rsb = hex(MR:GetRowColor(key, rkey) or MR:GetHeaderColor(key))
+                    local rowSwatch = MR_OptionsColorSwatch(rowFr, rsr, rsg, rsb,
+                        function(nr, ng, nb)
+                            local hx = string.format("#%02x%02x%02x", nr*255, ng*255, nb*255)
+                            MR:SetRowColor(key, rkey, hx)
+                        end,
+                        function()
+                            MR:ResetRowColor(key, rkey)
+                            return hex(MR:GetHeaderColor(key))
+                        end,
+                        L["Config_RowColor"])
+                    rowSwatch:SetSize(14, 14)
+                    rowSwatch:SetPoint("RIGHT", eyeBtn, "LEFT", -2, 0)
+
                     yOff = yOff - 19
                 end
 
@@ -1692,11 +1732,13 @@ function MR:PopulateConfigFrame(f)
     Btn(L["Config_ResetEverything"], function()
         MR.db.char.progress = {}
         MR.db.profile.headerColors = {}
+        MR.db.profile.rowColors = {}
         MR:Scan()
         MR:PopulateConfigFrame(f)
     end)
     Btn(L["Config_ResetColors"], function()
         MR.db.profile.headerColors = {}
+        MR.db.profile.rowColors = {}
         MR:RefreshUI()
         MR:PopulateConfigFrame(f)
     end)

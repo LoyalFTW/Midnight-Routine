@@ -67,6 +67,7 @@ local DEFAULTS = {
         gatheringProfColors  = {},
             gatheringHideCompleted = false,
         headerColors    = {},
+        rowColors       = {},
         syncWindowScale     = false,
         syncWindowFontSize  = false,
         peekOnHover         = false,
@@ -253,6 +254,7 @@ function MR:SetHeaderColor(modKey, hexColor)
     end
     self.db.profile.headerColors[modKey] = hexColor
     self:RefreshUI()
+    self:RepopulateConfigFrame()
 end
 
 function MR:ResetHeaderColor(modKey)
@@ -260,6 +262,30 @@ function MR:ResetHeaderColor(modKey)
         self.db.profile.headerColors[modKey] = nil
     end
     self:RefreshUI()
+end
+
+function MR:GetRowColor(modKey, rowKey)
+    local p = self.db.profile.rowColors
+    if p and p[modKey] and p[modKey][rowKey] then
+        return p[modKey][rowKey]
+    end
+end
+
+function MR:SetRowColor(modKey, rowKey, hexColor)
+    if not self.db.profile.rowColors then self.db.profile.rowColors = {} end
+    if not self.db.profile.rowColors[modKey] then self.db.profile.rowColors[modKey] = {} end
+    self.db.profile.rowColors[modKey][rowKey] = hexColor
+    self:RefreshUI()
+    self:RepopulateConfigFrame()
+end
+
+function MR:ResetRowColor(modKey, rowKey)
+    local p = self.db.profile.rowColors
+    if p and p[modKey] then
+        p[modKey][rowKey] = nil
+    end
+    self:RefreshUI()
+    self:RepopulateConfigFrame()
 end
 
 local PARENT_TO_MIDNIGHT = {
