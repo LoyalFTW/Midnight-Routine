@@ -39,7 +39,7 @@ MR:RegisterModule({
 
     rows = {
         { key = "dmf_dungeon",  label = L["DMF_Dungeon_Label"],  max = 1, note = L["DMF_Dungeon_Note"],  questIds = { 29525 } },
-        { key = "dmf_tonk",     label = L["DMF_Tonk_Label"],     max = 1, note = L["DMF_Tonk_Note"],     questIds = { 29520 } },
+        { key = "dmf_tonk",     label = L["DMF_Tonk_Label"],     max = 1, note = L["DMF_Tonk_Note"],     questIds = { 29434 } },
         { key = "dmf_shooting", label = L["DMF_Hammer_Label"],   max = 1, note = L["DMF_Hammer_Note"],   questIds = { 29526 } },
         { key = "dmf_ring",     label = L["DMF_Ring_Label"],     max = 1, note = L["DMF_Ring_Note"],     questIds = { 29524 } },
         { key = "dmf_cannon",   label = L["DMF_Cannon_Label"],   max = 1, note = L["DMF_Cannon_Note"],   questIds = { 29527 } },

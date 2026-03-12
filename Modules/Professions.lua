@@ -234,6 +234,7 @@ MR:RegisterModule({
         { key = "tail_notebook", spellId = 1270540, spellAmount = 2, questIds = { 93696 }, label = L["Tail_Quest"],    max = 1 },
         { key = "tail_drops",    spellId = 1264610, spellAmount = 1, label = L["Tail_Drops"],    max = 2 },
         { key = "tail_treatise", questIds = { 95137 },               label = L["Tail_Treatise"], max = 1 },
+        { key = "tail_dmf",      questIds = { 29520 },               label = L["DMF_Tail_Label"], note = L["DMF_Tail_Note"], max = 1, isVisible = function() return MR.IsDarkmoonVisible() end },
         { key = "prof_catchup", currencyId = 3190, noBlizzardTooltip = true, label = L["Prof_Catchup"], note = L["Prof_Catchup_Note"], max = 0 },
     },
 })

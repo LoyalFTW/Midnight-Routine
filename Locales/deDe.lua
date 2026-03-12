@@ -462,6 +462,8 @@ L["DMF_Mine_Label"]  = "|cffccccccMining — Rearm, Reuse, Recycle:|r"
 L["DMF_Mine_Note"]   = "3 skill points + 3 spec points"
 L["DMF_Skin_Label"]  = "|cffc8a060Skinning — Tan My Hide:|r"
 L["DMF_Skin_Note"]   = "3 skill points + 3 spec points"
+L["DMF_Tail_Label"]  = "|cffffaaddTailoring — Banners, Banners Everywhere!:|r"
+L["DMF_Tail_Note"]   = "3 skill points + 3 spec points"
 -- DMF fishing & cooking quest rows
 L["DMF_Fish_Label"]  = "|cff4499ccFishing — Spoilin' for Salty Sea Dogs:|r"
 L["DMF_Fish_Note"]   = "3 skill points"
