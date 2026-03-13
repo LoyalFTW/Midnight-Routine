@@ -708,14 +708,12 @@ function MR:RefreshUI()
     for _, mod in ipairs(MR:GetOrderedModules()) do
         local modVisible = not mod.isVisible or mod:isVisible()
         if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) then
-            local h = self:MeasureSection(mod)
-            table.insert(visibleMods, { mod = mod, h = h })
-            for _, row in ipairs(mod.rows) do
-                local rowVisible = not row.isVisible or row.isVisible()
-                if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
-                    allTotal = allTotal + 1
-                    if row.max and MR:GetProgress(mod.key, row.key) >= row.max then allDone = allDone + 1 end
-                end
+            local totalRows, doneRows, shownRows = self:GetModuleRowStats(mod)
+            if shownRows > 0 then
+                local h = self:MeasureSection(mod)
+                table.insert(visibleMods, { mod = mod, h = h })
+                allTotal = allTotal + shownRows
+                allDone = allDone + math.min(doneRows, shownRows)
             end
         end
     end
@@ -791,7 +789,8 @@ function MR:RefreshUI()
         local modVisible = not mod.isVisible or mod:isVisible()
         local detached = MR:IsModuleDetached(mod.key)
         local frame = self.detachedFrames[mod.key]
-        if detached and MR:IsModuleEnabled(mod.key) and modVisible then
+        local _, _, shownRows = self:GetModuleRowStats(mod)
+        if detached and MR:IsModuleEnabled(mod.key) and modVisible and shownRows > 0 then
             frame = self:EnsureDetachedFrame(mod)
             seenDetached[mod.key] = true
             local savedSize = self:GetDetachedModuleSize(mod.key)
@@ -846,7 +845,10 @@ end
 
 function MR:MeasureSection(mod)
     local isOpen = MR:IsModuleOpen(mod.key)
-    local hideComplete = MR:IsModuleHideComplete(mod.key)
+    local _, _, shownRows = self:GetModuleRowStats(mod)
+    if shownRows == 0 then
+        return 0
+    end
     local h = HEADER_HEIGHT + 1
     if isOpen then
         for _, row in ipairs(mod.rows) do
@@ -854,7 +856,7 @@ function MR:MeasureSection(mod)
             if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
                 local done = MR:GetProgress(mod.key, row.key)
                 local isComplete = not row.noMax and done >= row.max
-                if not (hideComplete and isComplete) then
+                if not (MR:IsModuleHideComplete(mod.key) and isComplete) then
                     h = h + ROW_HEIGHT
                 end
             end
@@ -863,19 +865,37 @@ function MR:MeasureSection(mod)
     return h
 end
 
+function MR:GetModuleRowStats(mod)
+    local hideComplete = MR:IsModuleHideComplete(mod.key)
+    local totalRows, doneRows, shownRows = 0, 0, 0
+
+    for _, row in ipairs(mod.rows) do
+        local rowVisible = not row.isVisible or row.isVisible()
+        if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
+            totalRows = totalRows + 1
+
+            local isComplete = row.max and not row.noMax and MR:GetProgress(mod.key, row.key) >= row.max
+            if isComplete then
+                doneRows = doneRows + 1
+            end
+            if not (hideComplete and isComplete) then
+                shownRows = shownRows + 1
+            end
+        end
+    end
+
+    return totalRows, doneRows, shownRows
+end
+
 function MR:BuildSection(mod, yOff, xOff, colW, col, parent, widgetBucket, opts)
     parent = parent or self.content
     widgetBucket = widgetBucket or self.widgets
     opts = opts or {}
     local isOpen = MR:IsModuleOpen(mod.key)
 
-    local secDone, secTotal = 0, 0
-    for _, row in ipairs(mod.rows) do
-        local rowVisible = not row.isVisible or row.isVisible()
-        if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
-            secTotal = secTotal + 1
-            if row.max and MR:GetProgress(mod.key, row.key) >= row.max then secDone = secDone + 1 end
-        end
+    local secTotal, secDone, shownRows = self:GetModuleRowStats(mod)
+    if shownRows == 0 then
+        return yOff
     end
     local allDone = (secTotal > 0) and (secDone == secTotal)
 
