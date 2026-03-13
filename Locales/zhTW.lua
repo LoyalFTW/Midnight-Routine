@@ -7,7 +7,7 @@ L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r 框架已鎖定。"
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r 框架已解鎖。"
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r 小地圖圖示已隱藏。"
 L["Minimap_Shown"] = "|cff2ae7c6MidnightRoutine:|r 小地圖圖示已顯示。"
-L["Chat_Commands"] = "|cff2ae7c6/mr|r 可用指令：show, hide, lock, unlock, reset, minimap, scale <0.5-2>, big, small, welcome, renown, rares, gathering"
+L["Chat_Commands"] = "|cff2ae7c6/mr|r 可用指令: show, hide, toggle, lock, unlock, reset, minimap, scale, scale <0.5-2>, big, small, welcome, renown, rares, gathering (Profession Knowledge), dmf (toggle Darkmoon test mode)"
 
 -- MinimapButton / Title
 L["Title"] = "|cff2ae7c6至暗之夜例行公事|r"

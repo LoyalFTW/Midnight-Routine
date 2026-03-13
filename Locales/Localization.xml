@@ -4,7 +4,7 @@
     <Script file="zhCN.lua"/>
 	<Script file="zhTW.lua"/>
 	<Script file="esMX.lua"/>
-	<Script file="deDe.lua"/>
+	<Script file="deDE.lua"/>
 	<Script file="ruRU.lua"/>
 </Ui>
 

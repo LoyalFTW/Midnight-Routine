@@ -912,6 +912,15 @@ SLASH_MIDROUTE1 = "/mr"
 SLASH_MIDROUTE2 = "/midroute"
 SlashCmdList["MIDROUTE"] = function(msg)
     msg = (msg or ""):lower():trim()
+    local function ApplyMainScale(value)
+        if MR.db.profile.syncWindowScale and MR.ApplyScaleToAll then
+            MR:ApplyScaleToAll(value)
+        else
+            MR.db.profile.scale = value
+            if MR.frame then MR.frame:SetScale(value) end
+        end
+    end
+
     if     msg == "reset"   then MR:DoWeeklyReset()
     elseif msg == "lock"    then
         MR.db.profile.locked = true
@@ -927,6 +936,15 @@ SlashCmdList["MIDROUTE"] = function(msg)
     elseif msg == "show"    then
         if MR.frame then MR.frame:Show() end
         MR.db.char.panelOpen = true
+    elseif msg == "toggle"  then
+        local shouldShow = not (MR.frame and MR.frame:IsShown())
+        if shouldShow then
+            if MR.frame then MR.frame:Show() end
+            MR.db.char.panelOpen = true
+        else
+            if MR.frame then MR.frame:Hide() end
+            MR.db.char.panelOpen = false
+        end
     elseif msg == "minimap" then
         local newHide = not (MR.db.profile.minimap and MR.db.profile.minimap.hide)
         MR:SetMinimapHidden(newHide)
@@ -935,11 +953,14 @@ SlashCmdList["MIDROUTE"] = function(msg)
         else
             print(L["Minimap_Shown"])
         end
+    elseif msg == "scale" or msg == "scale toggle" then
+        local current = tonumber(MR.db.profile.scale) or 1.0
+        local target = math.abs(current - 0.5) < 0.001 and 2.0 or 0.5
+        ApplyMainScale(target)
     elseif msg:match("^scale %d") then
         local s = tonumber(msg:match("scale (%S+)"))
         if s and s >= 0.5 and s <= 2 then
-            MR.db.profile.scale = s
-            if MR.frame then MR.frame:SetScale(s) end
+            ApplyMainScale(s)
         end
     elseif msg == "big"   then if MR.ApplyWidth then MR.ApplyWidth(500) end
     elseif msg == "small"   then if MR.ApplyWidth then MR.ApplyWidth(200) end

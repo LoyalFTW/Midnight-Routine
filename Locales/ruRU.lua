@@ -1,4 +1,4 @@
-local L = LibStub("AceLocale-3.0"):NewLocale("MidnightRoutine", "ruRU", true)
+local L = LibStub("AceLocale-3.0"):NewLocale("MidnightRoutine", "ruRU")
 if not L then return end
 
 -- Core / Chat (Основное / Чат)
@@ -7,7 +7,7 @@ L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r Рамка заблокиро�
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r Рамка разблокирована."
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r Иконка миникарты скрыта."
 L["Minimap_Shown"] = "|cff2ae7c6MidnightRoutine:|r Иконка миникарты показана."
-L["Chat_Commands"] = "|cff2ae7c6/mr|r команды: show, hide, lock, unlock, reset, minimap, scale <0.5-2>, big, small, welcome, renown, rares, gathering (знания профессий)"
+L["Chat_Commands"] = "|cff2ae7c6/mr|r команды: show, hide, toggle, lock, unlock, reset, minimap, scale, scale <0.5-2>, big, small, welcome, renown, rares, gathering (Profession Knowledge), dmf (toggle Darkmoon test mode)"
 
 -- MinimapButton / Title (Кнопка миникарты / Заголовок)
 L["Title"] = "|cff2ae7c6Midnight Routine|r"

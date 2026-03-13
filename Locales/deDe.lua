@@ -7,7 +7,7 @@ L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r Fenster gesperrt."
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r Fenster entsperrt."
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r Minimap-Symbol ausgeblendet."
 L["Minimap_Shown"] = "|cff2ae7c6MidnightRoutine:|r Minimap-Symbol angezeigt."
-L["Chat_Commands"] = "|cff2ae7c6/mr|r Befehle: show, hide, lock, unlock, reset, minimap, scale <0.5-2>, big, small, welcome, renown, rares, gathering"
+L["Chat_Commands"] = "|cff2ae7c6/mr|r Befehle: show, hide, toggle, lock, unlock, reset, minimap, scale, scale <0.5-2>, big, small, welcome, renown, rares, gathering (Profession Knowledge), dmf (toggle Darkmoon test mode)"
 
 -- MinimapButton / Title
 L["Title"] = "|cff2ae7c6Midnight Routine|r"
