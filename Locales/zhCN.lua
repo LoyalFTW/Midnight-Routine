@@ -8,7 +8,7 @@ L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r 框体已解锁。"
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r 小地图图标已隐藏。"
 L["Minimap_Shown"] = "|cff2ae7c6MidnightRoutine:|r 小地图图标已显示。"
 L["Chat_Commands"] = "|cff2ae7c6/mr|r 可用命令: show, hide, toggle, main, lock, unlock, reset, minimap, scale, scale <0.5-2>, big, small, welcome, renown, rares, gathering (Profession Knowledge), dmf (toggle Darkmoon test mode)"
-L["Config_ShowMainFrame"] = "Show Main Frame"
+L["Config_ShowMainFrame"] = "显示主框体"
 
 -- MinimapButton / Title
 L["Title"] = "|cff2ae7c6至暗之夜日常|r"
