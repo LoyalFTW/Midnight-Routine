@@ -3659,13 +3659,13 @@ function MR:RefreshUI()
         self._refreshUIPending = true
         if not self._refreshUITimer then
             local delay = math.max(minRefreshInterval - (now - self._lastRefreshUIAt), 0.01)
-            self._refreshUITimer = self:ScheduleTimer(function()
+            self._refreshUITimer = C_Timer.NewTimer(delay, function()
                 self._refreshUITimer = nil
                 if self._refreshUIPending then
                     self._refreshUIPending = nil
                     self:RefreshUI()
                 end
-            end, delay)
+            end)
         end
         return
     end
@@ -3847,10 +3847,10 @@ function MR:RefreshUI()
 
     if self._refreshUIPending and not self._refreshUITimer then
         self._refreshUIPending = nil
-        self._refreshUITimer = self:ScheduleTimer(function()
+        self._refreshUITimer = C_Timer.NewTimer(minRefreshInterval, function()
             self._refreshUITimer = nil
             self:RefreshUI()
-        end, minRefreshInterval)
+        end)
     end
 
 end

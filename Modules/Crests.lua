@@ -1,6 +1,8 @@
 local _, ns = ...
 local MR = ns.MR
 
+local F = _G.Foundry_1_0
+
 local CREST_CAP = 100
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local crestRows
@@ -381,9 +383,7 @@ MR:RegisterModule({
     rows = crestRows,
 })
 
-local itemCacheFrame = CreateFrame("Frame")
-itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-itemCacheFrame:SetScript("OnEvent", function(_, _, itemID)
+F.Events:New("MidnightRoutine-Crests"):Register("GET_ITEM_INFO_RECEIVED", function(_, itemID)
     if itemID ~= 232875 then return end
     RefreshCrestItemLabels()
 end)

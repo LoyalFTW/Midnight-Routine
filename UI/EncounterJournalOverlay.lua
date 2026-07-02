@@ -115,10 +115,11 @@ do
         return false
     end
 
-    local ejHookFrame = CreateFrame("Frame")
-    ejHookFrame:RegisterEvent("ADDON_LOADED")
-    ejHookFrame:SetScript("OnEvent", function(_, event, arg1)
-        if event ~= "ADDON_LOADED" or arg1 ~= "Blizzard_EncounterJournal" then return end
+    local F = _G.Foundry_1_0
+    local ejEvents = F.Events:New("MidnightRoutine-EncounterJournalOverlay")
+    ejEvents:Register("ADDON_LOADED", function(_, arg1)
+        if arg1 ~= "Blizzard_EncounterJournal" then return end
+        ejEvents:Unregister("ADDON_LOADED")
 
         C_Timer.After(0.5, function()
             HookScrollBoxIfFound(EncounterJournal, 0)

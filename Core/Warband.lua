@@ -79,16 +79,19 @@ end
 
 
 function MR:GetCurrentCharacterKey()
-    if self.db and self.db.keys and self.db.keys.char then
-        return self.db.keys.char
-    end
-
-    local name, realm = UnitFullName and UnitFullName("player")
+    -- Foundry.DB has no db.keys introspection surface (unlike AceDB) — even
+    -- referencing self.db.keys raises, so this is the only path now. Must match
+    -- Foundry.DB's own resolveCharKey() exactly (UnitName .. " - " .. GetRealmName,
+    -- the same formula AceDB used) since self.db.sv.char is keyed by that function,
+    -- not by this one — UnitFullName is a different API with no guarantee its
+    -- output matches, and using it here would silently break sv.char lookups.
+    local name = UnitName and UnitName("player")
+    local realm = GetRealmName and GetRealmName()
     if name and realm and realm ~= "" then
         return string.format("%s - %s", name, realm)
     end
 
-    return UnitName and UnitName("player") or "Unknown"
+    return name or "Unknown"
 end
 
 function MR:GetMainFrameProgressSource()

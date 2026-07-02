@@ -70,29 +70,32 @@ local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     end,
 })
 
-local mmLoader = CreateFrame("Frame")
-mmLoader:RegisterEvent("PLAYER_LOGIN")
-mmLoader:SetScript("OnEvent", function(self)
-    self:UnregisterAllEvents()
-
-    if not MR.db or not MR.db.profile then
+-- Foundry.Lifecycle's controller allows exactly one raw OnLogin hook per
+-- controller (Core.lua already claims it for MR:OnEnable()), so this can't
+-- register a second OnLogin subscriber directly. Instead this becomes an
+-- OnEnable-time subscriber: Core.lua's OnEnable calls MR:InitMinimapButton()
+-- at login, the same "chain a module init off the single login hook" pattern
+-- Foundry-based addons use elsewhere. One-shot by construction (OnLogin only
+-- fires once), so no UnregisterAllEvents equivalent is needed.
+function MR:InitMinimapButton()
+    if not self.db or not self.db.profile then
         return
     end
 
-    MR.db.profile.minimap = MR.db.profile.minimap or { hide = false }
+    self.db.profile.minimap = self.db.profile.minimap or { hide = false }
 
     if not LDBIcon:IsRegistered("MidnightRoutine") then
-        LDBIcon:Register("MidnightRoutine", minimapObject, MR.db.profile.minimap)
+        LDBIcon:Register("MidnightRoutine", minimapObject, self.db.profile.minimap)
     end
 
-    if not MR.db.profile.firstSeen then
+    if not self.db.profile.firstSeen then
         C_Timer.After(2.0, function()
             if MR and MR.db and MR.db.profile and not MR.db.profile.firstSeen then
                 StartGlow()
             end
         end)
     end
-end)
+end
 
 function MR:SetMinimapHidden(hide)
     if not self.db or not self.db.profile then return end

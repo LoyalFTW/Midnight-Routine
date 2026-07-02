@@ -1,6 +1,8 @@
 local _, ns = ...
 local MR = ns.MR
 
+local F = _G.Foundry_1_0
+
 local cfgFrame
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
@@ -100,6 +102,11 @@ local function ReleaseConfigWidgetTree(frame)
         frame:SetScript("OnLeave", nil)
         frame:SetScript("OnMouseDown", nil)
         frame:SetScript("OnMouseUp", nil)
+
+        if frame.menuCtrl then
+            frame.menuCtrl:Destroy()
+            frame.menuCtrl = nil
+        end
     end
 
     frame:SetScript("OnUpdate", nil)
@@ -229,15 +236,6 @@ function MR:PopulateConfigFrame(f)
         row:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
         row:SetSize(contentW, 26)
 
-        local measure = row:CreateFontString(nil, "OVERLAY")
-        measure:SetFont(FONT_ROWS, cfgFs, GetFontFlags())
-        local widestLabel = 0
-        for _, choice in ipairs(choices) do
-            measure:SetText(choice.label or "")
-            widestLabel = math.max(widestLabel, measure:GetStringWidth() or 0)
-        end
-        measure:Hide()
-
         local valueBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
         valueBtn:SetSize(math.max(170, contentW - 28), 20)
         valueBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -259,50 +257,6 @@ function MR:PopulateConfigFrame(f)
         caret:SetText("v")
         caret:SetTextColor(0.78, 0.90, 0.92)
 
-        local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        popup:SetFrameStrata("DIALOG")
-        popup:SetFrameLevel(50)
-        popup:SetBackdrop(MakeBackdrop())
-        popup:SetBackdropColor(0.04, 0.09, 0.15, 0.98)
-        popup:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
-        popup:EnableMouseWheel(true)
-        popup:Hide()
-        popup.buttons = {}
-
-        local popupScroll = CreateFrame("ScrollFrame", nil, popup)
-        popupScroll:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3)
-        popupScroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -3, 3)
-        popupScroll:EnableMouseWheel(true)
-
-        local popupContent = CreateFrame("Frame", nil, popupScroll)
-        popupContent:SetSize(1, 1)
-        popupScroll:SetScrollChild(popupContent)
-
-        local scrollTrack = CreateFrame("Button", nil, popup, "BackdropTemplate")
-        scrollTrack:SetWidth(8)
-        scrollTrack:SetBackdrop(MakeBackdrop())
-        scrollTrack:SetBackdropColor(0.03, 0.07, 0.11, 0.95)
-        scrollTrack:SetBackdropBorderColor(0.12, 0.26, 0.32, 0.95)
-        scrollTrack:Hide()
-
-        local scrollThumb = CreateFrame("Button", nil, scrollTrack, "BackdropTemplate")
-        scrollThumb:SetWidth(8)
-        scrollThumb:SetBackdrop(MakeBackdrop())
-        scrollThumb:SetBackdropColor(0.20, 0.66, 0.63, 0.95)
-        scrollThumb:SetBackdropBorderColor(0.30, 0.88, 0.82, 1)
-        scrollThumb:Hide()
-
-        local dismiss = CreateFrame("Frame", nil, UIParent)
-        dismiss:SetAllPoints(UIParent)
-        dismiss:SetFrameStrata("DIALOG")
-        dismiss:SetFrameLevel(49)
-        dismiss:EnableMouse(true)
-        dismiss:Hide()
-        dismiss:SetScript("OnMouseDown", function()
-            popup:Hide()
-            dismiss:Hide()
-        end)
-
         local function ApplySelection(index, commit)
             currentIndex = index
             local selected = choices[currentIndex] or choices[1]
@@ -310,150 +264,6 @@ function MR:PopulateConfigFrame(f)
             if commit ~= false then
                 setVal(selected.value, selected)
             end
-        end
-
-        local function EnsurePopupButton(index)
-            local btn = popup.buttons[index]
-            if btn then
-                return btn
-            end
-
-            btn = CreateFrame("Button", nil, popupContent, "BackdropTemplate")
-            btn:SetHeight(18)
-            btn:SetBackdrop(MakeBackdrop())
-            btn:SetBackdropColor(0.05, 0.12, 0.20, 0.94)
-            btn:SetBackdropBorderColor(0.12, 0.26, 0.32, 0.95)
-
-            btn._label = btn:CreateFontString(nil, "OVERLAY")
-            btn._label:SetFont(FONT_ROWS, cfgFs, GetFontFlags())
-            btn._label:SetPoint("LEFT", btn, "LEFT", 8, 1)
-            btn._label:SetPoint("RIGHT", btn, "RIGHT", -22, 1)
-            btn._label:SetJustifyH("LEFT")
-
-            btn._check = btn:CreateFontString(nil, "OVERLAY")
-            btn._check:SetFont(FONT_HEADERS, 10, GetFontFlags())
-            btn._check:SetPoint("RIGHT", btn, "RIGHT", -7, 1)
-
-            btn:SetScript("OnEnter", function(selfBtn)
-                selfBtn:SetBackdropColor(0.08, 0.18, 0.28, 0.98)
-                selfBtn:SetBackdropBorderColor(0.26, 0.78, 0.72, 1)
-            end)
-            btn:SetScript("OnLeave", function(selfBtn)
-                local active = selfBtn._checked == true
-                selfBtn:SetBackdropColor(active and 0.10 or 0.05, active and 0.22 or 0.12, active and 0.30 or 0.20, active and 0.98 or 0.94)
-                selfBtn:SetBackdropBorderColor(active and 0.28 or 0.12, active and 0.86 or 0.26, active and 0.78 or 0.32, active and 1 or 0.95)
-            end)
-
-            popup.buttons[index] = btn
-            return btn
-        end
-
-        local function UpdatePopupScrollBar()
-            local viewH = popupScroll:GetHeight() or 0
-            local contentH = popupContent:GetHeight() or 0
-            local maxScroll = math.max(contentH - viewH, 0)
-            local current = math.max(0, math.min(popupScroll:GetVerticalScroll() or 0, maxScroll))
-
-            if current ~= (popupScroll:GetVerticalScroll() or 0) then
-                popupScroll:SetVerticalScroll(current)
-            end
-
-            if maxScroll <= 0 then
-                scrollTrack:Hide()
-                scrollThumb:Hide()
-                return
-            end
-
-            scrollTrack:Show()
-            local trackH = scrollTrack:GetHeight() or 0
-            local thumbH = math.max(18, math.floor(trackH * (viewH / math.max(contentH, 1))))
-            thumbH = math.min(thumbH, trackH)
-            scrollThumb:SetHeight(thumbH)
-
-            local travel = math.max(trackH - thumbH, 0)
-            local pct = current / math.max(maxScroll, 1)
-            scrollThumb:ClearAllPoints()
-            scrollThumb:SetPoint("TOP", scrollTrack, "TOP", 0, -travel * pct)
-            scrollThumb:Show()
-        end
-
-        local function SetPopupScrollFromCursor(cursorY, grabOffset)
-            local contentH = popupContent:GetHeight() or 0
-            local viewH = popupScroll:GetHeight() or 0
-            local maxScroll = math.max(contentH - viewH, 0)
-            if maxScroll <= 0 then
-                popupScroll:SetVerticalScroll(0)
-                UpdatePopupScrollBar()
-                return
-            end
-
-            local trackTop = select(2, scrollTrack:GetCenter())
-            local trackH = scrollTrack:GetHeight() or 0
-            local thumbH = scrollThumb:GetHeight() or 0
-            local cursorOffset = (trackTop + trackH * 0.5) - cursorY - (grabOffset or thumbH * 0.5)
-            local travel = math.max(trackH - thumbH, 1)
-            local pct = math.max(0, math.min(cursorOffset / travel, 1))
-            popupScroll:SetVerticalScroll(maxScroll * pct)
-            UpdatePopupScrollBar()
-        end
-
-        local function RefreshPopup()
-            local width = math.max(valueBtn:GetWidth(), math.ceil(widestLabel) + 52)
-            local rowHeight = 18
-            local spacing = 2
-            local visibleCount = #choices
-            local maxVisibleRows = 10
-            local needsScroll = visibleCount > maxVisibleRows
-            local shownRows = math.min(visibleCount, maxVisibleRows)
-            local scrollGutter = needsScroll and 12 or 0
-            popup:SetSize(width + scrollGutter, math.max(shownRows * (rowHeight + spacing) + 6, 24))
-            popupScroll:ClearAllPoints()
-            if needsScroll then
-                popupScroll:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3)
-                popupScroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -14, 3)
-                scrollTrack:ClearAllPoints()
-                scrollTrack:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -3, -3)
-                scrollTrack:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -3, 3)
-            else
-                popupScroll:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3)
-                popupScroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -3, 3)
-                scrollTrack:Hide()
-                scrollThumb:Hide()
-            end
-
-            local contentWidth = math.max(width - 6, 1)
-            local contentHeight = math.max(visibleCount * (rowHeight + spacing) - spacing + 6, 1)
-            popupContent:SetSize(contentWidth, contentHeight)
-
-            for index, choice in ipairs(choices) do
-                local btn = EnsurePopupButton(index)
-                btn:ClearAllPoints()
-                btn:SetPoint("TOPLEFT", popupContent, "TOPLEFT", 0, -3 - (index - 1) * (rowHeight + spacing))
-                btn:SetPoint("TOPRIGHT", popupContent, "TOPRIGHT", 0, -3 - (index - 1) * (rowHeight + spacing))
-                btn:SetHeight(rowHeight)
-                btn._label:SetFont(FONT_ROWS, cfgFs, GetFontFlags())
-                btn._check:SetFont(FONT_HEADERS, 10, GetFontFlags())
-                btn._label:SetText(choice.label)
-                btn._check:SetText(index == currentIndex and "v" or "")
-                btn._checked = index == currentIndex
-                btn:SetBackdropColor(btn._checked and 0.10 or 0.05, btn._checked and 0.22 or 0.12, btn._checked and 0.30 or 0.20, btn._checked and 0.98 or 0.94)
-                btn:SetBackdropBorderColor(btn._checked and 0.28 or 0.12, btn._checked and 0.86 or 0.26, btn._checked and 0.78 or 0.32, btn._checked and 1 or 0.95)
-                btn:SetScript("OnClick", function()
-                    ApplySelection(index, true)
-                    popup:Hide()
-                    dismiss:Hide()
-                end)
-                btn:Show()
-            end
-
-            for index = visibleCount + 1, #popup.buttons do
-                popup.buttons[index]:Hide()
-            end
-
-            local selectedOffset = math.max(0, (currentIndex - 1) * (rowHeight + spacing))
-            local maxScroll = math.max(contentHeight - (popupScroll:GetHeight() or 0), 0)
-            popupScroll:SetVerticalScroll(math.max(0, math.min(selectedOffset, maxScroll)))
-            UpdatePopupScrollBar()
         end
 
         valueBtn:SetScript("OnEnter", function(selfBtn)
@@ -464,83 +274,38 @@ function MR:PopulateConfigFrame(f)
             selfBtn:SetBackdropColor(0.05, 0.12, 0.20, 0.95)
             selfBtn:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
         end)
-        valueBtn:SetScript("OnClick", function()
-            if popup:IsShown() then
-                popup:Hide()
-                dismiss:Hide()
-                return
-            end
 
-            RefreshPopup()
-            popup:ClearAllPoints()
-            local left = valueBtn:GetLeft() or 0
-            local popupWidth = popup:GetWidth() or valueBtn:GetWidth()
-            local screenWidth = UIParent and UIParent:GetWidth() or 0
-            local xOffset = 0
-            if screenWidth > 0 and left + popupWidth > screenWidth - 12 then
-                xOffset = math.min(0, (screenWidth - 12) - (left + popupWidth))
-            end
-            if left + xOffset < 12 then
-                xOffset = 12 - left
-            end
-            popup:SetPoint("TOPLEFT", valueBtn, "BOTTOMLEFT", xOffset, -2)
-            dismiss:Show()
-            popup:Show()
-            UpdatePopupScrollBar()
-        end)
-
-        local function ScrollPopup(delta)
-            local current = popupScroll:GetVerticalScroll() or 0
-            local maxScroll = math.max((popupContent:GetHeight() or 0) - (popupScroll:GetHeight() or 0), 0)
-            if maxScroll <= 0 then
-                popupScroll:SetVerticalScroll(0)
-                UpdatePopupScrollBar()
-                return
-            end
-
-            popupScroll:SetVerticalScroll(math.max(0, math.min(current - delta * 24, maxScroll)))
-            UpdatePopupScrollBar()
+        -- Popup mechanism (overflow scroll, outside-click dismiss, anchor
+        -- clamping) is Foundry.Menu / Blizzard's native menu system. valueBtn
+        -- stays a plain custom BackdropTemplate button (not a DropdownButton),
+        -- so we drive the menu with :CreateContextMenu(owner) from OnClick
+        -- rather than :SetupDropdown (which requires the DropdownButtonMixin
+        -- SetupMenu API valueBtn does not have). Anonymous name: this widget
+        -- is rebuilt every PopulateConfigFrame call, so a stable name would
+        -- collide with the still-live controller from the previous populate.
+        if F then
+            local menuCtrl = F.Menu:New({
+                builder = function(_, rootDescription)
+                    rootDescription:CreateTitle(label)
+                    for index, choice in ipairs(choices) do
+                        rootDescription:CreateRadio(choice.label, function()
+                            return index == currentIndex
+                        end, function()
+                            ApplySelection(index, true)
+                        end)
+                    end
+                end,
+            })
+            -- Stored on valueBtn so ReleaseConfigWidgetTree can :Destroy() it on
+            -- teardown -- this widget is rebuilt every PopulateConfigFrame call,
+            -- and an undestroyed anonymous controller leaks its liveKeys entry.
+            valueBtn.menuCtrl = menuCtrl
+            valueBtn:SetScript("OnClick", function()
+                if menuCtrl then
+                    menuCtrl:CreateContextMenu(valueBtn)
+                end
+            end)
         end
-
-        popup:SetScript("OnMouseWheel", function(_, delta)
-            ScrollPopup(delta)
-        end)
-        popupScroll:SetScript("OnMouseWheel", function(_, delta)
-            ScrollPopup(delta)
-        end)
-        popupScroll:SetScript("OnScrollRangeChanged", UpdatePopupScrollBar)
-        popupScroll:SetScript("OnVerticalScroll", UpdatePopupScrollBar)
-
-        scrollTrack:SetScript("OnMouseDown", function(_, button)
-            if button ~= "LeftButton" then
-                return
-            end
-
-            local _, cursorY = GetCursorPosition()
-            local scale = UIParent and UIParent:GetEffectiveScale() or 1
-            SetPopupScrollFromCursor(cursorY / scale, scrollThumb:GetHeight() * 0.5)
-        end)
-
-        scrollThumb:RegisterForDrag("LeftButton")
-        scrollThumb:SetScript("OnDragStart", function(selfBtn)
-            local _, cursorY = GetCursorPosition()
-            local scale = UIParent and UIParent:GetEffectiveScale() or 1
-            local thumbCenterY = select(2, selfBtn:GetCenter()) or 0
-            local thumbTopY = thumbCenterY + (selfBtn:GetHeight() or 0) * 0.5
-            selfBtn._grabOffset = thumbTopY - (cursorY / scale)
-        end)
-        scrollThumb:SetScript("OnDragStop", function(selfBtn)
-            selfBtn._grabOffset = nil
-        end)
-        scrollThumb:SetScript("OnUpdate", function(selfBtn)
-            if not selfBtn._grabOffset then
-                return
-            end
-
-            local _, cursorY = GetCursorPosition()
-            local scale = UIParent and UIParent:GetEffectiveScale() or 1
-            SetPopupScrollFromCursor(cursorY / scale, selfBtn._grabOffset)
-        end)
 
         local resetBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
         resetBtn:SetSize(20, 20)
@@ -560,12 +325,10 @@ function MR:PopulateConfigFrame(f)
             for index, choice in ipairs(choices) do
                 if choice.value == resetValue then
                     ApplySelection(index, true)
-                    RefreshPopup()
                     return
                 end
             end
             ApplySelection(1, true)
-            RefreshPopup()
         end)
 
         ApplySelection(currentIndex, false)
@@ -2095,26 +1858,21 @@ function MR:RequestConfigRepopulate(frame, delay)
         return
     end
 
-    if not self.ScheduleTimer then
-        self:PopulateConfigFrame(frame)
-        return
-    end
-
     delay = tonumber(delay) or 0.04
     self._configRepopulatePendingFrame = frame
-    if self._configRepopulateTimer and self.CancelTimer then
-        self:CancelTimer(self._configRepopulateTimer)
+    if self._configRepopulateTimer then
+        self._configRepopulateTimer:Cancel()
         self._configRepopulateTimer = nil
     end
 
-    self._configRepopulateTimer = self:ScheduleTimer(function()
+    self._configRepopulateTimer = C_Timer.NewTimer(delay, function()
         local target = self._configRepopulatePendingFrame
         self._configRepopulateTimer = nil
         self._configRepopulatePendingFrame = nil
         if target and target:IsShown() then
             self:PopulateConfigFrame(target)
         end
-    end, delay)
+    end)
 end
 
 function MR:RepopulateConfigFrame()

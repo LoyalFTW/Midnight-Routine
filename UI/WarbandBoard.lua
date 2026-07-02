@@ -1,6 +1,8 @@
 local _, ns = ...
 local MR = ns.MR
 
+local F = _G.Foundry_1_0
+
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local FONT_ROWS = ns.FONT_ROWS
 local FONT_HEADERS = ns.FONT_HEADERS
@@ -309,28 +311,6 @@ local function BuildExpansionDropdown(parent, forAltBoard, opts)
     caret:SetTextColor(0.78, 0.90, 0.92)
     btn._caret = caret
 
-    local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    popup:SetFrameStrata("DIALOG")
-    popup:SetFrameLevel(50)
-    popup:SetBackdrop(MakeBackdrop())
-    popup:SetBackdropColor(0.04, 0.09, 0.15, 0.98)
-    popup:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
-    popup:Hide()
-    popup.buttons = {}
-    btn._popup = popup
-
-    local dismiss = CreateFrame("Frame", nil, UIParent)
-    dismiss:SetAllPoints(UIParent)
-    dismiss:SetFrameStrata("DIALOG")
-    dismiss:SetFrameLevel(49)
-    dismiss:EnableMouse(true)
-    dismiss:Hide()
-    dismiss:SetScript("OnMouseDown", function()
-        popup:Hide()
-        dismiss:Hide()
-    end)
-    btn._dismiss = dismiss
-
     function btn:ApplyFonts()
         local fontSize = GetFontSize()
         local labelSize = opts.fontSize or math.max(8, fontSize - 1)
@@ -341,15 +321,6 @@ local function BuildExpansionDropdown(parent, forAltBoard, opts)
         end
         if self._caret then
             self._caret:SetFont(FONT_HEADERS, caretSize, GetFontFlags())
-        end
-
-        for _, row in ipairs(popup.buttons) do
-            if row._label then
-                row._label:SetFont(FONT_ROWS, labelSize, GetFontFlags())
-            end
-            if row._check then
-                row._check:SetFont(FONT_HEADERS, caretSize, GetFontFlags())
-            end
         end
     end
 
@@ -375,86 +346,44 @@ local function BuildExpansionDropdown(parent, forAltBoard, opts)
         self:Show()
     end
 
-    local function EnsurePopupButton(index)
-        local row = popup.buttons[index]
-        if row then
-            return row
-        end
-
-        row = CreateFrame("Button", nil, popup, "BackdropTemplate")
-        row:SetHeight(18)
-        row:SetBackdrop(MakeBackdrop())
-        row:SetBackdropColor(0.05, 0.12, 0.20, 0.94)
-        row:SetBackdropBorderColor(0.12, 0.26, 0.32, 0.95)
-
-        row._label = row:CreateFontString(nil, "OVERLAY")
-        row._label:SetFont(FONT_ROWS, opts.fontSize or 8, GetFontFlags())
-        row._label:SetPoint("LEFT", row, "LEFT", 8, 1)
-        row._label:SetPoint("RIGHT", row, "RIGHT", -22, 1)
-        row._label:SetJustifyH("LEFT")
-
-        row._check = row:CreateFontString(nil, "OVERLAY")
-        row._check:SetFont(FONT_HEADERS, 10, GetFontFlags())
-        row._check:SetPoint("RIGHT", row, "RIGHT", -7, 1)
-
-        row:SetScript("OnEnter", function(selfRow)
-            selfRow:SetBackdropColor(0.08, 0.18, 0.28, 0.98)
-            selfRow:SetBackdropBorderColor(0.26, 0.78, 0.72, 1)
+    -- Popup mechanism (overflow scroll, outside-click dismiss, anchor
+    -- clamping) is Foundry.Menu / Blizzard's native menu system -- see
+    -- UI/Config.lua's ChoiceDropdown conversion for the reference pattern.
+    -- Unlike ChoiceDropdown (rebuilt every PopulateConfigFrame call), this
+    -- button is built exactly once per parent: MR:BuildUI() and
+    -- MR:ToggleWarbandBoard() both gate frame construction behind
+    -- `if self.frame/self.altBoardFrame then ... return end`, so
+    -- BuildExpansionDropdown never re-runs for a given parent and this
+    -- controller lives for the addon session -- no :Destroy() teardown site
+    -- is needed (nothing in this file ever tears this frame down). An
+    -- anonymous name (omitted here) keeps the two call sites -- the main
+    -- board in UI.lua and the alt board in WarbandBoard.lua -- from
+    -- colliding on a shared stable name.
+    if F then
+        local menuCtrl = F.Menu:New({
+            builder = function(_, rootDescription)
+                local expansions = MR:GetSelectableExpansions()
+                local selectedKey = MR:GetSelectedExpansionKey(btn.forAltBoard)
+                for _, info in ipairs(expansions) do
+                    rootDescription:CreateRadio(info.shortLabel or info.label or info.key, function()
+                        return info.key == selectedKey
+                    end, function()
+                        MR:SetSelectedExpansionKey(info.key, btn.forAltBoard)
+                    end)
+                end
+            end,
+        })
+        btn.menuCtrl = menuCtrl
+        btn:SetScript("OnClick", function(selfBtn)
+            local expansions = MR:GetSelectableExpansions()
+            if #expansions <= 1 then
+                return
+            end
+            if menuCtrl then
+                menuCtrl:CreateContextMenu(selfBtn)
+            end
         end)
-        row:SetScript("OnLeave", function(selfRow)
-            local active = selfRow._checked == true
-            selfRow:SetBackdropColor(active and 0.10 or 0.05, active and 0.22 or 0.12, active and 0.30 or 0.20, active and 0.98 or 0.94)
-            selfRow:SetBackdropBorderColor(active and 0.28 or 0.12, active and 0.86 or 0.26, active and 0.78 or 0.32, active and 1 or 0.95)
-        end)
-
-        popup.buttons[index] = row
-        return row
     end
-
-    btn:SetScript("OnClick", function(selfBtn)
-        local expansions = MR:GetSelectableExpansions()
-        if #expansions <= 1 then
-            return
-        end
-
-        local selectedKey = MR:GetSelectedExpansionKey(selfBtn.forAltBoard)
-        local rowWidth = math.max(selfBtn:GetWidth(), 130)
-        popup:ClearAllPoints()
-        popup:SetPoint("TOPLEFT", selfBtn, "BOTTOMLEFT", 0, -4)
-        popup:SetSize(rowWidth, (#expansions * 20) + 6)
-
-        for index, info in ipairs(expansions) do
-            local row = EnsurePopupButton(index)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3 - ((index - 1) * 20))
-            row:SetSize(rowWidth - 6, 18)
-            row._checked = info.key == selectedKey
-            row._label:SetText(info.shortLabel or info.label or info.key)
-            row._label:SetTextColor(row._checked and 0.96 or 0.74, row._checked and 1.00 or 0.90, row._checked and 1.00 or 0.92)
-            row._check:SetText(row._checked and "x" or "")
-            row._check:SetTextColor(0.80, 0.94, 0.92)
-            row:SetBackdropColor(row._checked and 0.10 or 0.05, row._checked and 0.22 or 0.12, row._checked and 0.30 or 0.20, row._checked and 0.98 or 0.94)
-            row:SetBackdropBorderColor(row._checked and 0.28 or 0.12, row._checked and 0.86 or 0.26, row._checked and 0.78 or 0.32, row._checked and 1 or 0.95)
-            row:SetScript("OnClick", function()
-                MR:SetSelectedExpansionKey(info.key, selfBtn.forAltBoard)
-                popup:Hide()
-                dismiss:Hide()
-            end)
-            row:Show()
-        end
-
-        for index = #expansions + 1, #popup.buttons do
-            popup.buttons[index]:Hide()
-        end
-
-        if popup:IsShown() then
-            popup:Hide()
-            dismiss:Hide()
-        else
-            dismiss:Show()
-            popup:Show()
-        end
-    end)
 
     return btn
 end

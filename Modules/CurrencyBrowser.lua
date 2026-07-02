@@ -1,6 +1,8 @@
 local _, ns = ...
 local MR = ns.MR
 
+local F = _G.Foundry_1_0
+
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local ROW_HEIGHT = 24
@@ -1159,9 +1161,7 @@ function MR:ToggleCurrencyBrowserFrame()
     end
 end
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-eventFrame:SetScript("OnEvent", function()
+F.Events:New("MidnightRoutine-CurrencyBrowser"):Register("CURRENCY_DISPLAY_UPDATE", function()
     if MR.currencyBrowserFrame and MR.currencyBrowserFrame:IsShown() then
         MR:RefreshCurrencyBrowserFrame()
     end

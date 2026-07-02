@@ -1,13 +1,36 @@
 local addonName, ns = ...
 
 local LibStub  = LibStub
-local AceAddon = LibStub("AceAddon-3.0")
-local AceDB    = LibStub("AceDB-3.0")
 local L        = LibStub("AceLocale-3.0"):GetLocale(addonName)
 
-local MR = AceAddon:NewAddon(addonName, "AceEvent-3.0", "AceBucket-3.0", "AceTimer-3.0")
+local F = _G.Foundry_1_0
+if not F then
+    error(addonName .. " failed to load Foundry-1.0.", 0)
+end
+
+local MR = {}
 ns.MR = MR
 MR.ns = ns
+
+-- Foundry.Lifecycle replaces AceAddon:NewAddon's lifecycle wiring. There is no
+-- combined "DB ready" hook (see Foundry/Modules/Lifecycle.lua header comment) --
+-- MR:OnInitialize constructs self.db itself, at the same OnAddonLoaded timing
+-- AceAddon's OnInitialize used to fire at.
+local Lifecycle = F.Lifecycle:New(MR, addonName)
+
+Lifecycle:OnAddonLoaded(function()
+    MR:OnInitialize()
+end)
+
+Lifecycle:OnLogin(function()
+    MR:OnEnable()
+end)
+
+-- Foundry.Events replaces the AceEvent-3.0 mixin: one controller owns this
+-- addon's frame-event registrations for the addon's lifetime (there is no
+-- runtime enable/disable to tear it down against).
+local Events = F.Events:New(addonName)
+MR.Events = Events
 
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = {
     currencies = true,
@@ -251,8 +274,8 @@ function MR:QueueCombatDeferredUpdate(flag)
     self._combatDeferred = self._combatDeferred or {}
     self._combatDeferred[flag] = true
 
-    if self.RegisterEvent then
-        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
+    if not Events:IsRegistered("PLAYER_REGEN_ENABLED") then
+        Events:Register("PLAYER_REGEN_ENABLED", function() MR:OnCombatEnded() end)
     end
 end
 
@@ -345,9 +368,7 @@ function MR:FlushCombatDeferredUpdates()
 end
 
 function MR:OnCombatEnded()
-    if self.UnregisterEvent then
-        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-    end
+    Events:Unregister("PLAYER_REGEN_ENABLED")
 
     self:FlushCombatDeferredUpdates()
 end
@@ -605,7 +626,6 @@ end
 
 function MR:GetProgressBucket(moduleKey, rowKey)
     if moduleKey == "custom_tasks" and self.IsCustomTaskAccountWideCompletion and self:IsCustomTaskAccountWideCompletion(rowKey) then
-        self.db.global = self.db.global or {}
         self.db.global.customTaskProgress = self.db.global.customTaskProgress or {}
         return self.db.global.customTaskProgress
     end
@@ -615,7 +635,6 @@ end
 
 function MR:GetManualOverrideBucket(moduleKey, rowKey)
     if moduleKey == "custom_tasks" and self.IsCustomTaskAccountWideCompletion and self:IsCustomTaskAccountWideCompletion(rowKey) then
-        self.db.global = self.db.global or {}
         self.db.global.customTaskManualOverrides = self.db.global.customTaskManualOverrides or {}
         return self.db.global.customTaskManualOverrides
     end
@@ -1094,25 +1113,20 @@ function MR:SetModuleEnabled(key, enabled, skipRefresh)
 end
 
 function MR:RequestUIRefresh(delay)
-    if not self.ScheduleTimer then
-        self:RefreshUI()
-        return
-    end
-
     delay = tonumber(delay) or 0.05
     self._refreshRequestPending = true
-    if self._refreshRequestTimer and self.CancelTimer then
-        self:CancelTimer(self._refreshRequestTimer)
+    if self._refreshRequestTimer then
+        self._refreshRequestTimer:Cancel()
         self._refreshRequestTimer = nil
     end
 
-    self._refreshRequestTimer = self:ScheduleTimer(function()
+    self._refreshRequestTimer = C_Timer.NewTimer(delay, function()
         self._refreshRequestTimer = nil
         if self._refreshRequestPending then
             self._refreshRequestPending = nil
             self:RefreshUI()
         end
-    end, delay)
+    end)
 end
 
 function MR:RequestConfigRefresh()
@@ -1751,12 +1765,12 @@ function MR:RequestScan(delay)
 
     if delay > 0 then
         if self._requestedScanTimer then
-            self:CancelTimer(self._requestedScanTimer)
+            self._requestedScanTimer:Cancel()
         end
-        self._requestedScanTimer = self:ScheduleTimer(function()
+        self._requestedScanTimer = C_Timer.NewTimer(delay, function()
             self._requestedScanTimer = nil
             self:Scan()
-        end, delay)
+        end)
         return
     end
 
@@ -1814,7 +1828,6 @@ function MR:ScanAutoUpdateInstanceRows(changedQuestId, changedEncounterId, diffi
                         if self.db then
                             local diffProgress
                             if row.accountWideComplete then
-                                self.db.global = self.db.global or {}
                                 self.db.global.customTaskDiffProgress = self.db.global.customTaskDiffProgress or {}
                                 diffProgress = self.db.global.customTaskDiffProgress
                             elseif self.db.char then
@@ -2034,7 +2047,7 @@ function MR:Scan()
     local minScanInterval = 0.25
 
     if self._requestedScanTimer then
-        self:CancelTimer(self._requestedScanTimer)
+        self._requestedScanTimer:Cancel()
         self._requestedScanTimer = nil
     end
 
@@ -2047,13 +2060,13 @@ function MR:Scan()
         self._scanPending = true
         if not self._scanThrottleTimer then
             local delay = math.max(minScanInterval - (now - self._lastScanAt), 0.01)
-            self._scanThrottleTimer = self:ScheduleTimer(function()
+            self._scanThrottleTimer = C_Timer.NewTimer(delay, function()
                 self._scanThrottleTimer = nil
                 if self._scanPending then
                     self._scanPending = nil
                     self:Scan()
                 end
-            end, delay)
+            end)
         end
         return
     end
@@ -2131,10 +2144,10 @@ function MR:Scan()
 
     if self._scanPending and not self._scanThrottleTimer then
         self._scanPending = nil
-        self._scanThrottleTimer = self:ScheduleTimer(function()
+        self._scanThrottleTimer = C_Timer.NewTimer(minScanInterval, function()
             self._scanThrottleTimer = nil
             self:Scan()
-        end, minScanInterval)
+        end)
     end
 end
 
@@ -2175,7 +2188,12 @@ function MR:RebuildTurnInCompletions()
 end
 
 function MR:OnInitialize()
-    self.db = AceDB:New("MidnightRoutineDB", DEFAULTS, true)
+    self.db = F.DB:New({
+        name = addonName,
+        sv = "MidnightRoutineDB",
+        defaultProfile = true,
+        defaults = DEFAULTS,
+    })
     self:MigrateLegacySettings()
     if self.RefreshCustomTasksModule then
         self:RefreshCustomTasksModule()
@@ -2465,50 +2483,66 @@ function MR:UpdateInstanceFrameVisibility()
 end
 
 function MR:OnEnable()
-    self:RegisterBucketEvent({
-        "AREA_POIS_UPDATED",
-    }, 0.75, "OnAreaPoisUpdated")
+    Events:RegisterBucket({
+        events = "AREA_POIS_UPDATED",
+        interval = 0.75,
+        handler = function() MR:OnAreaPoisUpdated() end,
+    })
 
-    self:RegisterBucketEvent({
-        "QUEST_LOG_UPDATE",
-        "UNIT_QUEST_LOG_CHANGED",
-        "GOSSIP_SHOW",
-        "GOSSIP_CLOSED",
-        "QUEST_DETAIL",
-        "QUEST_DATA_LOAD_RESULT",
-        "QUEST_PROGRESS",
-        "QUEST_COMPLETE",
-    }, 0.5, "OnQuestDataChanged")
+    Events:RegisterBucket({
+        events = {
+            "QUEST_LOG_UPDATE",
+            "UNIT_QUEST_LOG_CHANGED",
+            "GOSSIP_SHOW",
+            "GOSSIP_CLOSED",
+            "QUEST_DETAIL",
+            "QUEST_DATA_LOAD_RESULT",
+            "QUEST_PROGRESS",
+            "QUEST_COMPLETE",
+        },
+        interval = 0.5,
+        handler = function() MR:OnQuestDataChanged() end,
+    })
 
-    self:RegisterBucketEvent({
-        "SKILL_LINES_CHANGED",
-        "TRADE_SKILL_LIST_UPDATE",
-        "SKILL_LINE_SPECS_RANKS_CHANGED",
-        "TRADE_SKILL_SHOW",
-    }, 1, "OnProfessionChange")
+    Events:RegisterBucket({
+        events = {
+            "SKILL_LINES_CHANGED",
+            "TRADE_SKILL_LIST_UPDATE",
+            "SKILL_LINE_SPECS_RANKS_CHANGED",
+            "TRADE_SKILL_SHOW",
+        },
+        interval = 1,
+        handler = function() MR:OnProfessionChange() end,
+    })
 
-    self:RegisterBucketEvent({
-        "ZONE_CHANGED_NEW_AREA",
-    }, 0.5, "OnZoneChanged")
+    Events:RegisterBucket({
+        events = "ZONE_CHANGED_NEW_AREA",
+        interval = 0.5,
+        handler = function() MR:OnZoneChanged() end,
+    })
 
-    self:RegisterBucketEvent({
-        "CHALLENGE_MODE_COMPLETED",
-        "WEEKLY_REWARDS_UPDATE",
-        "LFG_COMPLETION_REWARD",
-    }, 1, "OnVaultEvent")
+    Events:RegisterBucket({
+        events = {
+            "CHALLENGE_MODE_COMPLETED",
+            "WEEKLY_REWARDS_UPDATE",
+            "LFG_COMPLETION_REWARD",
+        },
+        interval = 1,
+        handler = function() MR:OnVaultEvent() end,
+    })
 
-    self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", "OnSpellCast")
-    self:RegisterEvent("ENCOUNTER_END",            "OnEncounterEnd")
-    self:RegisterEvent("BOSS_KILL",                "OnBossKill")
-    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE",  "OnCurrencyDisplayUpdate")
-    self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnedIn")
-    self:RegisterEvent("QUEST_ACCEPTED",           "OnQuestAccepted")
-    self:RegisterEvent("QUEST_REMOVED",            "OnQuestRemoved")
-    self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
+    Events:Register("UNIT_SPELLCAST_SUCCEEDED", function(...) MR:OnSpellCast(...) end)
+    Events:Register("ENCOUNTER_END",            function(...) MR:OnEncounterEnd(...) end)
+    Events:Register("BOSS_KILL",                function(...) MR:OnBossKill(...) end)
+    Events:Register("CURRENCY_DISPLAY_UPDATE",  function(...) MR:OnCurrencyDisplayUpdate(...) end)
+    Events:Register("QUEST_TURNED_IN",          function(...) MR:OnQuestTurnedIn(...) end)
+    Events:Register("QUEST_ACCEPTED",           function(...) MR:OnQuestAccepted(...) end)
+    Events:Register("QUEST_REMOVED",            function(...) MR:OnQuestRemoved(...) end)
+    Events:Register("BAG_UPDATE_DELAYED",       function(...) MR:OnBagUpdateDelayed(...) end)
+    Events:Register("PLAYER_ENTERING_WORLD",    function(...) MR:OnEnteringWorld(...) end)
 
-    self:ScheduleRepeatingTimer("CheckWeeklyReset", 60)
-    self:ScheduleRepeatingTimer("CheckDailyReset",  60)
+    C_Timer.NewTicker(60, function() MR:CheckWeeklyReset() end)
+    C_Timer.NewTicker(60, function() MR:CheckDailyReset() end)
 
     if not self._questTurnInFrame then
         local addon = self
@@ -2541,6 +2575,22 @@ function MR:OnEnable()
             addon:RefreshUI()
         end)
         self._questTurnInFrame = f
+    end
+
+    -- MinimapButton.lua's login-gated setup can't register its own
+    -- Foundry.Lifecycle OnLogin hook (one hook per phase per controller,
+    -- and this controller's login phase already runs MR:OnEnable) -- so it
+    -- is chained here instead.
+    if self.InitMinimapButton then
+        self:InitMinimapButton()
+    end
+
+    -- ProfessionKnowledge.lua's login-gated setup can't register its own
+    -- Foundry.Lifecycle OnLogin hook either (same one-hook-per-phase
+    -- limitation) -- chained here for the same reason as InitMinimapButton
+    -- above.
+    if self.InitProfessionKnowledge then
+        self:InitProfessionKnowledge()
     end
 end
 
@@ -2590,11 +2640,15 @@ function MR:OnEnteringWorld()
 
     self:MaybeShowWelcomeScreen()
     if self.OnRenownUpdate and not self._renownUpdateBucketHandle then
-        self._renownUpdateBucketHandle = self:RegisterBucketEvent({
-            "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
-            "UPDATE_FACTION",
-            "COMBAT_TEXT_UPDATE",
-        }, 1, "OnRenownUpdate")
+        self._renownUpdateBucketHandle = Events:RegisterBucket({
+            events = {
+                "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
+                "UPDATE_FACTION",
+                "COMBAT_TEXT_UPDATE",
+            },
+            interval = 1,
+            handler = function() MR:OnRenownUpdate() end,
+        })
     end
     if not shouldHideFrames and not temporarilyHidden and not self:IsManagedWindowsBundleHidden() then
         if self:GetManagedWindowOpen("renownOpen") and self.EnsureRenownShown then
@@ -2612,17 +2666,17 @@ function MR:OnEnteringWorld()
     end
     if self.db.profile.peekOnHover and self.ApplyPeekOnHover then
         if self._enteringWorldPeekTimer then
-            self:CancelTimer(self._enteringWorldPeekTimer)
+            self._enteringWorldPeekTimer:Cancel()
         end
-        self._enteringWorldPeekTimer = self:ScheduleTimer(function()
+        self._enteringWorldPeekTimer = C_Timer.NewTimer(2.5, function()
             self._enteringWorldPeekTimer = nil
             self:ApplyPeekOnHover(true)
-        end, 2.5)
+        end)
     end
     if self._enteringWorldRefreshTimer then
-        self:CancelTimer(self._enteringWorldRefreshTimer)
+        self._enteringWorldRefreshTimer:Cancel()
     end
-    self._enteringWorldRefreshTimer = self:ScheduleTimer(function()
+    self._enteringWorldRefreshTimer = C_Timer.NewTimer(0.5, function()
         self._enteringWorldRefreshTimer = nil
         self:CheckWeeklyReset()
         self:CheckDailyReset()
@@ -2632,14 +2686,14 @@ function MR:OnEnteringWorld()
         if self.RefreshGatheringLocationsFrame then
             self:RefreshGatheringLocationsFrame()
         end
-    end, 0.5)
+    end)
     if self._enteringWorldScanTimer then
-        self:CancelTimer(self._enteringWorldScanTimer)
+        self._enteringWorldScanTimer:Cancel()
     end
-    self._enteringWorldScanTimer = self:ScheduleTimer(function()
+    self._enteringWorldScanTimer = C_Timer.NewTimer(5, function()
         self._enteringWorldScanTimer = nil
         self:RequestScan()
-    end, 5)
+    end)
     self:RequestScan(0.35)
 end
 
@@ -2652,12 +2706,12 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
 
     if currencyID == 3290 and self.RefreshDelvesLiveProgress then
         if self._delvesLiveProgressTimer then
-            self:CancelTimer(self._delvesLiveProgressTimer)
+            self._delvesLiveProgressTimer:Cancel()
         end
-        self._delvesLiveProgressTimer = self:ScheduleTimer(function()
+        self._delvesLiveProgressTimer = C_Timer.NewTimer(2, function()
             self._delvesLiveProgressTimer = nil
             self:RefreshDelvesLiveProgress(true)
-        end, 2)
+        end)
     end
 
     if dirty then
@@ -2810,63 +2864,128 @@ function MR:OnBossKill(_, bossId, bossName)
     self:RefreshModuleScans({ "world_bosses", "great_vault", "s1_weekly" }, true)
 end
 
-SLASH_MIDROUTE1 = "/mr"
-SLASH_MIDROUTE2 = "/midroute"
-SlashCmdList["MIDROUTE"] = function(msg)
-    msg = (msg or ""):lower():trim()
-    local function ApplyMainScale(value)
-        if MR.db.profile.syncWindowScale and MR.ApplyScaleToAll then
-            MR:ApplyScaleToAll(value)
-        else
-            MR.db.profile.scale = value
-            if MR.frame then MR.frame:SetScale(value) end
-        end
+-- Foundry.Commands replaces the manual SlashCmdList/SLASH_MIDROUTEn dispatch
+-- table. Longest-prefix, word-boundary matching means a two-word alias like
+-- "main toggle" is not registered as its own subcommand name -- it is the
+-- base word ("main") registered once, with the handler switching on the
+-- trimmed remainder. This preserves the original if/elseif chain's behavior,
+-- including its exact-match semantics: an unrecognized remainder (e.g.
+-- "main foobar") falls through to the same Chat_Commands message the
+-- original's final `else` printed for any unmatched full command.
+local function ApplyMainScale(value)
+    if MR.db.profile.syncWindowScale and MR.ApplyScaleToAll then
+        MR:ApplyScaleToAll(value)
+    else
+        MR.db.profile.scale = value
+        if MR.frame then MR.frame:SetScale(value) end
     end
+end
 
-    if msg == "reset" then
-        MR:DoWeeklyReset()
-    elseif msg == "lock" then
+-- Wraps a no-argument leaf command so it only fires on an exact match (no
+-- trailing remainder), matching the original chain's exact-string elseif
+-- checks (e.g. "/mr lock foo" fell through to the unknown-command message,
+-- not into "lock").
+local function ExactOnly(fn)
+    return function(rest)
+        if rest ~= "" then
+            print(L["Chat_Commands"])
+            return
+        end
+        fn()
+    end
+end
+
+local Commands = F.Commands:New({
+    name = "MidRoute",
+    slashes = { "/mr", "/midroute" },
+    defaultHandler = function() print(L["Chat_Commands"]) end,
+    unknownMessage = function() return L["Chat_Commands"] end,
+})
+MR.Commands = Commands
+
+Commands:Register({
+    name = "reset",
+    handler = ExactOnly(function() MR:DoWeeklyReset() end),
+})
+
+Commands:Register({
+    name = "lock",
+    handler = ExactOnly(function()
         MR.db.profile.locked = true
         if MR.frame then MR.frame:SetMovable(false) end
         print(L["Frame_Locked"])
-    elseif msg == "unlock" then
+    end),
+})
+
+Commands:Register({
+    name = "unlock",
+    handler = ExactOnly(function()
         MR.db.profile.locked = false
         if MR.frame then MR.frame:SetMovable(true) end
         print(L["Frame_Unlocked"])
-    elseif msg == "hide" then
+    end),
+})
+
+Commands:Register({
+    name = "hide",
+    handler = ExactOnly(function()
         if MR.frame then MR.frame:Hide() end
         MR.db.char.panelOpen = false
-    elseif msg == "show" then
+    end),
+})
+
+Commands:Register({
+    name = "show",
+    handler = ExactOnly(function()
         if MR.frame then MR.frame:Show() end
         MR.db.char.panelOpen = true
         MR:ClearManagedWindowsBundleHidden()
-    elseif msg == "toggle" then
-        MR:ToggleManagedWindows()
-    elseif msg == "main" or msg == "main toggle" then
-        if not MR.frame and MR.BuildUI then
-            MR:BuildUI()
-        end
-        if MR.frame then
-            if MR.frame:IsShown() then
-                MR.frame:Hide()
-                MR.db.char.panelOpen = false
-            else
-                MR.frame:Show()
-                MR.db.char.panelOpen = true
-                MR:ClearManagedWindowsBundleHidden()
+    end),
+})
+
+Commands:Register({
+    name = "toggle",
+    handler = ExactOnly(function() MR:ToggleManagedWindows() end),
+})
+
+Commands:Register({
+    name = "main",
+    args = "[show|hide]",
+    handler = function(rest)
+        rest = (rest or ""):lower()
+        if rest == "" or rest == "toggle" then
+            if not MR.frame and MR.BuildUI then
+                MR:BuildUI()
             end
+            if MR.frame then
+                if MR.frame:IsShown() then
+                    MR.frame:Hide()
+                    MR.db.char.panelOpen = false
+                else
+                    MR.frame:Show()
+                    MR.db.char.panelOpen = true
+                    MR:ClearManagedWindowsBundleHidden()
+                end
+            end
+        elseif rest == "show" then
+            if not MR.frame and MR.BuildUI then
+                MR:BuildUI()
+            end
+            if MR.frame then MR.frame:Show() end
+            MR.db.char.panelOpen = true
+            MR:ClearManagedWindowsBundleHidden()
+        elseif rest == "hide" then
+            if MR.frame then MR.frame:Hide() end
+            MR.db.char.panelOpen = false
+        else
+            print(L["Chat_Commands"])
         end
-    elseif msg == "main show" then
-        if not MR.frame and MR.BuildUI then
-            MR:BuildUI()
-        end
-        if MR.frame then MR.frame:Show() end
-        MR.db.char.panelOpen = true
-        MR:ClearManagedWindowsBundleHidden()
-    elseif msg == "main hide" then
-        if MR.frame then MR.frame:Hide() end
-        MR.db.char.panelOpen = false
-    elseif msg == "minimap" then
+    end,
+})
+
+Commands:Register({
+    name = "minimap",
+    handler = ExactOnly(function()
         local newHide = not (MR.db.profile.minimap and MR.db.profile.minimap.hide)
         MR:SetMinimapHidden(newHide)
         if newHide then
@@ -2874,24 +2993,75 @@ SlashCmdList["MIDROUTE"] = function(msg)
         else
             print(L["Minimap_Shown"])
         end
-    elseif msg == "scale" or msg == "scale toggle" then
-        local current = tonumber(MR.db.profile.scale) or 1.0
-        local target = math.abs(current - 0.5) < 0.001 and 2.0 or 0.5
-        ApplyMainScale(target)
-    elseif msg:match("^scale %d") then
-        local s = tonumber(msg:match("scale (%S+)"))
-        if s and s >= 0.5 and s <= 2 then
-            ApplyMainScale(s)
+    end),
+})
+
+Commands:Register({
+    name = "scale",
+    args = "[value]",
+    handler = function(rest)
+        rest = (rest or ""):lower()
+        if rest == "" or rest == "toggle" then
+            local current = tonumber(MR.db.profile.scale) or 1.0
+            local target = math.abs(current - 0.5) < 0.001 and 2.0 or 0.5
+            ApplyMainScale(target)
+        elseif rest:match("^%d") then
+            local s = tonumber(rest:match("^(%d+%.?%d*)"))
+            if s and s >= 0.5 and s <= 2 then
+                ApplyMainScale(s)
+            end
+        else
+            print(L["Chat_Commands"])
         end
-    elseif msg == "big" then if MR.ApplyWidth then MR.ApplyWidth(500) end
-    elseif msg == "small" then if MR.ApplyWidth then MR.ApplyWidth(200) end
-    elseif msg == "welcome" then MR:ShowWelcomeScreen()
-    elseif msg == "renown" then MR:ToggleRenown()
-    elseif msg == "renown config" then MR:ToggleRenownConfig()
-    elseif msg == "rares" then MR:ToggleRares()
-    elseif msg == "rares config" then MR:ToggleRaresConfig()
-    elseif msg == "gathering" then MR:ToggleGatheringLocations()
-    else
-        print(L["Chat_Commands"])
-    end
-end
+    end,
+})
+
+Commands:Register({
+    name = "big",
+    handler = ExactOnly(function() if MR.ApplyWidth then MR.ApplyWidth(500) end end),
+})
+
+Commands:Register({
+    name = "small",
+    handler = ExactOnly(function() if MR.ApplyWidth then MR.ApplyWidth(200) end end),
+})
+
+Commands:Register({
+    name = "welcome",
+    handler = ExactOnly(function() MR:ShowWelcomeScreen() end),
+})
+
+Commands:Register({
+    name = "renown",
+    args = "[config]",
+    handler = function(rest)
+        rest = (rest or ""):lower()
+        if rest == "" then
+            MR:ToggleRenown()
+        elseif rest == "config" then
+            MR:ToggleRenownConfig()
+        else
+            print(L["Chat_Commands"])
+        end
+    end,
+})
+
+Commands:Register({
+    name = "rares",
+    args = "[config]",
+    handler = function(rest)
+        rest = (rest or ""):lower()
+        if rest == "" then
+            MR:ToggleRares()
+        elseif rest == "config" then
+            MR:ToggleRaresConfig()
+        else
+            print(L["Chat_Commands"])
+        end
+    end,
+})
+
+Commands:Register({
+    name = "gathering",
+    handler = ExactOnly(function() MR:ToggleGatheringLocations() end),
+})

@@ -1,5 +1,6 @@
 local _, ns = ...
 local MR = ns.MR
+local F = _G.Foundry_1_0
 
 local registeredCampaigns = {}
 local SKIP_STATES = { [3] = true }
@@ -89,6 +90,6 @@ local function TryRegisterCampaigns()
     if didRegister and MR.RefreshUI then MR:RefreshUI() end
 end
 
-MR:RegisterEvent("PLAYER_LOGIN", function()
+F.Events:New("MidnightRoutine-StoryCampaign"):RegisterOnce("PLAYER_LOGIN", function()
     C_Timer.After(1, TryRegisterCampaigns)
 end)

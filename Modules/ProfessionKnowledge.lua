@@ -1,6 +1,8 @@
 local _, ns = ...
 local MR = ns.MR
 
+local F = _G.Foundry_1_0
+
 local FONT_HEADERS = ns.FONT_HEADERS
 local FONT_ROWS = ns.FONT_ROWS
 local StyledFrame = ns.StyledFrame
@@ -508,15 +510,19 @@ local function SetGatheringWaypoint(entry)
     return false, "No waypoint API available"
 end
 
-local itemCacheFrame = CreateFrame("Frame")
-itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-itemCacheFrame:RegisterEvent("QUEST_TURNED_IN")
-itemCacheFrame:RegisterEvent("QUEST_LOG_UPDATE")
-itemCacheFrame:SetScript("OnEvent", function(self, event, itemID)
-    if event == "GET_ITEM_INFO_RECEIVED" then
-        if not watchedItemIDs[itemID] then return end
-        if AllWatchedItemsCached() then self:UnregisterEvent("GET_ITEM_INFO_RECEIVED") end
-    end
+local itemCacheEvents = F.Events:New("MidnightRoutine-ProfessionKnowledge")
+
+itemCacheEvents:Register("GET_ITEM_INFO_RECEIVED", function(_, itemID)
+    if not watchedItemIDs[itemID] then return end
+    if AllWatchedItemsCached() then itemCacheEvents:Unregister("GET_ITEM_INFO_RECEIVED") end
+    if gatheringLocationsFrame and gatheringLocationsFrame:IsShown() then RebuildGatheringLocationsFrame() end
+end)
+
+itemCacheEvents:Register("QUEST_TURNED_IN", function()
+    if gatheringLocationsFrame and gatheringLocationsFrame:IsShown() then RebuildGatheringLocationsFrame() end
+end)
+
+itemCacheEvents:Register("QUEST_LOG_UPDATE", function()
     if gatheringLocationsFrame and gatheringLocationsFrame:IsShown() then RebuildGatheringLocationsFrame() end
 end)
 
@@ -1525,19 +1531,30 @@ function MR:RebuildGatheringLocationsFrame()
     if gatheringLocationsFrame and gatheringLocationsFrame:IsShown() then RebuildGatheringLocationsFrame() end
 end
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("ADDON_LOADED")
-eventFrame:RegisterEvent("PLAYER_LOGIN")
-eventFrame:SetScript("OnEvent", function(_, event, addonName)
-    if event == "ADDON_LOADED" and addonName == "MidnightRoutine" then
-        if MR.db then
-            gatheringMinimized = MR.db.profile.gatheringMinimized or false
-        end
-        eventFrame:UnregisterEvent("ADDON_LOADED")
-    elseif event == "PLAYER_LOGIN" then
-        if MR.db and MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("gatheringLocOpen") then
-            MR:ShowGatheringLocations()
-        end
-        eventFrame:UnregisterEvent("PLAYER_LOGIN")
+-- Foundry.Lifecycle's controller allows exactly one raw OnLogin hook per
+-- controller (Core.lua already claims it for MR:OnEnable()), so this can't
+-- register a second OnLogin subscriber directly. Instead this becomes an
+-- OnEnable-time subscriber: Core.lua's OnEnable calls MR:InitProfessionKnowledge()
+-- at login, the same "chain a module init off the single login hook" pattern
+-- used for MinimapButton.lua. One-shot by construction (OnLogin only fires
+-- once), so no unregister-equivalent teardown is needed.
+--
+-- gatheringMinimized timing: the original code read
+-- MR.db.profile.gatheringMinimized from an ADDON_LOADED-branch handler, which
+-- ran BEFORE PLAYER_LOGIN. Under Foundry, MR.db is constructed in
+-- MR:OnInitialize(), which Core.lua hooks to Lifecycle:OnAddonLoaded --
+-- strictly before Lifecycle:OnLogin fires MR:OnEnable() (see Core.lua's
+-- Foundry.Lifecycle wiring: addon-loaded and login are two distinct,
+-- sequentially-ordered WoW startup signals). So reading gatheringMinimized
+-- here, at OnEnable/login time, sees MR.db fully constructed with defaults --
+-- strictly safer than the original ADDON_LOADED-branch timing, which relied
+-- on incidental frame-registration ordering between AceAddon's internal
+-- ADDON_LOADED demux and this file's own frame.
+function MR:InitProfessionKnowledge()
+    if self.db then
+        gatheringMinimized = self.db.profile.gatheringMinimized or false
     end
-end)
+    if self.db and self.GetManagedWindowOpen and self:GetManagedWindowOpen("gatheringLocOpen") then
+        self:ShowGatheringLocations()
+    end
+end

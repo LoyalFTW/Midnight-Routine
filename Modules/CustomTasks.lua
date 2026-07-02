@@ -33,7 +33,6 @@ local function GetTaskStorage(scope)
 
     scope = NormalizeTaskScope(scope)
     if scope == TASK_SCOPE_SHARED then
-        MR.db.global = MR.db.global or {}
         MR.db.global.customTasks = MR.db.global.customTasks or {}
         MR.db.global.customTaskNextId = tonumber(MR.db.global.customTaskNextId) or 1
         return MR.db.global.customTasks
@@ -323,11 +322,11 @@ local function RequestQuestRewardData(questId)
 end
 
 local function QueueRewardRefresh()
-    if not (MR and MR.ScheduleTimer) or MR._customTaskRewardRefreshTimer then
+    if not MR or MR._customTaskRewardRefreshTimer then
         return
     end
 
-    MR._customTaskRewardRefreshTimer = MR:ScheduleTimer(function()
+    MR._customTaskRewardRefreshTimer = C_Timer.NewTimer(1.5, function()
         MR._customTaskRewardRefreshTimer = nil
         if MR.RefreshCustomTasksModule then
             MR:RefreshCustomTasksModule()
@@ -335,7 +334,7 @@ local function QueueRewardRefresh()
         if MR.RefreshUI then
             MR:RefreshUI()
         end
-    end, 1.5)
+    end)
 end
 
 local function GetQuestMoneyReward(questId)
@@ -426,7 +425,6 @@ local function GetAccountWideProgressStorage()
         return nil
     end
 
-    MR.db.global = MR.db.global or {}
     MR.db.global.customTaskProgress = MR.db.global.customTaskProgress or {}
     return MR.db.global.customTaskProgress
 end
@@ -436,14 +434,12 @@ local function GetAccountWideManualOverrideStorage()
         return nil
     end
 
-    MR.db.global = MR.db.global or {}
     MR.db.global.customTaskManualOverrides = MR.db.global.customTaskManualOverrides or {}
     return MR.db.global.customTaskManualOverrides
 end
 
 local function GetDiffProgressStorage(task)
     if task and task.accountWideComplete then
-        MR.db.global = MR.db.global or {}
         MR.db.global.customTaskDiffProgress = MR.db.global.customTaskDiffProgress or {}
         return MR.db.global.customTaskDiffProgress
     end
@@ -781,7 +777,6 @@ function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuest
 
     local taskId
     if scope == TASK_SCOPE_SHARED then
-        self.db.global = self.db.global or {}
         taskId = tonumber(self.db.global.customTaskNextId) or 1
         self.db.global.customTaskNextId = taskId + 1
     else
@@ -839,7 +834,6 @@ function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allow
         end
 
         if scope == TASK_SCOPE_SHARED then
-            self.db.global = self.db.global or {}
             task.id = tonumber(self.db.global.customTaskNextId) or 1
             self.db.global.customTaskNextId = task.id + 1
         else
