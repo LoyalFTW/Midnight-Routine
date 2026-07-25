@@ -1,7 +1,7 @@
 ﻿local _, ns = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine", true)
 
-local T, S, WQ, WD, DMF, TR, Ref = ns.T, ns.S, ns.WQ, ns.WD, ns.DMF, ns.TR, ns.Ref
+local T, WQ, WD, DMF = ns.T, ns.WQ, ns.WD, ns.DMF
 
 local TWW_EXPANSION = {
         key = "tww",

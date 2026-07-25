@@ -1,4 +1,4 @@
-﻿local addonName, ns = ...
+local addonName, ns = ...
 
 local Foundry = _G.Foundry_1_0
 if not Foundry then
@@ -487,8 +487,12 @@ function MR:FlushCombatDeferredUpdates()
         self:RefreshUI()
     end
 
-    if pending and pending.gatheringFrame and self.RefreshGatheringLocationsFrame then
-        self:RefreshGatheringLocationsFrame()
+    if pending and pending.gatheringFrame then
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        elseif self.RefreshGatheringLocationsFrame then
+            self:RefreshGatheringLocationsFrame()
+        end
     end
 
     if pending and pending.rares and self.RefreshRares then
@@ -915,6 +919,10 @@ function MR:SetProgress(moduleKey, rowKey, value, maxVal, bypassInstanceSuspend)
     end
     SetProgressValue(progressBucket, moduleKey, rowKey, math.max(0, math.min(value, maxVal)))
     self:RefreshUI()
+    local mod = self.moduleByKey and self.moduleByKey[moduleKey]
+    if mod and mod.profSkillLine and self.RefreshProfessionKnowledgeSurfaces then
+        self:RequestProfessionKnowledgeSurfaceRefresh()
+    end
 end
 
 function MR:GetPatchInfo(key)
@@ -1570,6 +1578,28 @@ function MR:RefreshProfessionKnowledgeSurfaces()
     end
 end
 
+function MR:RequestProfessionKnowledgeSurfaceRefresh(delay)
+    if not self.ScheduleTimer then
+        self:RefreshProfessionKnowledgeSurfaces()
+        return
+    end
+
+    delay = tonumber(delay) or 0.04
+    self._professionKnowledgeSurfaceRefreshPending = true
+    if self._professionKnowledgeSurfaceRefreshTimer and self.CancelTimer then
+        self:CancelTimer(self._professionKnowledgeSurfaceRefreshTimer)
+        self._professionKnowledgeSurfaceRefreshTimer = nil
+    end
+
+    self._professionKnowledgeSurfaceRefreshTimer = self:ScheduleTimer(function()
+        self._professionKnowledgeSurfaceRefreshTimer = nil
+        if self._professionKnowledgeSurfaceRefreshPending then
+            self._professionKnowledgeSurfaceRefreshPending = nil
+            self:RefreshProfessionKnowledgeSurfaces()
+        end
+    end, delay)
+end
+
 function MR:IsRowEnabled(modKey, rowKey)
     local mod = self.moduleByKey and self.moduleByKey[modKey]
     if mod then
@@ -1596,7 +1626,7 @@ function MR:SetRowEnabled(modKey, rowKey, enabled, skipRefresh)
     if not skipRefresh then
         self:RefreshUI()
     end
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 function MR:IsRowGroupEnabled(modKey, rows)
@@ -1621,7 +1651,7 @@ function MR:SetRowGroupEnabled(modKey, rows, enabled)
     end
     self._suspendProfessionKnowledgeSurfaceRefresh = nil
     self:RefreshUI()
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 function MR:SetModuleRowOrder(modKey, orderedKeys)
@@ -1795,7 +1825,7 @@ function MR:SetHeaderColor(modKey, hexColor)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 function MR:ResetHeaderColor(modKey)
@@ -1807,7 +1837,7 @@ function MR:ResetHeaderColor(modKey)
     else
         self:RefreshUI()
     end
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 function MR:GetHeaderBackgroundColor(modKey)
@@ -1972,7 +2002,7 @@ function MR:SetRowColor(modKey, rowKey, hexColor)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 function MR:ResetRowColor(modKey, rowKey)
@@ -1990,7 +2020,7 @@ function MR:ResetRowColor(modKey, rowKey)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
-    self:RefreshProfessionKnowledgeSurfaces()
+    self:RequestProfessionKnowledgeSurfaceRefresh()
 end
 
 local PARENT_TO_MIDNIGHT = {
@@ -2201,7 +2231,7 @@ function MR:RefreshPlayerProfessions()
     end
 
     if self.RefreshProfessionKnowledgeSurfaces then
-        self:RefreshProfessionKnowledgeSurfaces()
+        self:RequestProfessionKnowledgeSurfaceRefresh()
     end
     if self.RequestConfigRefresh then
         self:RequestConfigRefresh()
@@ -2998,7 +3028,9 @@ end
 function MR:ResumeDeferredInstanceWork()
     if self._deferredInstanceGatheringRefresh then
         self._deferredInstanceGatheringRefresh = nil
-        if self.RefreshGatheringLocationsFrame then
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        elseif self.RefreshGatheringLocationsFrame then
             self:RefreshGatheringLocationsFrame()
         end
     end
@@ -3365,7 +3397,9 @@ function MR:OnEnteringWorld()
         self:RefreshPlayerProfessions()
         self:RequestScan(0.35)
         self:UpdateInstanceFrameVisibility()
-        if self.RefreshGatheringLocationsFrame then
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        elseif self.RefreshGatheringLocationsFrame then
             self:RefreshGatheringLocationsFrame()
         end
     end, 0.5)
@@ -3398,6 +3432,9 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
 
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3415,6 +3452,9 @@ function MR:OnQuestDataChanged()
     end
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3436,6 +3476,9 @@ function MR:OnQuestTurnedIn(_, questID)
     end
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3453,6 +3496,9 @@ function MR:OnQuestAccepted(_, questID)
     end
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3470,6 +3516,9 @@ function MR:OnQuestRemoved(_, questID)
     end
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3482,6 +3531,9 @@ function MR:OnBagUpdateDelayed()
 
     if dirty then
         self:RefreshUI()
+        if self.RefreshProfessionKnowledgeSurfaces then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
     end
 end
 
@@ -3489,7 +3541,9 @@ function MR:OnProfessionChange()
     self:RefreshPlayerProfessions()
     self:RefreshProfessionConcentration()
     self:RefreshUI()
-    if self.RefreshGatheringLocationsFrame then
+    if self.RequestProfessionKnowledgeSurfaceRefresh then
+        self:RequestProfessionKnowledgeSurfaceRefresh()
+    elseif self.RefreshGatheringLocationsFrame then
         self:RefreshGatheringLocationsFrame()
     end
 end

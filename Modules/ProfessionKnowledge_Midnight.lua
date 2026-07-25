@@ -1,8 +1,7 @@
 ﻿local _, ns = ...
-local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine", true)
 
-local T, S, WQ, WD, DMF, TR, Ref = ns.T, ns.S, ns.WQ, ns.WD, ns.DMF, ns.TR, ns.Ref
+local T, S, WQ, WD, DMF = ns.T, ns.S, ns.WQ, ns.WD, ns.DMF
 
 local function KnowsLureRecipe(itemID)
     if not itemID then return true end

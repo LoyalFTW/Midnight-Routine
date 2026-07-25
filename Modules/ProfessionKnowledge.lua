@@ -111,7 +111,7 @@ local function SetSelectedKnowledgeExpansion(key)
         return
     end
     MR.db.profile.gatheringSelectedKnowledgeExpansion = key
-    RebuildGatheringLocationsFrame()
+    RebuildGatheringLocationsFrame(true)
 end
 
 local ENTRY_FALLBACK_ICONS = {
@@ -483,12 +483,18 @@ local function IsProfessionKnowledgeModule(mod)
     return not IsSkinningLuresModule(mod)
 end
 
+local function GetProfessionTaskDisplayGroup(group)
+    if group == "treasures" then
+        return "discoveries"
+    end
+    return group
+end
+
 local PROFESSION_TASK_GROUP_ORDER = {
     "weekly",
     "catchup",
     "discoveries",
     "studies",
-    "treasures",
     "books",
     "darkmoon",
     "lures",
@@ -535,6 +541,7 @@ for _, expansion in ipairs(ALL_EXPANSIONS or {}) do
 end
 
 local waypointAlt = {}
+local waypointLocationIndex = {}
 local zoneNameCache = {}
 
 local function GetGatheringZoneName(mapID)
@@ -570,6 +577,45 @@ local function SetGatheringWaypoint(entry)
     end
 
     return false, "No waypoint API available"
+end
+
+local function GetQuestSpecificLocations(entry)
+    local locations = {}
+    local seen = {}
+    if entry and entry.questLocations then
+        for _, questID in ipairs(QuestIDs(entry)) do
+            local location = entry.questLocations[questID]
+            if location and location.zone and location.x and location.y then
+                local key = tostring(location.zone) .. ":" .. tostring(location.x) .. ":" .. tostring(location.y)
+                if not seen[key] then
+                    seen[key] = true
+                    locations[#locations + 1] = location
+                end
+            end
+        end
+    end
+    return locations
+end
+
+local function GetWaypointTarget(entry, cycleKey)
+    local locations = GetQuestSpecificLocations(entry)
+    if #locations > 0 then
+        for _, questID in ipairs(QuestIDs(entry)) do
+            if C_QuestLog and C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(questID) then
+                local location = entry.questLocations[questID]
+                if location and location.zone and location.x and location.y then
+                    return location, #locations
+                end
+            end
+        end
+        local index = waypointLocationIndex[cycleKey] or 1
+        if index < 1 or index > #locations then index = 1 end
+        return locations[index], #locations
+    end
+    if entry and entry.zone and entry.x and entry.y then
+        return entry, 1
+    end
+    return nil, 0
 end
 
 local itemCacheFrame = CreateFrame("Frame")
@@ -649,7 +695,11 @@ local function SetProfessionCardVisible(expansionKey, professionKey, visible)
     else
         MR.db.profile.gatheringProfessionVisibility[key] = false
     end
-    if MR.RefreshProfessionKnowledgeSurfaces then MR:RefreshProfessionKnowledgeSurfaces() end
+    if MR.RequestProfessionKnowledgeSurfaceRefresh then
+        MR:RequestProfessionKnowledgeSurfaceRefresh()
+    elseif MR.RefreshProfessionKnowledgeSurfaces then
+        MR:RefreshProfessionKnowledgeSurfaces()
+    end
     if MR.RepopulateConfigFrame then MR:RepopulateConfigFrame() end
 end
 
@@ -702,7 +752,7 @@ end
 
 local function EntryDisplayLabel(entry, sectionKey)
     if sectionKey == "treasures" and ns.ResolveProfessionEntryLabel and ns.GetCoordinateFallback then
-        local fallback = ns.GetCoordinateFallback(entry, L["ProfKnowledge_Section_Treasures"] or "Knowledge Treasure")
+        local fallback = ns.GetCoordinateFallback(entry, L["ProfKnowledge_Section_Discoveries"] or "One-Time Discovery")
         local resolved = ns.ResolveProfessionEntryLabel(entry, fallback, true)
         if resolved and resolved ~= "" then
             return resolved
@@ -902,13 +952,18 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         GameTooltip:SetText(EntryDisplayLabel(entry, sectionKey), 1, 1, 1)
         GameTooltip:AddLine(string.format(L["ProfKnowledge_KPValue"], KPDone(entry), KPTotal(entry)), 0.80, 0.80, 0.90)
         GameTooltip:AddLine(string.format(L["ProfKnowledge_RowProgress"], current, required), 0.70, 0.90, 1)
-        if entry.zone and entry.x and entry.y then
+        local cycleKey = entry.rowKey or entry.itemID or entry.label
+        local target, targetCount = GetWaypointTarget(entry, cycleKey)
+        if target then
             local altKey = entry.itemID or entry.label
             local useAlt = entry.altZone and waypointAlt[altKey]
-            local mapID = useAlt and entry.altZone or entry.zone
-            local mapX = useAlt and entry.altX or entry.x
-            local mapY = useAlt and entry.altY or entry.y
+            local mapID = useAlt and entry.altZone or target.zone
+            local mapX = useAlt and entry.altX or target.x
+            local mapY = useAlt and entry.altY or target.y
             GameTooltip:AddLine(" ")
+            if target.label then
+                GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
+            end
             GameTooltip:AddLine(GetGatheringZoneName(mapID), 0.85, 0.85, 0.85)
             GameTooltip:AddLine(string.format(L["Gathering_Coords"], mapX, mapY), 0.7, 1, 0.9)
             if entry.altZone then
@@ -928,8 +983,8 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         GameTooltip:AddLine(" ")
         if done then
             GameTooltip:AddLine(L["Gathering_AlreadyCollected"], 0, 0.8, 0.27)
-        elseif entry.zone and entry.x and entry.y then
-            GameTooltip:AddLine(entry.altZone and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+        elseif target then
+            GameTooltip:AddLine((entry.altZone or targetCount > 1) and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
         end
         GameTooltip:Show()
     end)
@@ -938,11 +993,16 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         GameTooltip:Hide()
     end)
     row:SetScript("OnClick", function()
-        if not entry.zone or not entry.x or not entry.y then return end
+        local cycleKey = entry.rowKey or entry.itemID or entry.label
+        local target, targetCount = GetWaypointTarget(entry, cycleKey)
+        if not target then return end
         local altKey = entry.itemID or entry.label
         local useAlt = entry.altZone and waypointAlt[altKey]
-        local target = useAlt and { itemID = entry.itemID, label = entry.label, zone = entry.altZone, x = entry.altX, y = entry.altY } or entry
+        target = useAlt and { itemID = entry.itemID, label = entry.label, zone = entry.altZone, x = entry.altX, y = entry.altY } or target
         if entry.altZone then waypointAlt[altKey] = not waypointAlt[altKey] end
+        if targetCount > 1 then
+            waypointLocationIndex[cycleKey] = ((waypointLocationIndex[cycleKey] or 1) % targetCount) + 1
+        end
         local ok, source = SetGatheringWaypoint(target)
         if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), target.x, target.y)) else print(L["Waypoint_Unavailable"]) end
     end)
@@ -1076,8 +1136,10 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(14, 14)
     icon:SetPoint("LEFT", statusBox, "RIGHT", 6, 0)
+    local sharedCatchupItemID = expansion and expansion.sharedCatchupItemID
     local currencyInfo = profession.catchupCurrency and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(profession.catchupCurrency)
-    icon:SetTexture((currencyInfo and currencyInfo.iconFileID) or "Interface\\Icons\\INV_Misc_Coin_01")
+    local itemIcon = sharedCatchupItemID and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(sharedCatchupItemID)
+    icon:SetTexture(itemIcon or (currencyInfo and currencyInfo.iconFileID) or "Interface\\Icons\\INV_Misc_Coin_01")
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     local done, max = GetProfessionCatchupProgress(profession)
@@ -1121,7 +1183,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
 
     local grouped = {}
     for _, entry in ipairs(taskRows) do
-        local group = entry.group or entry.category or "other"
+        local group = GetProfessionTaskDisplayGroup(entry.group or entry.category or "other")
         grouped[group] = grouped[group] or {}
         grouped[group][#grouped[group] + 1] = entry
     end
@@ -1159,8 +1221,9 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
                 task.max = catchupMax
                 task.done = (catchupDone or 0) >= catchupMax
             else
-                task.max = GetProfessionCatchupAmount(profession)
-                task.done = (task.current or 0) >= task.max
+                task.current = row.itemId and GetItemCountRemaining(row.itemId) or (task.current or 0)
+                task.max = nil
+                task.done = false
             end
         end
 
@@ -1199,8 +1262,9 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         local maxValue = (type(row.max) == "number" and row.max > 0 and row.max)
             or (type(task.max) == "number" and task.max > 0 and task.max)
             or 1
+        local canManualToggle = not (row.key == "prof_catchup" and not catchupMax)
         local manualOverride = MR:GetManualOverride(mod.key, row.key) or 0
-        local forcedComplete = maxValue and manualOverride >= maxValue
+        local forcedComplete = canManualToggle and maxValue and manualOverride >= maxValue
         local activeDone = forcedComplete and maxValue or (task.current or 0)
         local function ApplyStatus()
             statusBtn:SetBackdropColor(0.03, 0.04, 0.06, 0.95 * contentAlpha)
@@ -1225,6 +1289,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             end
         end
         ApplyStatus()
+        statusBtn:EnableMouse(canManualToggle)
 
         local rowIcon = taskFrame:CreateTexture(nil, "ARTWORK")
         rowIcon:SetSize(14, 14)
@@ -1245,6 +1310,9 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             else
                 valueText:SetTextColor(rr, rg, rb, 0.95)
             end
+        elseif row.key == "prof_catchup" then
+            valueText:SetText(tostring(task.current or 0))
+            valueText:SetTextColor(rr, rg, rb, 0.95)
         elseif task.done then
             valueText:SetText(L["Done"] or "Done")
             valueText:SetTextColor(0.32, 0.80, 0.50, 0.95)
@@ -1271,10 +1339,15 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             if row.note and row.note ~= "" then
                 GameTooltip:AddLine(row.note, 0.70, 0.82, 0.92, true)
             end
-            if row.zone and row.x and row.y then
+            local target, targetCount = GetWaypointTarget(row, row.key)
+            if target then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine(string.format(L["Gathering_Coords"], row.x, row.y), 0.7, 1, 0.9)
-                GameTooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                if target.label then
+                    GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
+                end
+                GameTooltip:AddLine(GetGatheringZoneName(target.zone), 0.85, 0.85, 0.85)
+                GameTooltip:AddLine(string.format(L["Gathering_Coords"], target.x, target.y), 0.7, 1, 0.9)
+                GameTooltip:AddLine(targetCount > 1 and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
             end
             GameTooltip:Show()
         end)
@@ -1283,16 +1356,21 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             GameTooltip:Hide()
         end)
         taskFrame:SetScript("OnClick", function()
-            if row.zone and row.x and row.y then
-                local ok, source = SetGatheringWaypoint(row)
+            local target, targetCount = GetWaypointTarget(row, row.key)
+            if target then
+                if targetCount > 1 then
+                    waypointLocationIndex[row.key] = ((waypointLocationIndex[row.key] or 1) % targetCount) + 1
+                end
+                local ok, source = SetGatheringWaypoint(target)
                 if ok then
-                    print(string.format(L["Waypoint_Set"], source, StripInlineColor(row.label or mod.label or row.key), row.x, row.y))
+                    print(string.format(L["Waypoint_Set"], source, StripInlineColor(row.label or mod.label or row.key), target.x, target.y))
                 else
                     print(L["Waypoint_Unavailable"])
                 end
             end
         end)
         statusBtn:SetScript("OnClick", function()
+            if not canManualToggle then return end
             local currentOverride = MR:GetManualOverride(mod.key, row.key) or 0
             MR:SetManualOverride(mod.key, row.key, currentOverride >= maxValue and 0 or maxValue, maxValue)
             RebuildGatheringLocationsFrame()
@@ -1301,6 +1379,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             end
         end)
         statusBtn:SetScript("OnEnter", function()
+            if not canManualToggle then return end
             hover:SetColorTexture(rr, rg, rb, 0.10 * accentAlpha)
             GameTooltip:SetOwner(statusBtn, "ANCHOR_RIGHT")
             GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
@@ -2201,10 +2280,17 @@ local function BuildGatheringLocationsFrame(isRetry)
     return frame
 end
 
-RebuildGatheringLocationsFrame = function()
+RebuildGatheringLocationsFrame = function(resetScroll)
     RefreshFonts()
     local wasShown = gatheringLocationsFrame and gatheringLocationsFrame:IsShown()
-    local savedScroll = gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
+    -- Preserving scroll position only makes sense when the rebuild is for
+    -- the SAME content (e.g. a label finished resolving in the background).
+    -- Switching expansions swaps in a whole different profession list, so
+    -- reapplying an old offset (possibly scrolled near the bottom of a
+    -- taller list) onto shorter content clamps to a spot that skips right
+    -- past the new list's own header/top cards — resetScroll opts out of
+    -- that for callers where the content is genuinely changing.
+    local savedScroll = not resetScroll and gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
     if gatheringLocationsFrame then gatheringLocationsFrame:Hide() end
     gatheringLocationsFrame = BuildGatheringLocationsFrame()
     if not wasShown then gatheringLocationsFrame:Hide() end

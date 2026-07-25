@@ -24,14 +24,41 @@ ns.AllExpansions = ALL_EXPANSIONS
 
 local FLAT_SECTIONS = {
     { field = "weekly", key = "weekly", labelKey = "ProfKnowledge_Section_Weekly", fallback = "Weekly Knowledge" },
-    { field = "treasures", key = "treasures", labelKey = "ProfKnowledge_Section_Treasures", fallback = "Knowledge Treasures" },
+    { field = "discoveries", key = "discoveries", labelKey = "ProfKnowledge_Section_Discoveries", fallback = "One-Time Discoveries" },
+    { field = "treasures", key = "treasures", labelKey = "ProfKnowledge_Section_Discoveries", fallback = "One-Time Discoveries" },
+    { field = "studies", key = "studies", labelKey = "ProfKnowledge_Section_Studies", fallback = "Studies" },
     { field = "books", key = "books", labelKey = "ProfKnowledge_Section_Books", fallback = "Knowledge Books" },
+    { field = "darkmoon", key = "darkmoon", labelKey = "ProfKnowledge_Section_Darkmoon", fallback = "Darkmoon Faire" },
 }
+
+local function SplitFlatWeeklyDarkmoon(profession)
+    if not (profession and profession.weekly) then
+        return
+    end
+
+    local weekly = {}
+    local darkmoon = profession.darkmoon
+    for _, entry in ipairs(profession.weekly) do
+        if entry.kind == "darkmoon" then
+            local questID = entry.questID or (entry.questIDs and entry.questIDs[1])
+            entry.rowKey = entry.rowKey or (questID and ("weekly_" .. tostring(questID))) or ("dmf_" .. tostring((darkmoon and #darkmoon or 0) + 1))
+            darkmoon = darkmoon or {}
+            darkmoon[#darkmoon + 1] = entry
+        else
+            weekly[#weekly + 1] = entry
+        end
+    end
+
+    profession.weekly = weekly
+    profession.darkmoon = darkmoon
+end
 
 local function NormalizeProfessionSections(profession)
     if profession.sections then
         return profession.sections
     end
+
+    SplitFlatWeeklyDarkmoon(profession)
 
     local sections = {}
     for _, def in ipairs(FLAT_SECTIONS) do
@@ -116,8 +143,12 @@ local function RequestLabelRefresh()
             MR:RefreshUI()
         end
 
-        if MR.RequestGatheringLocationsRefresh then
+        if MR.RequestProfessionKnowledgeSurfaceRefresh then
+            MR:RequestProfessionKnowledgeSurfaceRefresh(0.02)
+        elseif MR.RequestGatheringLocationsRefresh then
             MR.RequestGatheringLocationsRefresh()
+        elseif MR.RefreshProfessionKnowledgeSurfaces then
+            MR:RefreshProfessionKnowledgeSurfaces()
         end
     end)
 end
@@ -271,6 +302,13 @@ function ns.ResolveProfessionEntryLabel(entry, fallback, preferFallback)
         TrackPendingLabel({}, entry.itemID)
     end
 
+    if entry and entry.preferFallbackLabel then
+        local label = entry.label or entry.mainMenuLabel or fallback
+        if label and label ~= "" then
+            return label
+        end
+    end
+
     if entry and not entry.itemID then
         local questID = entry.questID or (entry.questIDs and entry.questIDs[1])
         local rewardItemID = GetQuestRewardItemID(questID)
@@ -350,6 +388,7 @@ local function BuildWeeklyGroupedRows(section)
             zone = entry.zone,
             x = entry.x,
             y = entry.y,
+            questLocations = entry.questLocations,
             isVisible = (entry.kind == "darkmoon") and function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end or nil,
             group = (entry.kind == "darkmoon") and "darkmoon" or "weekly",
         }
@@ -360,7 +399,7 @@ local function BuildWeeklyGroupedRows(section)
             TrackPendingLabel(row, entry.itemID)
         end
         if #questIds > 0 then
-            TrackPendingQuestTitle(row, entry, (entry and entry.itemID and WEEKLY_DROP_ITEM_LABELS[entry.itemID]) or "Weekly Knowledge")
+            TrackPendingQuestTitle(row, entry, (entry and entry.itemID and WEEKLY_DROP_ITEM_LABELS[entry.itemID]) or "Weekly Knowledge", entry.preferFallbackLabel)
         end
     end
     table.sort(rows, function(a, b) return orderByKey[a.key] < orderByKey[b.key] end)
@@ -400,13 +439,13 @@ local ROW_GROUP_LABEL_KEYS = {
     catchup = "Prof_Catchup",
     discoveries = "ProfKnowledge_Section_Discoveries",
     studies = "ProfKnowledge_Section_Studies",
-    treasures = "ProfKnowledge_Section_Treasures",
+    treasures = "ProfKnowledge_Section_Discoveries",
     books = "ProfKnowledge_Section_Books",
     darkmoon = "ProfKnowledge_Section_Darkmoon",
 }
 
 local ROW_GROUP_LABEL_FALLBACKS = {
-    treasures = "Knowledge Treasures",
+    treasures = "One-Time Discoveries",
     books = "Knowledge Books",
 }
 
@@ -473,10 +512,14 @@ function ns.BuildMainMenuRows(profession, expansion)
         end
     end
 
-    if profession.catchupCurrency then
+    local sharedCatchupItemID = expansion and expansion.sharedCatchupItemID
+    if profession.catchupCurrency or sharedCatchupItemID then
         rows[#rows + 1] = {
             key = "prof_catchup",
             currencyId = profession.catchupCurrency,
+            itemId = sharedCatchupItemID,
+            itemID = sharedCatchupItemID,
+            noMax = sharedCatchupItemID and true or nil,
             noBlizzardTooltip = true,
             hideWallet = true,
             label = L["Prof_Catchup"],
@@ -510,6 +553,7 @@ function ns.BuildMainMenuRows(profession, expansion)
                         zone = entry.zone,
                         x = entry.x,
                         y = entry.y,
+                        questLocations = entry.questLocations,
                         group = sectionKey,
                     }
                     rows[#rows + 1] = row
@@ -540,6 +584,7 @@ function ns.BuildMainMenuRows(profession, expansion)
                     zone = entry.zone,
                     x = entry.x,
                     y = entry.y,
+                    questLocations = entry.questLocations,
                     isVisible = function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end,
                     group = "darkmoon",
                 }
@@ -573,6 +618,7 @@ function ns.BuildLureRows(profession)
                 zone = entry.zone,
                 x = entry.x,
                 y = entry.y,
+                questLocations = entry.questLocations,
                 isVisible = entry.isVisible,
                 group = "lures",
             }
