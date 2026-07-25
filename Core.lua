@@ -1,4 +1,4 @@
-local addonName, ns = ...
+﻿local addonName, ns = ...
 
 local Foundry = _G.Foundry_1_0
 if not Foundry then
@@ -313,6 +313,7 @@ MR.expansions  = {
         key = "midnight",
         label = L["Expansion_Midnight"] or "Midnight",
         shortLabel = L["Expansion_Midnight"] or "Midnight",
+        order = 100,
     },
 }
 MR.patches = {
@@ -661,6 +662,7 @@ function MR:SetSelectedExpansionKey(key, forAltBoard)
 
     self.db.profile.selectedExpansion = key
     self._orderedModulesCache = nil
+    self._orderedAllModulesCache = nil
     if self.RefreshUI then
         self:RefreshUI()
     end
@@ -690,6 +692,7 @@ function MR:RegisterModule(def)
     table.insert(self.modules, def)
     self.moduleByKey[def.key] = def
     self._orderedModulesCache = nil
+    self._orderedAllModulesCache = nil
 
     if self.RebuildTurnInCompletions then
         self:RebuildTurnInCompletions()
@@ -1168,6 +1171,36 @@ function MR:SetManualOverride(modKey, rowKey, val, maxVal)
 end
 
 function MR:GetOrderedModules(expansionKey)
+    if expansionKey == "all" then
+        if self._orderedAllModulesCache then
+            return self._orderedAllModulesCache
+        end
+
+        local result, professionBlocks, trailing = {}, {}, {}
+        for _, expansion in ipairs(self:GetSelectableExpansions()) do
+            for _, mod in ipairs(self:GetOrderedModules(expansion.key)) do
+                if mod.profSkillLine then
+                    professionBlocks[expansion.key] = professionBlocks[expansion.key] or {}
+                    professionBlocks[expansion.key][#professionBlocks[expansion.key] + 1] = mod
+                elseif mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")) then
+                    trailing[#trailing + 1] = mod
+                else
+                    result[#result + 1] = mod
+                end
+            end
+        end
+        for _, expansion in ipairs(self:GetSelectableExpansions()) do
+            for _, mod in ipairs(professionBlocks[expansion.key] or {}) do
+                result[#result + 1] = mod
+            end
+        end
+        for _, mod in ipairs(trailing) do
+            result[#result + 1] = mod
+        end
+        self._orderedAllModulesCache = result
+        return result
+    end
+
     expansionKey = expansionKey or self:GetSelectedExpansionKey()
     if expansionKey == self:GetSelectedExpansionKey() and self._orderedModulesCache then
         return self._orderedModulesCache
@@ -1295,16 +1328,32 @@ function MR:GetActiveModuleOrderStorage(expansionKey)
     return self.db.profile.expansionModuleOrder[expansionKey]
 end
 
-function MR:SetModuleOrder(orderedKeys)
+function MR:SetModuleOrder(orderedKeys, expansionKey)
+    if expansionKey == "all" then
+        local grouped = {}
+        for _, key in ipairs(orderedKeys or {}) do
+            local mod = self.moduleByKey and self.moduleByKey[key]
+            local modExpansionKey = self:GetModuleExpansionKey(mod)
+            grouped[modExpansionKey] = grouped[modExpansionKey] or {}
+            grouped[modExpansionKey][#grouped[modExpansionKey] + 1] = key
+        end
+
+        for key, order in pairs(grouped) do
+            self:SetModuleOrder(order, key)
+        end
+        self._orderedModulesCache = nil
+        self._orderedAllModulesCache = nil
+        return
+    end
+
+    expansionKey = expansionKey or self:GetSelectedExpansionKey()
     if self:IsCharacterWindowLayoutEnabled() then
-        local expansionKey = self:GetSelectedExpansionKey()
         self.db.char.expansionModuleOrder = self.db.char.expansionModuleOrder or {}
         self.db.char.expansionModuleOrder[expansionKey] = orderedKeys
         if expansionKey == "midnight" then
             self.db.char.moduleOrder = orderedKeys
         end
     else
-        local expansionKey = self:GetSelectedExpansionKey()
         self.db.profile.expansionModuleOrder = self.db.profile.expansionModuleOrder or {}
         self.db.profile.expansionModuleOrder[expansionKey] = orderedKeys
         if expansionKey == "midnight" then
@@ -1312,6 +1361,7 @@ function MR:SetModuleOrder(orderedKeys)
         end
     end
     self._orderedModulesCache = nil
+    self._orderedAllModulesCache = nil
 end
 
 function MR:IsModuleEnabled(key)
@@ -1320,7 +1370,7 @@ function MR:IsModuleEnabled(key)
     local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource) or self:GetActiveModuleStorage()
     local s = storage and storage[key]
     if mod and mod.profSkillLine and self.HasProfessionForModule and not self:HasProfessionForModule(mod.profSkillLine, professionSource) then
-        return s and s.enabled == true and s.professionManual == true
+        return false
     end
     if mod and not self:IsPatchEnabled(mod.patchKey) then
         local hasEnabledPatchRows = false
@@ -1335,7 +1385,13 @@ function MR:IsModuleEnabled(key)
         end
     end
     if mod and mod.profSkillLine then
+        if not s and mod.defaultEnabled == false then
+            return false
+        end
         return not (s and s.enabled == false and s.professionDisabled == true)
+    end
+    if not s and mod and mod.defaultEnabled == false then
+        return false
     end
     return not (s and s.enabled == false)
 end
@@ -1372,7 +1428,8 @@ function MR:SetPatchEnabled(patchKey, enabled, skipRefresh)
 end
 
 function MR:IsModuleOpen(key)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     local s = storage and storage[key]
     if s == nil then
         local mod = self.moduleByKey[key]
@@ -1382,31 +1439,36 @@ function MR:IsModuleOpen(key)
 end
 
 function MR:IsModuleDetached(key)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     local s = storage and storage[key]
     return s and s.detached == true or false
 end
 
 function MR:SetModuleOpen(key, open)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     if not storage[key] then storage[key] = {} end
     storage[key].open = open
 end
 
 function MR:SetModuleDetached(key, detached)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     if not storage[key] then storage[key] = {} end
     storage[key].detached = detached and true or false
 end
 
 function MR:GetDetachedModulePosition(key)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     local s = storage and storage[key]
     return s and s.detachedPos or nil
 end
 
 function MR:SetDetachedModulePosition(key, point, relPoint, x, y)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     if not storage[key] then storage[key] = {} end
     storage[key].detachedPos = {
         point = point,
@@ -1417,13 +1479,15 @@ function MR:SetDetachedModulePosition(key, point, relPoint, x, y)
 end
 
 function MR:GetDetachedModuleSize(key)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     local s = storage and storage[key]
     return s and s.detachedSize or nil
 end
 
 function MR:SetDetachedModuleSize(key, width, height)
-    local storage = self:GetActiveModuleStorage()
+    local mod = self.moduleByKey and self.moduleByKey[key]
+    local storage = self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     if not storage[key] then storage[key] = {} end
     storage[key].detachedSize = {
         width = width,
@@ -1494,6 +1558,18 @@ function MR:SetModuleHideComplete(modKey, value, skipRefresh)
     end
 end
 
+function MR:RefreshProfessionKnowledgeSurfaces()
+    if self._suspendProfessionKnowledgeSurfaceRefresh then
+        return
+    end
+    if self.RebuildGatheringLocationsFrame then
+        self:RebuildGatheringLocationsFrame()
+    end
+    if self.RepopulateGatheringConfig then
+        self:RepopulateGatheringConfig()
+    end
+end
+
 function MR:IsRowEnabled(modKey, rowKey)
     local mod = self.moduleByKey and self.moduleByKey[modKey]
     if mod then
@@ -1520,6 +1596,32 @@ function MR:SetRowEnabled(modKey, rowKey, enabled, skipRefresh)
     if not skipRefresh then
         self:RefreshUI()
     end
+    self:RefreshProfessionKnowledgeSurfaces()
+end
+
+function MR:IsRowGroupEnabled(modKey, rows)
+    if not (modKey and type(rows) == "table") then
+        return true
+    end
+    for _, row in ipairs(rows) do
+        if not self:IsRowEnabled(modKey, row.key) then
+            return false
+        end
+    end
+    return true
+end
+
+function MR:SetRowGroupEnabled(modKey, rows, enabled)
+    if not (modKey and type(rows) == "table") then
+        return
+    end
+    self._suspendProfessionKnowledgeSurfaceRefresh = true
+    for _, row in ipairs(rows) do
+        self:SetRowEnabled(modKey, row.key, enabled, true)
+    end
+    self._suspendProfessionKnowledgeSurfaceRefresh = nil
+    self:RefreshUI()
+    self:RefreshProfessionKnowledgeSurfaces()
 end
 
 function MR:SetModuleRowOrder(modKey, orderedKeys)
@@ -1693,6 +1795,7 @@ function MR:SetHeaderColor(modKey, hexColor)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
+    self:RefreshProfessionKnowledgeSurfaces()
 end
 
 function MR:ResetHeaderColor(modKey)
@@ -1704,6 +1807,7 @@ function MR:ResetHeaderColor(modKey)
     else
         self:RefreshUI()
     end
+    self:RefreshProfessionKnowledgeSurfaces()
 end
 
 function MR:GetHeaderBackgroundColor(modKey)
@@ -1868,6 +1972,7 @@ function MR:SetRowColor(modKey, rowKey, hexColor)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
+    self:RefreshProfessionKnowledgeSurfaces()
 end
 
 function MR:ResetRowColor(modKey, rowKey)
@@ -1885,6 +1990,7 @@ function MR:ResetRowColor(modKey, rowKey)
     elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
+    self:RefreshProfessionKnowledgeSurfaces()
 end
 
 local PARENT_TO_MIDNIGHT = {
@@ -2053,6 +2159,7 @@ function MR:RefreshPlayerProfessions()
     end
 
     if self.db and self.db.char then
+        self.db.char.knownProfessionLines = nil
         if scanned then
             self.db.char.professions = CopyProfessionMap(self.playerProfessions)
             self.db.char.professionsScanned = true
@@ -2066,6 +2173,15 @@ function MR:RefreshPlayerProfessions()
                 end
             end
         end
+    end
+
+    if self.RefreshProfessionKnowledgeSurfaces then
+        self:RefreshProfessionKnowledgeSurfaces()
+    end
+    if self.RequestConfigRefresh then
+        self:RequestConfigRefresh()
+    elseif self.RefreshUI then
+        self:RefreshUI()
     end
 end
 
@@ -2790,6 +2906,7 @@ function MR:ResetAllSettings()
     self.db.profile.firstSeen = firstSeen and true or false
 
     self._orderedModulesCache = nil
+    self._orderedAllModulesCache = nil
     self._moduleStatsCache = nil
     if self.RefreshCustomTasksModule then
         self:RefreshCustomTasksModule()

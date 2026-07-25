@@ -1,4 +1,4 @@
-local _, ns = ...
+﻿local _, ns = ...
 local MR = ns.MR
 
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
@@ -685,6 +685,12 @@ local function HideMainSectionWidget(section)
     section:Hide()
 end
 
+local function HideMainExpansionHeaderWidget(frame)
+    if frame then
+        frame:Hide()
+    end
+end
+
 local GetTextOnlyHeaderAlpha
 local ShouldShowIcons
 local ShouldShowSectionHeaders
@@ -696,6 +702,92 @@ local GetModuleFallbackIconInfo
 local ApplyIconToTexture
 local EnsureMainRowWidget
 local UpdateMainRowWidget
+
+local function GetMainRowGroupKey(row)
+    local group = row and row.group
+    if group then
+        return group
+    end
+    return nil
+end
+
+local function GetVisibleRowsByGroup(mod, rows)
+    local rowsByGroup = {}
+    for _, row in ipairs(rows or {}) do
+        local group = GetMainRowGroupKey(row)
+        if group then
+            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+            if rowVisible then
+                rowsByGroup[group] = rowsByGroup[group] or {}
+                rowsByGroup[group][#rowsByGroup[group] + 1] = row
+            end
+        end
+    end
+    return rowsByGroup
+end
+
+local function BuildMainRowGroupHeader(mod, group, groupRows)
+    local visible = MR:IsRowGroupEnabled(mod.key, groupRows)
+    local label = (ns.GetRowGroupLabel and ns.GetRowGroupLabel(group)) or tostring(group)
+    return {
+        key = "__group_" .. tostring(group),
+        label = label,
+        control = true,
+        sectionHeader = true,
+        hideStatus = true,
+        noDefaultTooltipHint = true,
+        headerActionStyle = "visibility",
+        headerActionVisible = visible,
+        onHeaderActionClick = function()
+            MR:SetRowGroupEnabled(mod.key, groupRows, not MR:IsRowGroupEnabled(mod.key, groupRows))
+        end,
+    }
+end
+
+local function ShouldRenderMainRowGroupHeader(self, mod, groupRows, hideComplete)
+    if not MR:IsRowGroupEnabled(mod.key, groupRows) then
+        return true
+    end
+
+    for _, row in ipairs(groupRows or {}) do
+        if MR:IsRowEnabled(mod.key, row.key) then
+            local done = MR:GetProgress(mod.key, row.key)
+            local rowComplete = self:IsRowComplete(mod, row, done)
+            if row.control or not (hideComplete and rowComplete) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, colW, usedRows, buildRowFunc)
+    local rowsByGroup = GetVisibleRowsByGroup(mod, rows)
+    local lastGroup
+    for _, row in ipairs(rows or {}) do
+        local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+        local group = GetMainRowGroupKey(row)
+        if rowVisible and group and group ~= lastGroup and rowsByGroup[group] and ShouldRenderMainRowGroupHeader(self, mod, rowsByGroup[group], hideComplete) then
+            local header = BuildMainRowGroupHeader(mod, group, rowsByGroup[group])
+            local rowFrame, nextY, rowId = buildRowFunc(header, 0, yOff)
+            yOff = nextY
+            if usedRows then usedRows[rowId] = true end
+        end
+        lastGroup = group
+
+        if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
+            local done = MR:GetProgress(mod.key, row.key)
+            local rowComplete = self:IsRowComplete(mod, row, done)
+            if row.control or not (hideComplete and rowComplete) then
+                local rowFrame, nextY, rowId = buildRowFunc(row, done, yOff)
+                yOff = nextY
+                if usedRows then usedRows[rowId] = true end
+            end
+        end
+    end
+    return yOff
+end
 
 local function EnsureMainSeparator(self, index)
     self._mainColumnSeparators = self._mainColumnSeparators or {}
@@ -714,6 +806,43 @@ local function EnsureMainSeparator(self, index)
     return sep
 end
 
+local function EnsureMainExpansionHeaderWidget(self, expansionKey)
+    self._mainExpansionHeaderFrames = self._mainExpansionHeaderFrames or {}
+    local key = "__expansion_" .. tostring(expansionKey or "midnight")
+    local frame = self._mainExpansionHeaderFrames[key]
+    if frame then
+        frame:SetParent(self.content)
+        frame:Show()
+        return frame
+    end
+
+    frame = CreateFrame("Frame", nil, self.content, "BackdropTemplate")
+    frame._label = frame:CreateFontString(nil, "OVERLAY")
+    frame._label:SetJustifyH("LEFT")
+    self._mainExpansionHeaderFrames[key] = frame
+    return frame
+end
+
+local function UpdateMainExpansionHeaderWidget(self, expansionKey, yOff, xOff, colW)
+    local frame = EnsureMainExpansionHeaderWidget(self, expansionKey)
+    local info = MR.GetExpansionInfo and MR:GetExpansionInfo(expansionKey) or nil
+    local label = (info and (info.shortLabel or info.label or info.key)) or tostring(expansionKey or "")
+    local frameAlpha = MR.db.profile.frameAlpha or 1.0
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", xOff + 3, -yOff)
+    frame:SetSize(math.max(colW - 6, 1), 18)
+    frame:SetFrameLevel((self.content:GetFrameLevel() or 0) + 8)
+    frame:SetBackdrop(MakeBackdrop())
+    frame:SetBackdropColor(0.035, 0.055, 0.070, 0.86 * frameAlpha)
+    frame:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.80 * frameAlpha)
+    frame._label:SetFont(FONT_HEADERS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    frame._label:SetPoint("LEFT", frame, "LEFT", 7, 0)
+    frame._label:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+    frame._label:SetText(label)
+    frame._label:SetTextColor(0.72, 0.86, 0.88, 0.95)
+    return frame
+end
+
 local function EnsureMainSectionWidget(self, modKey)
     self._mainSectionFrames = self._mainSectionFrames or {}
     local card = self._mainSectionFrames[modKey]
@@ -728,6 +857,11 @@ local function EnsureMainSectionWidget(self, modKey)
     card._glow:SetPoint("TOPLEFT", card, "TOPLEFT", 1, -1)
     card._glow:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -1, 1)
     card._glow:SetTexture("Interface\\Buttons\\WHITE8X8")
+
+    card._expHeader = CreateFrame("Frame", nil, card, "BackdropTemplate")
+    card._expHeader:SetBackdrop(MakeBackdrop())
+    card._expHeader._label = card._expHeader:CreateFontString(nil, "OVERLAY")
+    card._expHeader._label:SetJustifyH("LEFT")
 
     card._hdrFrame = CreateFrame("Frame", nil, card)
     card._hdrFrame:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
@@ -823,7 +957,7 @@ local function EnsureDetachedSectionWidget(frame, modKey)
     return card
 end
 
-local function AddSectionRegistryEntry(self, frame, modKey, col, yOff, bottom)
+local function AddSectionRegistryEntry(self, frame, modKey, col, yOff, bottom, expansionHeaderKey)
     self._sectionRegistryPool = self._sectionRegistryPool or {}
     local index = (self._sectionRegistryCount or 0) + 1
     self._sectionRegistryCount = index
@@ -834,6 +968,7 @@ local function AddSectionRegistryEntry(self, frame, modKey, col, yOff, bottom)
     entry.col = col or 1
     entry.yOff = yOff or 0
     entry.bottom = bottom
+    entry.expansionHeaderKey = expansionHeaderKey
     self.sectionRegistry[index] = entry
     return entry
 end
@@ -939,7 +1074,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)
-        or string.format(L["%d / %d complete"], secDone, secTotal))
+        or string.format("%d / %d", secDone, secTotal))
     card._hdrFrame._count:SetTextColor(countColor(secDone, secTotal))
     card._hdrFrame._count:SetJustifyH("RIGHT")
     card._hdrFrame._label:SetPoint("RIGHT", card._hdrFrame._count, "LEFT", -8, 0)
@@ -962,18 +1097,9 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
         localY = localY + 1
         local hideComplete = stats and stats.hideComplete
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
-        for _, row in ipairs(rows) do
-            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
-            if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
-                local done = MR:GetProgress(mod.key, row.key)
-                local rowComplete = self:IsRowComplete(mod, row, done)
-                if row.control or not (hideComplete and rowComplete) then
-                    local _, nextY, rowId = UpdateMainRowWidget(self, card, mod, row, done, localY, card:GetWidth())
-                    localY = nextY
-                    usedRows[rowId] = true
-                end
-            end
-        end
+        localY = RenderMainGroupedRows(self, card, mod, rows, hideComplete, localY, card:GetWidth(), usedRows, function(row, done, rowY)
+            return UpdateMainRowWidget(self, card, mod, row, done, rowY, card:GetWidth())
+        end)
     end
 
     for key, rowFrame in pairs(card._rows or {}) do
@@ -1299,7 +1425,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
 
     local isCurrencyModule = mod and (mod.key == "currencies" or mod.key == "pvp_currencies")
     local countIconInfo = (showIcons and isCurrencyModule and row.currencyId) and GetRowIconInfo(mod, row) or nil
-    local rowIconInfo = nil
+    local rowIconInfo = (mod and mod.profSkillLine) and GetRowIconInfo(mod, row) or nil
     local iconSize = math.max(ROW_HEIGHT - 8, 12)
     rowFrame._rowIcon:ClearAllPoints()
     rowFrame._rowIcon:SetSize(iconSize, iconSize)
@@ -1325,8 +1451,10 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
 
     local hasNumericMax = type(row.max) == "number" and row.max > 0
     local isCurrencyRow = row.currencyId and hasNumericMax and not row.noMax
-    local hasCoordText = hasWaypoint and not row.hideCoordText
-    local lblRightOff = isCurrencyRow and -96 or (hasCoordText and -128 or -52)
+    local isProfessionRow = mod and mod.profSkillLine
+    local hasCoordText = hasWaypoint and not row.hideCoordText and not isProfessionRow
+    local hasKnowledgeText = type(row.kpTotal) == "number" and row.kpTotal > 0
+    local lblRightOff = isCurrencyRow and -96 or (hasCoordText and (hasKnowledgeText and -168 or -128) or (hasKnowledgeText and -64 or -52))
 
     SetFontForText(rowFrame._label, CleanLabelText(row.label), GetFontSize(), GetFontFlags())
     rowFrame._label:ClearAllPoints()
@@ -1339,7 +1467,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     rowFrame._label:SetJustifyH("LEFT")
     rowFrame._label:SetJustifyV("MIDDLE")
 
-    local rowCustom = MR:GetRowColor(mod.key, row.key)
+    local rowCustom = MR:GetRowColor(mod.key, row.key) or (row.colorKey and MR:GetRowColor(mod.key, row.colorKey))
     local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local inlineColor = ExtractInlineLabelColor(row.label)
     local effectiveColor = rowCustom or headerCustom or inlineColor
@@ -1375,6 +1503,9 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     rowFrame._count:SetWidth(0)
 
     local countText, countTextColor = GetMainFrameRowCount(row)
+    if isProfessionRow then
+        countText, countTextColor = nil, nil
+    end
     if countText then
         rowFrame._count:SetText(countText)
         if countTextColor then
@@ -1426,6 +1557,8 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             rowFrame._wallet:SetText(string.format("|cffaaaaaa(%d)|r", wallet))
             rowFrame._label:SetPoint("RIGHT", rowFrame._wallet, "LEFT", -8, 0)
         end
+    elseif isProfessionRow then
+        rowFrame._count:SetText("")
     else
         rowFrame._count:SetText((row.noMax or not hasNumericMax) and tostring(done) or string.format("%d / %d", done, row.max))
         if row.noMax or not hasNumericMax then
@@ -1441,10 +1574,31 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     end
     rowFrame._count:Show()
 
+    local rightAnchor = rowFrame._count
+    if hasKnowledgeText then
+        rowFrame._vault:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 1), GetFontFlags())
+        rowFrame._vault:ClearAllPoints()
+        rowFrame._vault:SetPoint("RIGHT", rowFrame._count, "LEFT", -8, 0)
+        rowFrame._vault:SetJustifyH("RIGHT")
+        if isComplete then
+            rowFrame._vault:SetText(L["Done"] or "Done")
+            rowFrame._vault:SetTextColor(0.32, 0.80, 0.50, 0.95)
+        else
+            rowFrame._vault:SetText("+" .. tostring(row.kpTotal))
+            if effectiveColor then
+                rowFrame._vault:SetTextColor(hex(effectiveColor))
+            else
+                rowFrame._vault:SetTextColor(0.92, 0.78, 0.24, 0.95)
+            end
+        end
+        rowFrame._vault:Show()
+        rightAnchor = rowFrame._vault
+    end
+
     if hasCoordText then
         rowFrame._coords:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 1), GetFontFlags())
         rowFrame._coords:ClearAllPoints()
-        rowFrame._coords:SetPoint("RIGHT", rowFrame._count, "LEFT", -8, 0)
+        rowFrame._coords:SetPoint("RIGHT", rightAnchor, "LEFT", -8, 0)
         rowFrame._coords:SetJustifyH("RIGHT")
         rowFrame._coords:SetText(string.format("%.2f, %.2f", row.x, row.y))
         if isComplete then
@@ -1594,7 +1748,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     return rowFrame, yOff + rowH, rowId
 end
 
-local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordRegistry)
+local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordRegistry, expansionHeaderKey)
     local transparent = IsMainTextOnlyMode()
     local frameAlpha = MR.db.profile.frameAlpha or 1.0
     local showSectionHeaders = ShouldShowSectionHeaders()
@@ -1614,7 +1768,8 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
 
     local allDone = (secTotal > 0) and (secDone == secTotal)
     local card = EnsureMainSectionWidget(self, mod.key)
-    local sectionHeight = math.max((stats and stats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1)
+    local expansionHeaderH = expansionHeaderKey and 22 or 0
+    local sectionHeight = math.max((stats and stats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1) + expansionHeaderH
     card:ClearAllPoints()
     card:SetPoint("TOPLEFT", self.content, "TOPLEFT", xOff + 3, -yOff)
     card:SetSize(math.max(colW - 6, 1), sectionHeight)
@@ -1628,6 +1783,31 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     end
     card._glow:SetColorTexture(0.12, 0.14, 0.18, transparent and 0 or (0.10 * frameAlpha))
 
+    if card._expHeader then
+        if expansionHeaderKey then
+            local info = MR.GetExpansionInfo and MR:GetExpansionInfo(expansionHeaderKey) or nil
+            local label = (info and (info.shortLabel or info.label or info.key)) or tostring(expansionHeaderKey or "")
+            card._expHeader:ClearAllPoints()
+            card._expHeader:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
+            card._expHeader:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
+            card._expHeader:SetHeight(expansionHeaderH - 3)
+            card._expHeader:SetBackdropColor(0.035, 0.055, 0.070, transparent and 0 or (0.86 * frameAlpha))
+            card._expHeader:SetBackdropBorderColor(0.14, 0.30, 0.34, transparent and 0 or (0.80 * frameAlpha))
+            card._expHeader._label:ClearAllPoints()
+            card._expHeader._label:SetPoint("LEFT", card._expHeader, "LEFT", 7, 0)
+            card._expHeader._label:SetPoint("RIGHT", card._expHeader, "RIGHT", -7, 0)
+            card._expHeader._label:SetFont(FONT_HEADERS, math.max(8, GetFontSize() - 1), GetFontFlags())
+            card._expHeader._label:SetText(label)
+            card._expHeader._label:SetTextColor(0.72, 0.86, 0.88, transparent and 0.85 or 0.95)
+            card._expHeader:Show()
+        else
+            card._expHeader:Hide()
+        end
+    end
+
+    card._hdrFrame:ClearAllPoints()
+    card._hdrFrame:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -expansionHeaderH)
+    card._hdrFrame:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -expansionHeaderH)
     card._hdrFrame:SetHeight(HEADER_HEIGHT)
     card._hdrFrame._mrMod = mod
     card._hdrFrame._mrHoverAlpha = transparent and (0.10 * textOnlyHeaderAlpha) or ((showSectionHeaders and 0.05 or 0) * frameAlpha)
@@ -1693,14 +1873,14 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)
-        or string.format(L["%d / %d complete"], secDone, secTotal))
+        or string.format("%d / %d", secDone, secTotal))
     card._hdrFrame._count:SetTextColor(countColor(secDone, secTotal))
     card._hdrFrame._count:SetJustifyH("RIGHT")
     card._hdrFrame._label:SetPoint("RIGHT", card._hdrFrame._count, "LEFT", -8, 0)
 
     StyleSectionCollapseIndicator(card._hdrFrame._arrow, isOpen)
 
-    local localY = HEADER_HEIGHT
+    local localY = expansionHeaderH + HEADER_HEIGHT
     card._divider:ClearAllPoints()
     card._divider:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -localY)
     card._divider:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -localY)
@@ -1716,18 +1896,9 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         localY = localY + 1
         local hideComplete = stats and stats.hideComplete
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
-        for _, row in ipairs(rows) do
-            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
-            if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
-                local done = MR:GetProgress(mod.key, row.key)
-                local rowComplete = self:IsRowComplete(mod, row, done)
-                if row.control or not (hideComplete and rowComplete) then
-                    local rowFrame, nextY, rowId = UpdateMainRowWidget(self, card, mod, row, done, localY, card:GetWidth())
-                    localY = nextY
-                    usedRows[rowId] = true
-                end
-            end
-        end
+        localY = RenderMainGroupedRows(self, card, mod, rows, hideComplete, localY, card:GetWidth(), usedRows, function(row, done, rowY)
+            return UpdateMainRowWidget(self, card, mod, row, done, rowY, card:GetWidth())
+        end)
     end
 
     for key, rowFrame in pairs(card._rows or {}) do
@@ -1737,7 +1908,7 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     end
 
     if recordRegistry ~= false then
-        AddSectionRegistryEntry(self, card, mod.key, col or 1, yOff, yOff + (stats and stats.height or 0))
+        AddSectionRegistryEntry(self, card, mod.key, col or 1, yOff, yOff + (stats and stats.height or 0) + expansionHeaderH, expansionHeaderKey)
     end
     return card
 end
@@ -1788,19 +1959,29 @@ function MR:RefreshMainPanelSectionsOnly()
     local visibleMods = self._visibleModsBuffer or {}
     self._visibleModsBuffer = visibleMods
     local visibleModCount = 0
-    for _, mod in ipairs(MR:GetOrderedModules()) do
+    local lastVisibleExpansionKey
+    local pendingExpansionHeaderKey
+    for _, mod in ipairs(MR:GetOrderedModules("all")) do
         local modVisible = not mod.isVisible or mod:isVisible()
         if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
             local stats = GetModuleStats(self, mod)
             local doneRows = stats and stats.doneRows or 0
             local shownRows = stats and stats.shownRows or 0
             if shownRows > 0 then
+                local expansionKey = MR:GetModuleExpansionKey(mod)
+                if mod.profSkillLine and expansionKey ~= lastVisibleExpansionKey then
+                    pendingExpansionHeaderKey = expansionKey
+                    lastVisibleExpansionKey = expansionKey
+                end
                 visibleModCount = visibleModCount + 1
                 local slot = visibleModCount
                 local entry = visibleMods[slot] or {}
                 entry.mod = mod
-                entry.h = stats and stats.height or 0
+                entry.expansionKey = nil
+                entry.expansionHeaderKey = pendingExpansionHeaderKey
+                entry.h = (stats and stats.height or 0) + (pendingExpansionHeaderKey and 22 or 0)
                 visibleMods[slot] = entry
+                pendingExpansionHeaderKey = nil
                 allTotal = allTotal + shownRows
                 allDone = allDone + math.min(doneRows, shownRows)
             end
@@ -1825,15 +2006,22 @@ function MR:RefreshMainPanelSectionsOnly()
     self._modColAssignBuffer = modColAssign
     local modColAssignCount = 0
     local curCol = 1
+    local targetColH = math.max(totalModH / numCols, 1)
     for i = 1, visibleModCount do
         local entry = visibleMods[i]
-        if curCol < numCols and cols[curCol] >= totalModH / numCols then
+        local projectedH = entry.h or 0
+        if entry.expansionKey and visibleMods[i + 1] then
+            projectedH = projectedH + (visibleMods[i + 1].h or 0)
+        end
+        if curCol < numCols and cols[curCol] > 0 and (cols[curCol] + projectedH) > targetColH then
             curCol = curCol + 1
         end
         modColAssignCount = modColAssignCount + 1
         local slot = modColAssignCount
         local assign = modColAssign[slot] or {}
         assign.mod = entry.mod
+        assign.expansionKey = entry.expansionKey
+        assign.expansionHeaderKey = entry.expansionHeaderKey
         assign.col = curCol
         assign.yOff = cols[curCol]
         modColAssign[slot] = assign
@@ -1849,10 +2037,12 @@ function MR:RefreshMainPanelSectionsOnly()
     for i = 1, modColAssignCount do
         local assign = modColAssign[i]
         local xOff = (assign.col - 1) * colW
-        local section = UpdateMainSectionWidget(self, assign.mod, assign.yOff, xOff, colW, assign.col, true)
-        if section then
-            activeMainSections[assign.mod.key] = true
-            self.widgets[#self.widgets + 1] = section
+        if assign.mod then
+            local section = UpdateMainSectionWidget(self, assign.mod, assign.yOff, xOff, colW, assign.col, true, assign.expansionHeaderKey)
+            if section then
+                activeMainSections[assign.mod.key] = true
+                self.widgets[#self.widgets + 1] = section
+            end
         end
     end
 
@@ -1861,6 +2051,11 @@ function MR:RefreshMainPanelSectionsOnly()
             if not activeMainSections[key] then
                 HideMainSectionWidget(section)
             end
+        end
+    end
+    if self._mainExpansionHeaderFrames then
+        for _, frame in pairs(self._mainExpansionHeaderFrames) do
+            HideMainExpansionHeaderWidget(frame)
         end
     end
 
@@ -1967,7 +2162,7 @@ function MR:FastToggleMainSection(modKey)
     local colW = math.floor(usableW / numCols)
     local xOff = ((registryEntry.col or 1) - 1) * colW
 
-    UpdateMainSectionWidget(self, mod, registryEntry.yOff or 0, xOff, colW, registryEntry.col or 1, false)
+    UpdateMainSectionWidget(self, mod, registryEntry.yOff or 0, xOff, colW, registryEntry.col or 1, false, registryEntry.expansionHeaderKey)
 
     local colOffsets = self._fastToggleColOffsets or {}
     self._fastToggleColOffsets = colOffsets
@@ -1986,13 +2181,14 @@ function MR:FastToggleMainSection(modKey)
             local col = math.max(1, math.min(info.col or 1, numCols))
             local yOff = colOffsets[col] or 0
             local x = (col - 1) * colW
+            local expansionHeaderH = info.expansionHeaderKey and 22 or 0
             curSection:ClearAllPoints()
             curSection:SetPoint("TOPLEFT", self.content, "TOPLEFT", x + 3, -yOff)
-            curSection:SetSize(math.max(colW - 6, 1), math.max((curStats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1))
+            curSection:SetSize(math.max(colW - 6, 1), math.max((curStats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1) + expansionHeaderH)
             info.col = col
             info.yOff = yOff
-            info.bottom = yOff + (curStats.height or 0)
-            colOffsets[col] = yOff + (curStats.height or 0)
+            info.bottom = yOff + (curStats.height or 0) + expansionHeaderH
+            colOffsets[col] = yOff + (curStats.height or 0) + expansionHeaderH
             if colOffsets[col] > totalH then
                 totalH = colOffsets[col]
             end
@@ -2207,8 +2403,9 @@ GetRowIconInfo = function(mod, row)
         end
     end
 
-    if row.itemId and C_Item and C_Item.GetItemIconByID then
-        local icon = C_Item.GetItemIconByID(row.itemId)
+    local itemId = row.itemId or row.itemID
+    if itemId and C_Item and C_Item.GetItemIconByID then
+        local icon = C_Item.GetItemIconByID(itemId)
         if icon then
             return { texture = icon }
         end
@@ -2630,7 +2827,6 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     local scroll = MR and MR.scroll
     local track = MR and MR._scrollTrack
     local dragger = MR and MR._dragger
-    local expansionDropdown = MR and MR.expansionDropdown
     local characterBar = MR and MR._characterBar
     local headerHeight = titleBar and titleBar:GetHeight() or GetMainHeaderHeight()
     local characterBarHeight = GetMainCharacterBarHeight()
@@ -2695,15 +2891,6 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
             dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
         else
             dragger:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
-        end
-    end
-
-    if expansionDropdown then
-        expansionDropdown:ClearAllPoints()
-        if headerBottom then
-            expansionDropdown:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", -4, 0)
-        else
-            expansionDropdown:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -4, 0)
         end
     end
 
@@ -3200,12 +3387,6 @@ function MR:BuildUI()
     self.RefreshMainHeaderChrome = RefreshMainHeaderChrome
     RefreshMainHeaderChrome()
 
-    local expansionDropdown = ns.BuildExpansionDropdown(f, false, {
-        width = 150,
-        height = 16,
-    })
-    self.expansionDropdown = expansionDropdown
-
     local scroll = CreateFrame("ScrollFrame", nil, f)
     scroll:EnableMouseWheel(true)
     self.scroll = scroll
@@ -3595,7 +3776,7 @@ function MR:RefreshVisibleDetachedFrames()
     end
     local allowShowing = not self._instanceFramesHidden and not self:IsManagedWindowsBundleHidden()
 
-    for _, mod in ipairs(MR:GetOrderedModules()) do
+    for _, mod in ipairs(MR:GetOrderedModules("all")) do
         local modVisible = not mod.isVisible or mod:isVisible()
         local detached = MR:IsModuleDetached(mod.key)
         local frame = self.detachedFrames[mod.key]
@@ -3762,7 +3943,9 @@ function MR:RefreshUI()
         local visibleMods = self._visibleModsBuffer or {}
         self._visibleModsBuffer = visibleMods
         local visibleModCount = 0
-        for _, mod in ipairs(MR:GetOrderedModules()) do
+        local lastVisibleExpansionKey
+        local pendingExpansionHeaderKey
+        for _, mod in ipairs(MR:GetOrderedModules("all")) do
             local modVisible = not mod.isVisible or mod:isVisible()
             if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
                 local stats = GetModuleStats(self, mod)
@@ -3771,12 +3954,20 @@ function MR:RefreshUI()
                 local shownRows = stats and stats.shownRows or 0
                 if shownRows > 0 then
                     local h = stats and stats.height or 0
+                    local expansionKey = MR:GetModuleExpansionKey(mod)
+                    if mod.profSkillLine and expansionKey ~= lastVisibleExpansionKey then
+                        pendingExpansionHeaderKey = expansionKey
+                        lastVisibleExpansionKey = expansionKey
+                    end
                     visibleModCount = visibleModCount + 1
                     local slot = visibleModCount
                     local entry = visibleMods[slot] or {}
                     entry.mod = mod
-                    entry.h = h
+                    entry.expansionKey = nil
+                    entry.expansionHeaderKey = pendingExpansionHeaderKey
+                    entry.h = h + (pendingExpansionHeaderKey and 22 or 0)
                     visibleMods[slot] = entry
+                    pendingExpansionHeaderKey = nil
                     allTotal = allTotal + shownRows
                     allDone = allDone + math.min(doneRows, shownRows)
                 end
@@ -3801,15 +3992,22 @@ function MR:RefreshUI()
         self._modColAssignBuffer = modColAssign
         local modColAssignCount = 0
         local curCol = 1
+        local targetColH = math.max(totalModH / numCols, 1)
         for i = 1, visibleModCount do
             local entry = visibleMods[i]
-            if curCol < numCols and cols[curCol] >= totalModH / numCols then
+            local projectedH = entry.h or 0
+            if entry.expansionKey and visibleMods[i + 1] then
+                projectedH = projectedH + (visibleMods[i + 1].h or 0)
+            end
+            if curCol < numCols and cols[curCol] > 0 and (cols[curCol] + projectedH) > targetColH then
                 curCol = curCol + 1
             end
             modColAssignCount = modColAssignCount + 1
             local slot = modColAssignCount
             local assign = modColAssign[slot] or {}
             assign.mod = entry.mod
+            assign.expansionKey = entry.expansionKey
+            assign.expansionHeaderKey = entry.expansionHeaderKey
             assign.col = curCol
             assign.yOff = cols[curCol]
             modColAssign[slot] = assign
@@ -3824,10 +4022,12 @@ function MR:RefreshUI()
         for i = 1, modColAssignCount do
             local assign = modColAssign[i]
             local xOff = (assign.col - 1) * colW
-            local section = UpdateMainSectionWidget(self, assign.mod, assign.yOff, xOff, colW, assign.col)
-            if section then
-                activeMainSections[assign.mod.key] = true
-                table.insert(self.widgets, section)
+            if assign.mod then
+                local section = UpdateMainSectionWidget(self, assign.mod, assign.yOff, xOff, colW, assign.col, nil, assign.expansionHeaderKey)
+                if section then
+                    activeMainSections[assign.mod.key] = true
+                    table.insert(self.widgets, section)
+                end
             end
         end
 
@@ -3836,6 +4036,11 @@ function MR:RefreshUI()
                 if not activeMainSections[key] then
                     HideMainSectionWidget(section)
                 end
+            end
+        end
+        if self._mainExpansionHeaderFrames then
+            for _, frame in pairs(self._mainExpansionHeaderFrames) do
+                HideMainExpansionHeaderWidget(frame)
             end
         end
 
@@ -4021,15 +4226,26 @@ BuildModuleStatsCache = function(self)
     local seen = self._moduleStatsSeen or {}
     self._moduleStatsSeen = seen
 
-    for _, mod in ipairs(MR:GetOrderedModules()) do
+    for _, mod in ipairs(MR:GetOrderedModules("all")) do
         local hideComplete = MR:IsModuleHideComplete(mod.key)
         local isOpen = MR:IsModuleOpen(mod.key)
         local totalRows, doneRows, shownRows = 0, 0, 0
         local height = HEADER_HEIGHT + 1 + SECTION_GAP
 
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
+        local rowsByGroup = GetVisibleRowsByGroup(mod, rows)
+        local lastGroup
         for _, row in ipairs(rows) do
             local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+            local group = GetMainRowGroupKey(row)
+            if rowVisible and group and group ~= lastGroup and rowsByGroup[group] and ShouldRenderMainRowGroupHeader(self, mod, rowsByGroup[group], hideComplete) then
+                shownRows = shownRows + 1
+                if isOpen then
+                    height = height + ROW_HEIGHT
+                end
+            end
+            lastGroup = group
+
             if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
                 local done = MR:GetProgress(mod.key, row.key)
                 local countsForTotals = not row.control
@@ -4207,7 +4423,7 @@ function MR:BuildSection(mod, yOff, xOff, colW, col, parent, widgetBucket, opts)
     local cnt = hdrFrame:CreateFontString(nil, "OVERLAY")
     cnt:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     cnt:SetPoint("RIGHT", hdrFrame, "RIGHT", -18, 0)
-    cnt:SetText(string.format(L["%d / %d complete"], secDone, secTotal))
+    cnt:SetText(string.format("%d / %d", secDone, secTotal))
     cnt:SetTextColor(countColor(secDone, secTotal))
     cnt:SetJustifyH("RIGHT")
     lbl:SetPoint("RIGHT", cnt, "LEFT", -8, 0)
@@ -4305,16 +4521,10 @@ function MR:BuildSection(mod, yOff, xOff, colW, col, parent, widgetBucket, opts)
         localY = localY + 1
         local hideComplete = stats and stats.hideComplete
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
-        for _, row in ipairs(rows) do
-            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
-            if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
-                local done       = MR:GetProgress(mod.key, row.key)
-                local isComplete = self:IsRowComplete(mod, row, done)
-                if row.control or not (hideComplete and isComplete) then
-                    localY = self:BuildRow(mod, row, done, localY, false, 0, card:GetWidth(), card, widgetBucket)
-                end
-            end
-        end
+        localY = RenderMainGroupedRows(self, card, mod, rows, hideComplete, localY, card:GetWidth(), nil, function(row, done, rowY)
+            local nextY = self:BuildRow(mod, row, done, rowY, false, 0, card:GetWidth(), card, widgetBucket)
+            return nil, nextY, row.key or tostring(row.label or rowY)
+        end)
     end
 
     if widgetBucket == self.widgets then
@@ -4664,7 +4874,7 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
     end
 
     local isCurrencyModule = mod and (mod.key == "currencies" or mod.key == "pvp_currencies")
-    local rowIconInfo = nil
+    local rowIconInfo = (mod and mod.profSkillLine) and GetRowIconInfo(mod, row) or nil
     local countIconInfo = (showIcons and isCurrencyModule and row.currencyId) and GetRowIconInfo(mod, row) or nil
     local iconSize = math.max(ROW_HEIGHT - 8, 12)
     local rowIcon = rowFrame:CreateTexture(nil, "ARTWORK")
@@ -4683,8 +4893,10 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
     end
     local hasNumericMax = type(row.max) == "number" and row.max > 0
     local isCurrencyRow = row.currencyId and hasNumericMax and not row.noMax
-    local hasCoordText  = hasWaypoint and not row.hideCoordText
-    local lblRightOff   = isCurrencyRow and -96 or (hasCoordText and -128 or -52)
+    local isProfessionRow = mod and mod.profSkillLine
+    local hasCoordText  = hasWaypoint and not row.hideCoordText and not isProfessionRow
+    local hasKnowledgeText = type(row.kpTotal) == "number" and row.kpTotal > 0
+    local lblRightOff   = isCurrencyRow and -96 or (hasCoordText and (hasKnowledgeText and -168 or -128) or (hasKnowledgeText and -64 or -52))
 
     local lbl = rowFrame:CreateFontString(nil, "OVERLAY")
     if lbl.SetWordWrap then
@@ -4706,7 +4918,7 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
     lbl:SetJustifyH("LEFT")
     lbl:SetJustifyV("MIDDLE")
 
-    local rowCustom    = MR:GetRowColor(mod.key, row.key)
+    local rowCustom    = MR:GetRowColor(mod.key, row.key) or (row.colorKey and MR:GetRowColor(mod.key, row.colorKey))
     local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local inlineColor  = ExtractInlineLabelColor(row.label)
     local effectiveColor = rowCustom or headerCustom or inlineColor
@@ -4741,6 +4953,9 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
     end
 
     local countText, countTextColor = GetMainFrameRowCount(row)
+    if isProfessionRow then
+        countText, countTextColor = nil, nil
+    end
     if countText then
         countFS:SetText(countText)
         if countTextColor then
@@ -4787,6 +5002,8 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
             walletFS:SetText(string.format("|cffaaaaaa(%d)|r", wallet))
             lbl:SetPoint("RIGHT", walletFS, "LEFT", -8, 0)
         end
+    elseif isProfessionRow then
+        countFS:SetText("")
     else
         countFS:SetText((row.noMax or not hasNumericMax) and tostring(done) or string.format("%d / %d", done, row.max))
         if row.noMax or not hasNumericMax then
@@ -4801,10 +5018,33 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
         end
     end
 
+    local rightAnchor = countFS
+    if hasKnowledgeText then
+        local knowledgeFS = rowFrame:CreateFontString(nil, "OVERLAY")
+        knowledgeFS:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 1), GetFontFlags())
+        knowledgeFS:SetPoint("RIGHT", countFS, "LEFT", -8, 0)
+        knowledgeFS:SetJustifyH("RIGHT")
+        if knowledgeFS.SetWordWrap then
+            knowledgeFS:SetWordWrap(false)
+        end
+        if isComplete then
+            knowledgeFS:SetText(L["Done"] or "Done")
+            knowledgeFS:SetTextColor(0.32, 0.80, 0.50, 0.95)
+        else
+            knowledgeFS:SetText("+" .. tostring(row.kpTotal))
+            if effectiveColor then
+                knowledgeFS:SetTextColor(hex(effectiveColor))
+            else
+                knowledgeFS:SetTextColor(0.92, 0.78, 0.24, 0.95)
+            end
+        end
+        rightAnchor = knowledgeFS
+    end
+
     if hasCoordText then
         local coordsFS = rowFrame:CreateFontString(nil, "OVERLAY")
         coordsFS:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 1), GetFontFlags())
-        coordsFS:SetPoint("RIGHT", countFS, "LEFT", -8, 0)
+        coordsFS:SetPoint("RIGHT", rightAnchor, "LEFT", -8, 0)
         coordsFS:SetJustifyH("RIGHT")
         coordsFS:SetText(string.format("%.2f, %.2f", row.x, row.y))
         if isComplete then
@@ -4846,4 +5086,116 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
 
     table.insert(widgetBucket, rowFrame)
     return yOff + rowH
+end
+
+function ns.AttachScrollList(scroll, content, track)
+    scroll:EnableMouseWheel(true)
+    scroll:SetScrollChild(content)
+
+    local trackBg = track:CreateTexture(nil, "BACKGROUND")
+    trackBg:SetAllPoints()
+    trackBg:SetColorTexture(0, 0, 0, 0.3)
+
+    local thumb = CreateFrame("Button", nil, track)
+    thumb:SetPoint("LEFT", track, "LEFT", 0, 0)
+    thumb:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+    thumb:EnableMouse(true)
+    thumb:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
+    local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
+    thumbTex:SetAllPoints()
+    thumbTex:SetColorTexture(0.20, 0.66, 0.63, 0.7)
+
+    local function GetContentHeight()
+        local child = scroll:GetScrollChild()
+        return child and child:GetHeight() or 0
+    end
+
+    local function UpdateScrollBar()
+        local viewH, contentH = scroll:GetHeight(), GetContentHeight()
+        if contentH <= viewH or viewH <= 0 then thumb:Hide(); return end
+        thumb:Show()
+        local trackH = math.max(track:GetHeight(), 1)
+        local thumbH = math.max(trackH * (viewH / contentH), 14)
+        local pct = scroll:GetVerticalScroll() / math.max(contentH - viewH, 1)
+        thumb:SetHeight(thumbH)
+        thumb:ClearAllPoints()
+        thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackH - thumbH) * pct))
+        thumb:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+    end
+
+    local function SetScrollFromCursor(cursorY, grabOffset)
+        local viewH = scroll:GetHeight()
+        local contentH = GetContentHeight()
+        local maxScroll = math.max(contentH - viewH, 0)
+        if maxScroll <= 0 then
+            scroll:SetVerticalScroll(0)
+            UpdateScrollBar()
+            return
+        end
+
+        local trackTop = track:GetTop()
+        local trackBottom = track:GetBottom()
+        if not trackTop or not trackBottom then return end
+
+        local trackH = math.max(trackTop - trackBottom, 1)
+        local thumbH = thumb:GetHeight()
+        local movable = math.max(trackH - thumbH, 1)
+        local offset = grabOffset or (thumbH * 0.5)
+        local y = math.max(0, math.min((trackTop - cursorY) - offset, movable))
+        local pct = y / movable
+        scroll:SetVerticalScroll(maxScroll * pct)
+        UpdateScrollBar()
+    end
+
+    track:SetScript("OnMouseDown", function(_, button)
+        if button ~= "LeftButton" or not thumb:IsShown() then return end
+        local _, cursorY = GetCursorPosition()
+        cursorY = cursorY / UIParent:GetEffectiveScale()
+        SetScrollFromCursor(cursorY, thumb:GetHeight() * 0.5)
+        thumb._grabOffset = thumb:GetHeight() * 0.5
+        thumb:SetScript("OnUpdate", function(self)
+            if not IsMouseButtonDown("LeftButton") then
+                self._grabOffset = nil
+                self:SetScript("OnUpdate", nil)
+                return
+            end
+
+            local _, dragCursorY = GetCursorPosition()
+            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
+            SetScrollFromCursor(dragCursorY, self._grabOffset)
+        end)
+    end)
+
+    thumb:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" or not self:IsShown() then return end
+        local _, cursorY = GetCursorPosition()
+        cursorY = cursorY / UIParent:GetEffectiveScale()
+        local thumbTop = self:GetTop()
+        self._grabOffset = thumbTop and (thumbTop - cursorY) or (self:GetHeight() * 0.5)
+        self:SetScript("OnUpdate", function(btn)
+            if not IsMouseButtonDown("LeftButton") then
+                btn._grabOffset = nil
+                btn:SetScript("OnUpdate", nil)
+                return
+            end
+
+            local _, dragCursorY = GetCursorPosition()
+            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
+            SetScrollFromCursor(dragCursorY, btn._grabOffset)
+        end)
+    end)
+
+    thumb:SetScript("OnMouseUp", function(self)
+        self._grabOffset = nil
+        self:SetScript("OnUpdate", nil)
+    end)
+
+    scroll:SetScript("OnMouseWheel", function(_, delta)
+        scroll:SetVerticalScroll(math.max(0, math.min(scroll:GetVerticalScroll() - delta * 30, math.max(GetContentHeight() - scroll:GetHeight(), 0))))
+        UpdateScrollBar()
+    end)
+    scroll:SetScript("OnScrollRangeChanged", UpdateScrollBar)
+    scroll:SetScript("OnVerticalScroll", UpdateScrollBar)
+
+    return UpdateScrollBar, thumb, trackBg, thumbTex
 end

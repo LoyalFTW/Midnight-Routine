@@ -27,12 +27,14 @@ local UATV_BRANCHES = {
     { quest = 93912, name = L["Unity_Raids"]         },
     { quest = 93889, name = L["Unity_Soiree"]        },
     { quest = 93892, name = L["Unity_Stormarion"]    },
+    { quest = 94385, name = L["Unity_VoidAssaults"] or "Midnight: Void Assaults" },
+    { quest = 94386, name = L["Unity_VoidAssaults"] or "Midnight: Void Assaults" },
     { quest = 93913, name = L["Unity_WorldBoss"]     },
     { quest = 93766, name = L["Unity_WorldQuests"]   },
 }
 
 local UATV_META_QUEST_IDS = {
-    93744, 96727,
+    93744,
 }
 
 local UATV_BRANCH_QUEST_IDS = {}

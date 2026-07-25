@@ -560,6 +560,12 @@ function MR:SetMainAltViewCharacter(charKey)
     if self.RequestConfigRepopulate then
         self:RequestConfigRepopulate(nil, 0.04)
     end
+    if self.RebuildGatheringLocationsFrame then
+        self:RebuildGatheringLocationsFrame()
+    end
+    if self.RepopulateGatheringConfig then
+        self:RepopulateGatheringConfig()
+    end
 end
 
 function MR:GetMainAltViewCharacterInfo()
@@ -655,7 +661,6 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                         or (snapshot.isCurrent and self.HasProfessionForModule and self:HasProfessionForModule(mod.profSkillLine))
                         or (savedProfessions and savedProfessions[mod.profSkillLine])
                         or ((not charData.professionsScanned) and (not HasAnyProfessionRecord(savedProfessions)) and savedConcentration and savedConcentration[mod.profSkillLine] ~= nil)
-                        or (effectiveSettings and effectiveSettings.enabled == true and effectiveSettings.professionManual == true)
 
                     if moduleVisible and knowsProfession then
                         local moduleEntry = {

@@ -45,6 +45,9 @@ local function BuildRows()
             note = L["Omnium_Progress_Note"] or "Complete the five Seeking Knowledge quests to unlock every Omnium Folio rune row. Missed weeks can be caught up until you are current.",
             patchKey = "12.0.7",
             control = true,
+            sectionHeader = true,
+            hideStatus = true,
+            noDefaultTooltipHint = true,
         },
     }
 

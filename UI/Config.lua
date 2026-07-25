@@ -1,4 +1,4 @@
-local _, ns = ...
+﻿local _, ns = ...
 local MR = ns.MR
 
 local cfgFrame
@@ -204,6 +204,26 @@ function MR:BuildConfigFrame()
 
     local closeBtn = CloseButton(tbar, function() f:Hide() end)
 
+    local scroll = CreateFrame("ScrollFrame", nil, f)
+    scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -22)
+    scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 0)
+    local scrollContent = CreateFrame("Frame", nil, scroll)
+    scrollContent:SetSize(f:GetWidth() or 344, 1)
+
+    local track = CreateFrame("Frame", nil, f)
+    track:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -25)
+    track:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, 3)
+    track:SetWidth(4)
+
+    if ns.AttachScrollList then
+        f.UpdateScrollBar = ns.AttachScrollList(scroll, scrollContent, track)
+        f.scroll = scroll
+        f.scrollTrack = track
+    else
+        scroll:Hide()
+        track:Hide()
+    end
+
     return f
 end
 
@@ -213,12 +233,13 @@ function MR:PopulateConfigFrame(f)
         f.body = nil
     end
 
-    local body = CreateFrame("Frame", nil, f)
-    body:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    body:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    local bodyParent = (f.scroll and f.scroll:GetScrollChild()) or f
+    local body = CreateFrame("Frame", nil, bodyParent)
+    body:SetPoint("TOPLEFT",  bodyParent, "TOPLEFT",  0, 0)
+    body:SetPoint("TOPRIGHT", bodyParent, "TOPRIGHT", 0, 0)
     f.body = body
 
-    local yOff = -26
+    local yOff = f.scroll and -4 or -26
     local cfgFs = GetFontSize()
     local contentW = (f:GetWidth() or 344) - 16
     local activePage = MR._cfgPage or "windows"
@@ -1342,10 +1363,18 @@ function MR:PopulateConfigFrame(f)
         return mod and (mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")))
     end
 
-    local orderedMods = MR:GetOrderedModules()
+    local orderedMods = MR:GetOrderedModules("all")
     local orderIndex = {}
     for index, mod in ipairs(orderedMods) do
         orderIndex[mod.key] = index
+    end
+    local weeklyAnchor = orderIndex.weeklies or orderIndex.weekly_tasks or orderIndex.weekly or 2
+
+    local function GetConfigSortOrder(mod)
+        if mod and MR:GetModulePatchKey(mod) == "12.0.7" then
+            return weeklyAnchor + 0.35
+        end
+        return orderIndex[mod.key] or 9999
     end
 
     local _allMods = {}
@@ -1357,6 +1386,11 @@ function MR:PopulateConfigFrame(f)
         local bStory = IsStoryConfigModule(b)
         if aStory ~= bStory then
             return not aStory
+        end
+        local aSort = GetConfigSortOrder(a)
+        local bSort = GetConfigSortOrder(b)
+        if aSort ~= bSort then
+            return aSort < bSort
         end
         local ao = MR.GetPatchSortOrder and MR:GetPatchSortOrder(MR:GetModulePatchKey(a)) or 999999
         local bo = MR.GetPatchSortOrder and MR:GetPatchSortOrder(MR:GetModulePatchKey(b)) or 999999
@@ -1377,7 +1411,10 @@ function MR:PopulateConfigFrame(f)
         return "|cff667788(" .. (patchInfo.shortLabel or patchInfo.key or patchKey) .. ")|r"
     end
 
-    local function FormatModuleConfigLabel(mod)
+    local function FormatModuleConfigLabel(mod, includePatch)
+        if includePatch == false then
+            return mod.label or mod.key
+        end
         local suffix = FormatReleaseSuffix(MR:GetModulePatchKey(mod))
         if suffix then
             return string.format("%s  %s", mod.label or mod.key, suffix)
@@ -1387,7 +1424,8 @@ function MR:PopulateConfigFrame(f)
 
     local function FormatRowConfigLabel(mod, row)
         local cleanLabel = (row.label or row.key):gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
-        local suffix = FormatReleaseSuffix(MR:GetRowPatchKey(mod, row))
+        local rowPatchKey = MR:GetRowPatchKey(mod, row)
+        local suffix = rowPatchKey ~= MR:GetModulePatchKey(mod) and FormatReleaseSuffix(rowPatchKey) or nil
         if suffix then
             return string.format("%s  %s", cleanLabel, suffix)
         end
@@ -1429,11 +1467,16 @@ function MR:PopulateConfigFrame(f)
         yOff = yOff - ROW_H
     end
 
+    local function ShouldShowModulePatchHeader(patchKey)
+        return patchKey and patchKey ~= "12.0.7"
+    end
+
     local function GetConfigRowsForModule(mod)
         local orderedRows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or (mod.rows or {})
         local rows = {}
         for _, row in ipairs(orderedRows) do
-            if not row.control then
+            local visible = not row.isVisible or row.isVisible()
+            if not row.control and visible then
                 rows[#rows + 1] = row
             end
         end
@@ -1471,6 +1514,40 @@ function MR:PopulateConfigFrame(f)
         lbl:SetPoint("RIGHT", patchFr, "RIGHT", -6, 0)
         lbl:SetJustifyH("LEFT")
         lbl:SetText((patchInfo.label or patchKey) .. "  |cff667788" .. (L["Config_PatchFilter"] or "Patch filter") .. "|r")
+        lbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
+
+        yOff = yOff - ROW_H
+    end
+
+    local function BuildRowGroupHeader(modKey, groupRows, label)
+        local enabled = MR:IsRowGroupEnabled(modKey, groupRows)
+        local ROW_H = 18
+        local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+        groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
+        groupFr:SetSize(contentW - 20, ROW_H)
+        groupFr:SetBackdrop(MakeBackdrop())
+        groupFr:SetBackdropColor(enabled and 0.05 or 0.07, enabled and 0.13 or 0.06, enabled and 0.16 or 0.07, 0.88)
+        groupFr:SetBackdropBorderColor(enabled and 0.16 or 0.30, enabled and 0.42 or 0.16, enabled and 0.48 or 0.16, 0.9)
+
+        local cb = CreateFrame("CheckButton", nil, groupFr, "UICheckButtonTemplate")
+        cb:SetSize(18, 18)
+        cb:SetPoint("LEFT", groupFr, "LEFT", 0, 0)
+        cb:SetChecked(enabled)
+        cb:SetScript("OnClick", function(s)
+            MR:SetRowGroupEnabled(modKey, groupRows, s:GetChecked())
+            if MR.RequestConfigRepopulate then
+                MR:RequestConfigRepopulate(f, 0.04)
+            else
+                MR:PopulateConfigFrame(f)
+            end
+        end)
+
+        local lbl = groupFr:CreateFontString(nil, "OVERLAY")
+        lbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+        lbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
+        lbl:SetPoint("RIGHT", groupFr, "RIGHT", -6, 0)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetText(label)
         lbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
 
         yOff = yOff - ROW_H
@@ -1598,7 +1675,7 @@ function MR:PopulateConfigFrame(f)
             return
         end
 
-        local allMods = MR:GetOrderedModules()
+        local allMods = MR:GetOrderedModules("all")
         local visMods = {}
         for _, row in ipairs(_cfgRows) do
             for _, m in ipairs(allMods) do
@@ -1629,7 +1706,7 @@ function MR:PopulateConfigFrame(f)
                     table.insert(newOrder, m.key)
                 end
             end
-            MR:SetModuleOrder(newOrder)
+            MR:SetModuleOrder(newOrder, "all")
             MR:RefreshUI()
         end
         drag.srcKey = nil; drag.targetIdx = nil; drag.mode = "module"; drag.moduleKey = nil
@@ -1646,13 +1723,31 @@ function MR:PopulateConfigFrame(f)
     local storyGroupOpen = MR._cfgExpanded.__storyCampaigns == true
     local storyTotal, storyEnabled = 0, 0
     local professionSource = MR.GetMainFrameProgressSource and MR:GetMainFrameProgressSource() or nil
-    for _, mod in ipairs(_allMods) do
-        if mod.profSkillLine then
+    local function IsProfessionKnownForConfig(profession)
+        if not profession then
+            return false
+        end
+        if ns.IsProfessionLearnedForSource then
+            return ns.IsProfessionLearnedForSource(profession, professionSource)
+        end
+        return not MR.HasProfessionForModule or MR:HasProfessionForModule(profession.skillLine, professionSource)
+    end
+    local function IsProfessionModuleKnownForConfig(mod)
+        if not mod or not mod.profSkillLine then
+            return true
+        end
+        return not MR.HasProfessionForModule or MR:HasProfessionForModule(mod.profSkillLine, professionSource)
+    end
+    for _, expansion in ipairs(ns.AllExpansions or {}) do
+        for _, profession in ipairs(expansion.professions or {}) do
             professionTotal = professionTotal + 1
-            if not MR.HasProfessionForModule or MR:HasProfessionForModule(mod.profSkillLine, professionSource) then
+            if IsProfessionKnownForConfig(profession) then
                 professionKnown = professionKnown + 1
             end
-        elseif IsStoryConfigModule(mod) then
+        end
+    end
+    for _, mod in ipairs(_allMods) do
+        if IsStoryConfigModule(mod) then
             storyTotal = storyTotal + 1
             if MR:IsModuleEnabled(mod.key) then
                 storyEnabled = storyEnabled + 1
@@ -1661,13 +1756,26 @@ function MR:PopulateConfigFrame(f)
     end
 
     local function BuildProfessionGroupHeader()
-        local ROW_H = 22
+        local ROW_H = 38
         local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         headerFr:SetSize(contentW, ROW_H)
         headerFr:SetBackdrop(MakeBackdrop())
-        headerFr:SetBackdropColor(0.05, 0.11, 0.16, 0.94)
-        headerFr:SetBackdropBorderColor(0.18, 0.40, 0.45, 0.95)
+        headerFr:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
+        headerFr:SetBackdropBorderColor(0.24, 0.76, 0.70, 1)
+
+        local badge = CreateFrame("Frame", nil, headerFr, "BackdropTemplate")
+        badge:SetSize(28, 24)
+        badge:SetPoint("LEFT", headerFr, "LEFT", 7, 0)
+        badge:SetBackdrop(MakeBackdrop())
+        badge:SetBackdropColor(0.06, 0.17, 0.18, 0.95)
+        badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
+
+        local badgeText = badge:CreateFontString(nil, "OVERLAY")
+        badgeText:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        badgeText:SetPoint("CENTER")
+        badgeText:SetText("PK")
+        badgeText:SetTextColor(0.60, 1.00, 0.90)
 
         local arrowBtn = CreateFrame("Button", nil, headerFr, "BackdropTemplate")
         arrowBtn:SetSize(16, 16)
@@ -1683,12 +1791,20 @@ function MR:PopulateConfigFrame(f)
         arrowLbl:SetTextColor(0.45, 0.75, 0.70)
 
         local lbl = headerFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 10, GetFontFlags())
-        lbl:SetPoint("LEFT", headerFr, "LEFT", 8, 0)
+        lbl:SetFont(FONT_HEADERS, 11, GetFontFlags())
+        lbl:SetPoint("TOPLEFT", badge, "TOPRIGHT", 8, -1)
         lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText(string.format("Professions  |cff667788%d/%d|r", professionKnown, professionTotal))
-        lbl:SetTextColor(0.78, 0.95, 0.90)
+        lbl:SetText("Profession Knowledge")
+        lbl:SetTextColor(0.88, 1.00, 0.94)
+
+        local sub = headerFr:CreateFontString(nil, "OVERLAY")
+        sub:SetFont(FONT_ROWS, 8, GetFontFlags())
+        sub:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -1)
+        sub:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
+        sub:SetJustifyH("LEFT")
+        sub:SetText(string.format("Learned professions %d/%d", professionKnown, professionTotal))
+        sub:SetTextColor(0.58, 0.80, 0.78, 0.95)
 
         local function ToggleProfessionGroup()
             MR._cfgExpanded.__professions = not professionGroupOpen
@@ -1713,7 +1829,176 @@ function MR:PopulateConfigFrame(f)
             arrowLbl:SetTextColor(0.45, 0.75, 0.70)
         end)
 
-        yOff = yOff - ROW_H
+        yOff = yOff - ROW_H - 3
+    end
+
+    local function GetProfessionEntryVisibilityId(expansionKey, professionKey, sectionKey, index)
+        return tostring(expansionKey) .. ":" .. tostring(professionKey) .. ":" .. tostring(sectionKey) .. ":" .. tostring(index)
+    end
+
+    local function CleanProfessionConfigLabel(text)
+        text = tostring(text or "")
+        text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        return text
+    end
+
+    local function RenderLegacyProfessionConfigRows()
+        local expansions = ns.AllExpansions or {}
+        local profile = MR.db and MR.db.profile
+        if not profile then return end
+        profile.gatheringEntryVisibility = profile.gatheringEntryVisibility or {}
+        local entryVisibility = profile.gatheringEntryVisibility
+        local renderedAny = false
+
+        local function GroupEnabled(expansionKey, profession, section)
+            for index in ipairs(section.entries or {}) do
+                local entryId = GetProfessionEntryVisibilityId(expansionKey, profession.key, section.key, index)
+                if entryVisibility[entryId] == false then
+                    return false
+                end
+            end
+            return true
+        end
+
+        local function SetGroupEnabled(expansionKey, profession, section, enabled)
+            for index in ipairs(section.entries or {}) do
+                local entryId = GetProfessionEntryVisibilityId(expansionKey, profession.key, section.key, index)
+                entryVisibility[entryId] = enabled and true or false
+            end
+            if MR.RebuildGatheringLocationsFrame then MR:RebuildGatheringLocationsFrame() end
+            MR:PopulateConfigFrame(f)
+        end
+
+        local function ProfessionEnabled(expansionKey, profession)
+            if ns.IsProfessionKnowledgeProfessionVisible then
+                return ns.IsProfessionKnowledgeProfessionVisible(expansionKey, profession.key)
+            end
+            return true
+        end
+
+        local function SetProfessionEnabled(expansionKey, profession, enabled)
+            if ns.SetProfessionKnowledgeProfessionVisible then
+                ns.SetProfessionKnowledgeProfessionVisible(expansionKey, profession.key, enabled)
+            end
+            MR:PopulateConfigFrame(f)
+        end
+
+        for _, expansion in ipairs(expansions) do
+            if expansion.key ~= "midnight" then
+                local learned = {}
+                for _, profession in ipairs(expansion.professions or {}) do
+                    if IsProfessionKnownForConfig(profession) then
+                        learned[#learned + 1] = profession
+                    end
+                end
+                if #learned > 0 then
+                    if not renderedAny then
+                        Gap(4)
+                        renderedAny = true
+                    end
+
+                    local expH = 18
+                    local expFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+                    expFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
+                    expFr:SetSize(contentW - 4, expH)
+                    expFr:SetBackdrop(MakeBackdrop())
+                    expFr:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
+                    expFr:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
+                    local expLbl = expFr:CreateFontString(nil, "OVERLAY")
+                    expLbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+                    expLbl:SetPoint("LEFT", expFr, "LEFT", 7, 0)
+                    expLbl:SetPoint("RIGHT", expFr, "RIGHT", -7, 0)
+                    expLbl:SetJustifyH("LEFT")
+                    expLbl:SetText(string.format("%s  |cff667788%d|r", expansion.label or expansion.key, #learned))
+                    expLbl:SetTextColor(0.72, 0.86, 0.88)
+                    yOff = yOff - expH
+
+                    for _, profession in ipairs(learned) do
+                        local rowH = 22
+                        local rowKey = "__pk:" .. expansion.key .. ":" .. profession.key
+                        local isExp = MR._cfgExpanded[rowKey]
+                        local professionEnabled = ProfessionEnabled(expansion.key, profession)
+                        local rowFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+                        rowFr:SetPoint("TOPLEFT", body, "TOPLEFT", 14, yOff)
+                        rowFr:SetSize(contentW - 10, rowH)
+                        rowFr:SetBackdrop(MakeBackdrop())
+                        rowFr:SetBackdropColor(0.018, 0.025, 0.032, 0.86)
+                        rowFr:SetBackdropBorderColor(0.16, 0.24, 0.28, 0.72)
+
+                        local enableBtn = CreateFrame("CheckButton", nil, rowFr, "UICheckButtonTemplate")
+                        enableBtn:SetSize(18, 18)
+                        enableBtn:SetPoint("LEFT", rowFr, "LEFT", 4, 0)
+                        enableBtn:SetChecked(professionEnabled)
+                        enableBtn:SetScript("OnClick", function(s)
+                            SetProfessionEnabled(expansion.key, profession, s:GetChecked() and true or false)
+                        end)
+                        enableBtn:SetScript("OnEnter", function()
+                            GameTooltip:SetOwner(enableBtn, "ANCHOR_RIGHT")
+                            GameTooltip:SetText(enableBtn:GetChecked() and (L["Config_DisableModule"] or "Disable this profession") or (L["Config_EnableModule"] or "Enable this profession"), 1, 1, 1)
+                            GameTooltip:Show()
+                        end)
+                        enableBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+                        local expandBtn = CreateFrame("Button", nil, rowFr, "BackdropTemplate")
+                        expandBtn:SetSize(16, 16)
+                        expandBtn:SetPoint("RIGHT", rowFr, "RIGHT", -4, 0)
+                        expandBtn:SetBackdrop(MakeBackdrop())
+                        expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
+                        expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
+                        local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")
+                        expandLbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+                        expandLbl:SetPoint("CENTER", expandBtn, "CENTER", 0, 1)
+                        expandLbl:SetText(isExp and "v" or ">")
+                        expandLbl:SetTextColor(0.45, 0.75, 0.70)
+                        expandBtn:SetScript("OnClick", function()
+                            MR._cfgExpanded[rowKey] = not isExp
+                            MR:PopulateConfigFrame(f)
+                        end)
+
+                        local lbl = rowFr:CreateFontString(nil, "OVERLAY")
+                        lbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                        lbl:SetPoint("LEFT", enableBtn, "RIGHT", 6, 0)
+                        lbl:SetPoint("RIGHT", expandBtn, "LEFT", -6, 0)
+                        lbl:SetJustifyH("LEFT")
+                        lbl:SetText(profession.label)
+                        lbl:SetTextColor(0.80, 0.86, 0.88)
+                        yOff = yOff - rowH
+
+                        if isExp then
+                            for _, section in ipairs(profession.sections or {}) do
+                                if #section.entries > 0 then
+                                    local enabled = GroupEnabled(expansion.key, profession, section)
+                                    local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+                                    groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 26, yOff)
+                                    groupFr:SetSize(contentW - 22, 16)
+                                    groupFr:SetBackdrop(MakeBackdrop())
+                                    groupFr:SetBackdropColor(enabled and 0.035 or 0.055, enabled and 0.085 or 0.045, enabled and 0.095 or 0.050, 0.72)
+                                    groupFr:SetBackdropBorderColor(enabled and 0.10 or 0.24, enabled and 0.32 or 0.12, enabled and 0.34 or 0.12, 0.70)
+
+                                    local cb = CreateFrame("CheckButton", nil, groupFr, "UICheckButtonTemplate")
+                                    cb:SetSize(18, 18)
+                                    cb:SetPoint("LEFT", groupFr, "LEFT", 0, 0)
+                                    cb:SetChecked(enabled)
+                                    cb:SetScript("OnClick", function(s)
+                                        SetGroupEnabled(expansion.key, profession, section, s:GetChecked() and true or false)
+                                    end)
+
+                                    local sectionLbl = groupFr:CreateFontString(nil, "OVERLAY")
+                                    sectionLbl:SetFont(FONT_ROWS, 8, GetFontFlags())
+                                    sectionLbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
+                                    sectionLbl:SetPoint("RIGHT", groupFr, "RIGHT", -5, 0)
+                                    sectionLbl:SetJustifyH("LEFT")
+                                    sectionLbl:SetText(CleanProfessionConfigLabel(section.label))
+                                    sectionLbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
+                                    yOff = yOff - 16
+                                end
+                            end
+                            Gap(2)
+                        end
+                    end
+                end
+            end
+        end
     end
 
     local function BuildStoryGroupHeader()
@@ -1795,12 +2080,12 @@ function MR:PopulateConfigFrame(f)
     end
 
     local lastPatchKey
-    local professionSeparatorRendered = false
-    local lastRenderedProfession = false
+    local lastProfessionExpansionKey
     for _, mod in ipairs(_allMods) do
         local key = mod.key
         local optVisible = not mod.isVisible or mod:isVisible()
         local isStoryConfigModule = IsStoryConfigModule(mod)
+        local patchKey = MR:GetModulePatchKey(mod)
         if isStoryConfigModule then
             if not storyGroupRendered then
                 Gap(2)
@@ -1815,36 +2100,60 @@ function MR:PopulateConfigFrame(f)
             end
         elseif mod.profSkillLine then
             if not professionGroupRendered then
+                if ShouldShowModulePatchHeader(patchKey) and patchKey ~= lastPatchKey then
+                    BuildPatchHeader(patchKey)
+                    lastPatchKey = patchKey
+                end
                 BuildProfessionGroupHeader()
                 professionGroupRendered = true
             end
             if not professionGroupOpen then
                 optVisible = false
+            elseif not IsProfessionModuleKnownForConfig(mod) then
+                optVisible = false
             end
-        elseif professionGroupOpen and lastRenderedProfession and not professionSeparatorRendered then
-            Gap(2)
-            Divider()
-            Gap(2)
-            professionSeparatorRendered = true
-            lastPatchKey = nil
-            lastRenderedProfession = false
         end
-        local patchKey = MR:GetModulePatchKey(mod)
 
-        if optVisible and not isStoryConfigModule and patchKey and patchKey ~= lastPatchKey then
+        if optVisible and not isStoryConfigModule and ShouldShowModulePatchHeader(patchKey) and patchKey ~= lastPatchKey then
             BuildPatchHeader(patchKey)
             lastPatchKey = patchKey
         end
 
         if mod.profSkillLine and optVisible then
-            local ROW_H = 22
-            local headerFr = CreateFrame("Frame", nil, body)
-            headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
-            headerFr:SetSize(contentW, ROW_H)
+            local professionExpansionKey = MR:GetModuleExpansionKey(mod)
+            if professionExpansionKey ~= lastProfessionExpansionKey then
+                local expansionInfo = MR:GetExpansionInfo(professionExpansionKey)
+                local ROW_H = 18
+                local expFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+                expFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
+                expFr:SetSize(contentW - 4, ROW_H)
+                expFr:SetBackdrop(MakeBackdrop())
+                expFr:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
+                expFr:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
+
+                local expLbl = expFr:CreateFontString(nil, "OVERLAY")
+                expLbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+                expLbl:SetPoint("LEFT", expFr, "LEFT", 7, 0)
+                expLbl:SetPoint("RIGHT", expFr, "RIGHT", -7, 0)
+                expLbl:SetJustifyH("LEFT")
+                expLbl:SetText((expansionInfo and (expansionInfo.shortLabel or expansionInfo.label or expansionInfo.key)) or professionExpansionKey)
+                expLbl:SetTextColor(0.72, 0.86, 0.88)
+                yOff = yOff - ROW_H
+                lastProfessionExpansionKey = professionExpansionKey
+            end
+
+            local ROW_H = 24
+            local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+            headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
+            headerFr:SetSize(contentW - 4, ROW_H)
+            headerFr:SetBackdrop(MakeBackdrop())
+            local pr, pg, pb = hex(MR:GetHeaderColor(key) or mod.labelColor or "#2ae7c6")
+            headerFr:SetBackdropColor(0.018 + pr * 0.035, 0.024 + pg * 0.035, 0.030 + pb * 0.035, 0.90)
+            headerFr:SetBackdropBorderColor(pr * 0.42, pg * 0.42, pb * 0.42, 0.82)
 
                 local grip = CreateFrame("Button", nil, headerFr, "BackdropTemplate")
-                grip:SetSize(16, ROW_H - 2)
-                grip:SetPoint("LEFT", headerFr, "LEFT", 1, 0)
+                grip:SetSize(14, ROW_H - 6)
+                grip:SetPoint("LEFT", headerFr, "LEFT", 4, 0)
                 grip:RegisterForClicks("LeftButtonUp")
                 grip:SetBackdrop(MakeBackdrop())
                 grip:SetBackdropColor(0.12, 0.22, 0.20, 0.6)
@@ -1884,7 +2193,7 @@ function MR:PopulateConfigFrame(f)
 
                 local cb = CreateFrame("CheckButton", nil, headerFr, "UICheckButtonTemplate")
                 cb:SetSize(20, 20)
-                cb:SetPoint("LEFT", headerFr, "LEFT", 18, 0)
+                cb:SetPoint("LEFT", grip, "RIGHT", 1, 0)
                 cb:SetChecked(MR:IsModuleEnabled(key))
                 cb:SetScript("OnClick", function(s)
                     MR:SetModuleEnabled(key, s:GetChecked(), true)
@@ -1898,7 +2207,7 @@ function MR:PopulateConfigFrame(f)
                 local isExp = MR._cfgExpanded[key]
                 local arrowBtn = CreateFrame("Button", nil, headerFr, "BackdropTemplate")
                 arrowBtn:SetSize(16, 16)
-                arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", 0, 0)
+                arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", -3, 0)
                 arrowBtn:SetBackdrop(MakeBackdrop())
                 arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                 arrowBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
@@ -1938,7 +2247,7 @@ function MR:PopulateConfigFrame(f)
                 lbl:SetFont(FONT_ROWS, 10, GetFontFlags())
                 lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
                 lbl:SetPoint("RIGHT", colorSwatch, "LEFT", -2, 0)
-                lbl:SetText(FormatModuleConfigLabel(mod))
+                lbl:SetText(FormatModuleConfigLabel(mod, false))
                 lbl:SetJustifyH("LEFT")
                 local customColor = MR:GetHeaderColor(key)
                 if customColor or mod.labelColor then
@@ -1956,13 +2265,26 @@ function MR:PopulateConfigFrame(f)
 
                     local guideTopY = yOff
 
+                    local rowsByGroup = {}
+                    for _, row in ipairs(GetConfigRowsForModule(mod)) do
+                        if row.group then
+                            rowsByGroup[row.group] = rowsByGroup[row.group] or {}
+                            table.insert(rowsByGroup[row.group], row)
+                        end
+                    end
+
                     local lastRowPatchKey
+                    local lastRowGroup
                     for _, row in ipairs(GetConfigRowsForModule(mod)) do
                         local rowPatchKey = MR:GetRowPatchKey(mod, row)
-                        if rowPatchKey and rowPatchKey ~= lastRowPatchKey then
+                        if rowPatchKey and rowPatchKey ~= MR:GetModulePatchKey(mod) and rowPatchKey ~= lastRowPatchKey then
                             BuildRowPatchHeader(rowPatchKey)
                             lastRowPatchKey = rowPatchKey
                         end
+                        if row.group and row.group ~= lastRowGroup and rowsByGroup[row.group] then
+                            BuildRowGroupHeader(key, rowsByGroup[row.group], ns.GetRowGroupLabel(row.group))
+                        end
+                        lastRowGroup = row.group
                         local rkey    = row.key
                         local enabled = MR:IsRowEnabled(key, rkey)
 
@@ -2116,7 +2438,6 @@ function MR:PopulateConfigFrame(f)
 
                     Gap(3)
                 end
-                lastRenderedProfession = true
         elseif optVisible then
             local ROW_H = 22
             local headerFr = CreateFrame("Frame", nil, body)
@@ -2219,7 +2540,7 @@ function MR:PopulateConfigFrame(f)
             lbl:SetFont(FONT_ROWS, 10, GetFontFlags())
             lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
             lbl:SetPoint("RIGHT", colorSwatch, "LEFT", -2, 0)
-            lbl:SetText(FormatModuleConfigLabel(mod))
+            lbl:SetText(FormatModuleConfigLabel(mod, false))
             lbl:SetJustifyH("LEFT")
             local customColor = MR:GetHeaderColor(key)
             if customColor or mod.labelColor then
@@ -2240,7 +2561,7 @@ function MR:PopulateConfigFrame(f)
                 local lastRowPatchKey
                 for _, row in ipairs(GetConfigRowsForModule(mod)) do
                     local rowPatchKey = MR:GetRowPatchKey(mod, row)
-                    if rowPatchKey and rowPatchKey ~= lastRowPatchKey then
+                    if rowPatchKey and rowPatchKey ~= MR:GetModulePatchKey(mod) and rowPatchKey ~= lastRowPatchKey then
                         BuildRowPatchHeader(rowPatchKey)
                         lastRowPatchKey = rowPatchKey
                     end
@@ -2552,8 +2873,15 @@ function MR:PopulateConfigFrame(f)
 
     Gap(8)
     local totalH = math.abs(yOff) + 8
+    local maxBodyH = math.max(220, math.min(PANEL_MAX_HEIGHT - 22, (UIParent:GetHeight() or 768) - 120))
     body:SetHeight(totalH)
-    f:SetHeight(totalH)
+    bodyParent:SetHeight(totalH)
+    if f.scroll then
+        f:SetHeight(math.min(totalH + 22, maxBodyH + 22))
+        if f.UpdateScrollBar then f.UpdateScrollBar() end
+    else
+        f:SetHeight(totalH)
+    end
 end
 
 function MR:RequestConfigRepopulate(frame, delay)

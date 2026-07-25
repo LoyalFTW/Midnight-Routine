@@ -1,4 +1,4 @@
-local _, ns = ...
+﻿local _, ns = ...
 local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine", true)
 
@@ -19,115 +19,463 @@ ns.T, ns.S, ns.WQ, ns.WD, ns.DMF, ns.TR, ns.Ref = T, S, WQ, WD, DMF, TR, Ref
 
 ns.DRAGONFLIGHT_CATCHUP_ITEM_ID = 191784
 
-local LEGACY_EXPANSIONS = {}
-ns.LegacyExpansions = LEGACY_EXPANSIONS
+local ALL_EXPANSIONS = {}
+ns.AllExpansions = ALL_EXPANSIONS 
 
-function ns.RegisterLegacyExpansion(def)
-    table.insert(LEGACY_EXPANSIONS, def)
+local FLAT_SECTIONS = {
+    { field = "weekly", key = "weekly", labelKey = "ProfKnowledge_Section_Weekly", fallback = "Weekly Knowledge" },
+    { field = "treasures", key = "treasures", labelKey = "ProfKnowledge_Section_Treasures", fallback = "Knowledge Treasures" },
+    { field = "books", key = "books", labelKey = "ProfKnowledge_Section_Books", fallback = "Knowledge Books" },
+}
+
+local function NormalizeProfessionSections(profession)
+    if profession.sections then
+        return profession.sections
+    end
+
+    local sections = {}
+    for _, def in ipairs(FLAT_SECTIONS) do
+        local entries = profession[def.field]
+        if entries and #entries > 0 then
+            sections[#sections + 1] = {
+                key = def.key,
+                label = L[def.labelKey] or def.fallback,
+                entries = entries,
+            }
+        end
+    end
+    profession.sections = sections
+    return sections
+end
+ns.NormalizeProfessionSections = NormalizeProfessionSections
+
+function ns.RegisterProfessionExpansion(def)
+    for _, profession in ipairs(def.professions or {}) do
+        NormalizeProfessionSections(profession)
+    end
+    table.insert(ALL_EXPANSIONS, def)
+    if MR and MR.RegisterExpansion then
+        local order = def.order
+        if not order then
+            if def.key == "tww" then
+                order = 200
+            elseif def.key == "dragonflight" then
+                order = 300
+            end
+        end
+        MR:RegisterExpansion({
+            key = def.key,
+            label = def.label,
+            shortLabel = def.shortLabel or def.label,
+            order = order,
+        })
+    end
 end
 
-local function BuildWeeklyRowsFromEntries(entries, fallbackLabel)
+
+local function FindSection(profession, key)
+    for _, section in ipairs(profession.sections) do
+        if section.key == key then
+            return section
+        end
+    end
+    return nil
+end
+
+local function ColorToHex(color)
+    if not color then return nil end
+    return string.format("#%02x%02x%02x",
+        math.floor((color[1] or 1) * 255 + 0.5),
+        math.floor((color[2] or 1) * 255 + 0.5),
+        math.floor((color[3] or 1) * 255 + 0.5))
+end
+
+local Slug
+
+local pendingLabelRows
+local itemLabelWatchFrame
+local TrackPendingLabel
+local itemNameCache = {}
+local questTitleCache = {}
+local labelRefreshPending
+
+local function RequestLabelRefresh()
+    if labelRefreshPending then return end
+    labelRefreshPending = true
+    C_Timer.After(0.08, function()
+        labelRefreshPending = false
+        if MR.RequestUIRefresh then
+            MR:RequestUIRefresh(0.02)
+        elseif MR.RefreshUI then
+            MR:RefreshUI()
+        end
+    end)
+end
+
+local WEEKLY_DROP_ITEM_LABELS = {
+    [259188] = "Lightbloomed Spore Sample",
+    [259189] = "Aged Cruor",
+    [259190] = "Thalassian Whestone",
+    [259191] = "Infused Quenching Oil",
+    [259192] = "Voidstorm Ashes",
+    [259193] = "Lost Thalassian Vellum",
+    [259194] = "Dance Gear",
+    [259195] = "Dawn Capacitor",
+    [259196] = "Brilliant Phoenix Ink",
+    [259197] = "Loa-Blessed Rune",
+    [259198] = "Void-Touched Eversong Diamond Fragments",
+    [259199] = "Harandar Stone Sample",
+    [259200] = "Amani Tanning Oil",
+    [259201] = "Thalassian Mana Oil",
+    [259202] = "Embroidered Memento",
+    [259203] = "Finely Woven Lynx Collar",
+}
+
+local function GetWeeklyEntryRowKey(entry, index, rowKeyCounts)
+    local rowKey = entry and entry.rowKey
+    if not rowKey then
+        local questID = entry and (entry.questID or (entry.questIDs and entry.questIDs[1]))
+        if questID then
+            return "weekly_" .. questID
+        end
+        if entry and entry.itemID then
+            return "weekly_item_" .. entry.itemID
+        end
+        return "weekly_" .. tostring(index) .. "_" .. Slug(entry and (entry.label or entry.note))
+    end
+    if (rowKeyCounts and rowKeyCounts[rowKey] or 0) <= 1 then
+        return rowKey
+    end
+    return rowKey .. "_" .. tostring(entry.itemID or entry.questID or index)
+end
+
+local function GetQuestTitle(entry)
+    local questID = entry and (entry.questID or (entry.questIDs and entry.questIDs[1]))
+    if questID and C_QuestLog and C_QuestLog.GetTitleForQuestID then
+        if questTitleCache[questID] then
+            return questTitleCache[questID]
+        end
+        local title = C_QuestLog.GetTitleForQuestID(questID)
+        if title and title ~= "" then
+            questTitleCache[questID] = title
+            return title
+        end
+    end
+    return nil
+end
+
+function ns.ResolveProfessionEntryLabel(entry, fallback)
+    if entry and entry.itemID then
+        if itemNameCache[entry.itemID] then
+            return itemNameCache[entry.itemID]
+        end
+        local itemName = GetItemInfo(entry.itemID)
+        if itemName and itemName ~= "" then
+            itemNameCache[entry.itemID] = itemName
+            return itemName
+        end
+    end
+
+    local questTitle = GetQuestTitle(entry)
+    if questTitle then
+        return questTitle
+    end
+
+    return entry and (entry.label or entry.mainMenuLabel or entry.note) or fallback
+end
+
+local function GetWeeklyEntryLabel(entry)
+    return ns.ResolveProfessionEntryLabel(entry, (entry and entry.itemID and WEEKLY_DROP_ITEM_LABELS[entry.itemID]) or "Weekly Knowledge")
+end
+
+local function BuildWeeklyGroupedRows(section)
+    local rows, orderByKey = {}, {}
+    local rowKeyCounts = {}
+    for _, entry in ipairs(section.entries or {}) do
+        if entry.rowKey then
+            rowKeyCounts[entry.rowKey] = (rowKeyCounts[entry.rowKey] or 0) + 1
+        end
+    end
+
+    for index, entry in ipairs(section.entries or {}) do
+        local rowKey = entry.rowKey
+        local questIds = {}
+        if entry.questIDs then
+            for _, qid in ipairs(entry.questIDs) do table.insert(questIds, qid) end
+        elseif entry.questID then
+            table.insert(questIds, entry.questID)
+        end
+
+        local key = GetWeeklyEntryRowKey(entry, index, rowKeyCounts)
+        local label = GetWeeklyEntryLabel(entry)
+        local row = {
+            key = key,
+            colorKey = rowKey,
+            questIds = questIds,
+            label = label,
+            max = (entry.mode == "count") and (entry.required or #questIds) or 1,
+            note = entry.note,
+            itemID = entry.itemID,
+            kind = entry.kind,
+            kpTotal = ((entry.mode == "count") and (entry.required or #questIds) or 1) * (entry.kp or 0),
+            zone = entry.zone,
+            x = entry.x,
+            y = entry.y,
+            isVisible = (entry.kind == "darkmoon") and function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end or nil,
+            group = (entry.kind == "darkmoon") and "darkmoon" or "weekly",
+        }
+        rows[#rows + 1] = row
+        orderByKey[key] = ((entry.mainMenuOrder or 999) * 1000) + index
+
+        if entry.itemID and TrackPendingLabel and not GetItemInfo(entry.itemID) then
+            TrackPendingLabel(row, entry.itemID)
+        end
+    end
+    table.sort(rows, function(a, b) return orderByKey[a.key] < orderByKey[b.key] end)
+    return rows
+end
+
+function TrackPendingLabel(row, itemID)
+    pendingLabelRows = pendingLabelRows or {}
+    pendingLabelRows[itemID] = pendingLabelRows[itemID] or {}
+    table.insert(pendingLabelRows[itemID], row)
+
+    if not itemLabelWatchFrame then
+        itemLabelWatchFrame = CreateFrame("Frame")
+        itemLabelWatchFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+        itemLabelWatchFrame:SetScript("OnEvent", function(self, event, resolvedItemID)
+            local rows = pendingLabelRows and pendingLabelRows[resolvedItemID]
+            if not rows then return end
+            local name = GetItemInfo(resolvedItemID)
+            if not name or name == "" then return end
+            itemNameCache[resolvedItemID] = name
+            for _, row in ipairs(rows) do
+                row.label = name
+            end
+            pendingLabelRows[resolvedItemID] = nil
+            RequestLabelRefresh()
+            if not next(pendingLabelRows) then
+                self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+            end
+        end)
+    else
+        itemLabelWatchFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+    end
+end
+
+local ROW_GROUP_LABEL_KEYS = {
+    weekly = "ProfKnowledge_Section_Weekly",
+    catchup = "Prof_Catchup",
+    discoveries = "ProfKnowledge_Section_Discoveries",
+    studies = "ProfKnowledge_Section_Studies",
+    treasures = "ProfKnowledge_Section_Treasures",
+    books = "ProfKnowledge_Section_Books",
+    darkmoon = "ProfKnowledge_Section_Darkmoon",
+}
+
+local ROW_GROUP_LABEL_FALLBACKS = {
+    treasures = "Knowledge Treasures",
+    books = "Knowledge Books",
+}
+
+function ns.GetRowGroupLabel(group)
+    local labelKey = ROW_GROUP_LABEL_KEYS[group]
+    local label = (labelKey and L[labelKey]) or ROW_GROUP_LABEL_FALLBACKS[group] or group
+    if group == "catchup" then
+        label = tostring(label or "Catch-Up Knowledge")
+        label = label:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub(":%s*$", "")
+    end
+    return label
+end
+
+function ns.GetProfessionModuleKey(expansionKey, profession)
+    if not profession then return nil end
+    if not expansionKey or expansionKey == "midnight" then
+        return "prof_" .. profession.key
+    end
+    return "prof_" .. expansionKey .. "_" .. profession.key
+end
+
+function Slug(value)
+    value = tostring(value or "row"):lower()
+    value = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    value = value:gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", "")
+    if value == "" then value = "row" end
+    return value
+end
+
+function ns.GetEntryMainMenuKey(sectionKey, entry)
+    if entry.rowKey then
+        return entry.rowKey
+    end
+    local questID = entry.questID or (entry.questIDs and entry.questIDs[1])
+    if sectionKey == "discoveries" then
+        return questID and ("disc_" .. questID) or nil
+    elseif sectionKey == "studies" then
+        return questID and ("study_" .. questID) or nil
+    elseif sectionKey == "treasures" then
+        return questID and ("treasure_" .. questID) or nil
+    elseif sectionKey == "books" then
+        if questID then
+            return "book_" .. questID
+        end
+    end
+    if entry.itemID then
+        return sectionKey .. "_item_" .. entry.itemID
+    end
+    return sectionKey .. "_" .. Slug(entry.label or entry.note)
+end
+
+function ns.BuildMainMenuRows(profession, expansion)
     local rows = {}
-    for i, entry in ipairs(entries or {}) do
-        if entry.kind ~= "darkmoon" then
-            local questIds = entry.questIDs or (entry.questID and { entry.questID }) or nil
-            if entry.spellID then
-                rows[#rows + 1] = {
-                    key = "w" .. i,
-                    label = entry.label or entry.note or fallbackLabel,
-                    note = entry.note,
-                    spellId = entry.spellID,
-                    spellAmount = 1,
+    local darkmoonRows = {}
+
+    local weekly = FindSection(profession, "weekly")
+    if weekly then
+        for _, row in ipairs(BuildWeeklyGroupedRows(weekly)) do
+            if row.group == "darkmoon" then
+                darkmoonRows[#darkmoonRows + 1] = row
+            else
+                rows[#rows + 1] = row
+            end
+        end
+    end
+
+    if profession.catchupCurrency then
+        rows[#rows + 1] = {
+            key = "prof_catchup",
+            currencyId = profession.catchupCurrency,
+            noBlizzardTooltip = true,
+            hideWallet = true,
+            label = L["Prof_Catchup"],
+            note = L["Prof_Catchup_Note"],
+            max = 0,
+            kpTotal = 0,
+            group = "catchup",
+        }
+    end
+
+    for _, sectionKey in ipairs({ "discoveries", "studies", "treasures", "books" }) do
+        local section = FindSection(profession, sectionKey)
+        if section then
+            for _, entry in ipairs(section.entries) do
+                local key = ns.GetEntryMainMenuKey(sectionKey, entry)
+                if key then
+                    local row = {
+                        key = key,
+                        questIds = entry.questIDs or { entry.questID },
+                        label = ns.ResolveProfessionEntryLabel(entry, ns.GetRowGroupLabel(sectionKey) or profession.label),
+                        max = 1,
+                        note = entry.note,
+                        itemID = entry.itemID,
+                        kind = entry.kind,
+                        kpTotal = entry.kp or 0,
+                        zone = entry.zone,
+                        x = entry.x,
+                        y = entry.y,
+                        group = sectionKey,
+                    }
+                    rows[#rows + 1] = row
+                    if entry.itemID and not GetItemInfo(entry.itemID) then
+                        TrackPendingLabel(row, entry.itemID)
+                    end
+                end
+            end
+        end
+    end
+
+    local darkmoon = FindSection(profession, "darkmoon")
+    if darkmoon then
+        for _, entry in ipairs(darkmoon.entries) do
+            if entry.rowKey and entry.questID then
+                darkmoonRows[#darkmoonRows + 1] = {
+                    key = entry.rowKey,
+                    questIds = { entry.questID },
+                    label = ns.ResolveProfessionEntryLabel(entry, entry.mainMenuLabel),
                     max = 1,
-                }
-            elseif questIds and #questIds > 0 then
-                local required = (entry.mode == "count") and (entry.required or #questIds) or 1
-                rows[#rows + 1] = {
-                    key = "w" .. i,
-                    label = entry.label or entry.note or fallbackLabel,
                     note = entry.note,
-                    questIds = questIds,
-                    max = required,
+                    itemID = entry.itemID,
+                    kind = entry.kind,
+                    kpTotal = entry.kp or 0,
                     zone = entry.zone,
                     x = entry.x,
                     y = entry.y,
-                    waypointTitle = entry.label or entry.note,
+                    isVisible = function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end,
+                    group = "darkmoon",
                 }
             end
+        end
+    end
+
+    for _, row in ipairs(darkmoonRows) do
+        rows[#rows + 1] = row
+    end
+
+    return rows
+end
+
+function ns.BuildLureRows(profession)
+    local lures = FindSection(profession, "lures")
+    if not lures then return nil end
+
+    local rows = {}
+    for _, entry in ipairs(lures.entries) do
+        if entry.rowKey and entry.questID then
+            rows[#rows + 1] = {
+                key = entry.rowKey,
+                questIds = { entry.questID },
+                label = ns.ResolveProfessionEntryLabel(entry, entry.mainMenuLabel or entry.label),
+                max = 1,
+                note = entry.note,
+                itemID = entry.itemID,
+                kind = entry.kind,
+                kpTotal = entry.kp or 0,
+                zone = entry.zone,
+                x = entry.x,
+                y = entry.y,
+                isVisible = entry.isVisible,
+                group = "lures",
+            }
         end
     end
     return rows
 end
 
-local function BuildSpellBackfillOnScan(rows)
-    local spellRows = {}
-    for _, row in ipairs(rows) do
-        if row.spellId then
-            spellRows[#spellRows + 1] = row
-        end
-    end
-    if #spellRows == 0 then
-        return nil
+function ns.RegisterProfessionMainMenuModule(profession, expansion)
+    if not (MR and MR.RegisterModule) then
+        return
     end
 
-    return function(mod)
-        if not ns.IsSpellOnCooldown then
-            return false
-        end
-        local progress = MR.db and MR.db.char and MR.db.char.progress
-        if not progress then
-            return false
-        end
-
-        local dirty = false
-        for _, row in ipairs(spellRows) do
-            local bucket = progress[mod.key]
-            local current = bucket and tonumber(bucket[row.key]) or 0
-            local target = row.max or 1
-            if current < target and ns.IsSpellOnCooldown(row.spellId) then
-                progress[mod.key] = progress[mod.key] or {}
-                progress[mod.key][row.key] = target
-                dirty = true
-            end
-        end
-        return dirty
+    local expansionKey = (expansion and expansion.key) or "midnight"
+    local rows = ns.BuildMainMenuRows(profession, expansion)
+    if #rows > 0 then
+        MR:RegisterModule({
+            key = ns.GetProfessionModuleKey(expansionKey, profession),
+            expansionKey = expansionKey,
+            profSkillLine = profession.skillLine,
+            label = profession.label,
+            labelColor = ColorToHex(profession.color),
+            defaultEnabled = expansionKey == "midnight",
+            resetType = "weekly",
+            defaultOpen = false,
+            rows = rows,
+        })
     end
-end
 
-local function RegisterWeeklyModule(expansionKey, professionKey, professionLabel, skillLine, rows)
-    if #rows == 0 then return end
-    MR:RegisterModule({
-        key = "profknow_" .. expansionKey .. "_" .. professionKey,
-        label = professionLabel .. " " .. (L["ProfKnowledge_Section_Weekly"] or "Weekly Knowledge"),
-        resetType = "weekly",
-
-        expansionKey = "midnight",
-        defaultOpen = false,
-        isVisible = function()
-            return ns.HasProfessionLearned and ns.HasProfessionLearned(skillLine) or false
-        end,
-        onScan = BuildSpellBackfillOnScan(rows),
-        rows = rows,
-    })
-end
-
-function ns.RegisterProfessionWeeklyModules(expansionKey, professions)
-    for _, profession in ipairs(professions) do
-        local rows = BuildWeeklyRowsFromEntries(profession.weekly, profession.label)
-        RegisterWeeklyModule(expansionKey, profession.key, profession.label, profession.skillLine, rows)
+    local lureRows = expansionKey == "midnight" and ns.BuildLureRows(profession)
+    if lureRows and #lureRows > 0 then
+        MR:RegisterModule({
+            key = "skin_lures",
+            profSkillLine = profession.skillLine,
+            label = L["Skin_Lures_Title"],
+            labelColor = ColorToHex(profession.color),
+            resetType = "daily",
+            defaultOpen = false,
+            rows = lureRows,
+        })
     end
-end
 
-function ns.RegisterMidnightWeeklyModules(professions)
-    for _, profession in ipairs(professions) do
-        local weeklyEntries
-        for _, section in ipairs(profession.sections or {}) do
-            if section.key == "weekly" then
-                weeklyEntries = section.entries
-                break
-            end
-        end
-        local rows = BuildWeeklyRowsFromEntries(weeklyEntries, profession.label)
-        RegisterWeeklyModule("midnight", profession.key, profession.label, profession.skillLine, rows)
+    if MR.RequestScan then
+        MR:RequestScan(1)
     end
 end

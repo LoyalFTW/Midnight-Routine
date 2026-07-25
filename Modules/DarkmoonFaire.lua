@@ -7,13 +7,31 @@ local HOLIDAY_DARKMOON_FAIRE = 479
 
 local DARKMOON_ISLAND_MAP = 244
 
+local function CalendarTimeToEpoch(value)
+    if type(value) == "number" then
+        return value
+    end
+    if type(value) ~= "table" or not time then
+        return nil
+    end
+    return time({
+        year = value.year,
+        month = value.month,
+        day = value.monthDay or value.day,
+        hour = value.hour or 0,
+        min = value.minute or 0,
+        sec = 0,
+    })
+end
+
 local function IsHolidayActive(holidayId)
     if not C_DateAndTime or not C_DateAndTime.GetHolidayInfo then return false end
     local info = C_DateAndTime.GetHolidayInfo(holidayId)
-    return info ~= nil
-        and info.startTime ~= nil
-        and GetServerTime() >= info.startTime
-        and GetServerTime() <= info.endTime
+    if not info then return false end
+    local startTime = CalendarTimeToEpoch(info.startTime)
+    local endTime = CalendarTimeToEpoch(info.endTime)
+    local now = GetServerTime and GetServerTime() or time()
+    return startTime ~= nil and endTime ~= nil and now >= startTime and now <= endTime
 end
 
 local function IsOnDarkmoonIsland()
