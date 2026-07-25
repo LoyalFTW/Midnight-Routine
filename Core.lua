@@ -1993,18 +1993,23 @@ function MR:ResetRowColor(modKey, rowKey)
     self:RefreshProfessionKnowledgeSurfaces()
 end
 
-local PARENT_TO_EXPANSION_SKILLLINES = {
-    [171] = { 2906, 2871, 2823 }, 
-    [164] = { 2907, 2872, 2822 }, 
-    [333] = { 2909, 2874, 2825 }, 
-    [202] = { 2910, 2875, 2827 }, 
-    [182] = { 2912, 2877, 2832 }, 
-    [773] = { 2913, 2878, 2828 },
-    [755] = { 2914, 2879, 2829 },
-    [165] = { 2915, 2880, 2830 }, 
-    [186] = { 2916, 2881, 2833 },
-    [393] = { 2917, 2882, 2834 }, 
-    [197] = { 2918, 2883, 2831 }, 
+local PARENT_TO_MIDNIGHT = {
+    [171]=2906, [164]=2907, [333]=2909, [202]=2910, [182]=2912,
+    [773]=2913, [755]=2914, [165]=2915, [186]=2916, [393]=2917, [197]=2918,
+}
+
+local PROFESSION_TIER_LEARN_SPELLS = {
+    [2906] = 471003, [2871] = 423321, [2823] = 366261, 
+    [2907] = 471004, [2872] = 423332, [2822] = 365677, 
+    [2909] = 471006, [2874] = 423334, [2825] = 366255, 
+    [2910] = 471007, [2875] = 423335, [2827] = 366254, 
+    [2912] = 471009, [2877] = 441327, [2832] = 366242, 
+    [2913] = 471010, [2878] = 423338, [2828] = 366251, 
+    [2914] = 471011, [2879] = 423339, [2829] = 366250, 
+    [2915] = 471012, [2880] = 423340, [2830] = 366249,
+    [2916] = 471013, [2881] = 423341, [2833] = 366264, 
+    [2917] = 471014, [2882] = 423342, [2834] = 366263, 
+    [2918] = 471015, [2883] = 423343, [2831] = 366258, 
 }
 
 local PROFESSION_CONCENTRATION_CURRENCIES = {
@@ -2129,6 +2134,17 @@ function MR:RefreshPlayerProfessions()
     wipe(self.playerProfessions)
     local found = false
     local scanned = false
+
+    if C_SpellBook and C_SpellBook.IsSpellKnown then
+        scanned = true
+        for tierSkillLine, learnSpellID in pairs(PROFESSION_TIER_LEARN_SPELLS) do
+            if C_SpellBook.IsSpellKnown(learnSpellID) then
+                self.playerProfessions[tierSkillLine] = true
+                found = true
+            end
+        end
+    end
+
     if C_TradeSkillUI and C_TradeSkillUI.GetAllProfessionTradeSkillLines then
         local lines = C_TradeSkillUI.GetAllProfessionTradeSkillLines()
         if lines then
@@ -2140,11 +2156,9 @@ function MR:RefreshPlayerProfessions()
                     self.playerProfessions[skillLineID] = true
                     found = true
                     if info.parentProfessionID then
-                        local tiers = PARENT_TO_EXPANSION_SKILLLINES[info.parentProfessionID]
-                        if tiers then
-                            for _, tierSkillLine in ipairs(tiers) do
-                                self.playerProfessions[tierSkillLine] = true
-                            end
+                        local mid = PARENT_TO_MIDNIGHT[info.parentProfessionID]
+                        if mid then
+                            self.playerProfessions[mid] = true
                             found = true
                         end
                     end
@@ -2159,11 +2173,9 @@ function MR:RefreshPlayerProfessions()
             if idx then
                 local _, _, _, _, _, _, parentSkillLine = GetProfessionInfo(idx)
                 if parentSkillLine then
-                    local tiers = PARENT_TO_EXPANSION_SKILLLINES[parentSkillLine]
-                    if tiers then
-                        for _, tierSkillLine in ipairs(tiers) do
-                            self.playerProfessions[tierSkillLine] = true
-                        end
+                    local mid = PARENT_TO_MIDNIGHT[parentSkillLine]
+                    if mid then
+                        self.playerProfessions[mid] = true
                         found = true
                     end
                 end
@@ -3208,6 +3220,7 @@ function MR:OnEnable()
         "TRADE_SKILL_LIST_UPDATE",
         "SKILL_LINE_SPECS_RANKS_CHANGED",
         "TRADE_SKILL_SHOW",
+        "LEARNED_SPELL_IN_SKILL_LINE",
     }, 1, "OnProfessionChange")
 
     self:RegisterBucketEvent({

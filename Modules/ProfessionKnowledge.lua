@@ -2209,16 +2209,16 @@ RebuildGatheringLocationsFrame = function()
     gatheringLocationsFrame = BuildGatheringLocationsFrame()
     if not wasShown then gatheringLocationsFrame:Hide() end
 
-    if savedScroll and savedScroll > 0 then
-        local restoreFrame = gatheringLocationsFrame
-        C_Timer.After(0, function()
-            if restoreFrame and restoreFrame._scroll then
-                restoreFrame._scroll:SetVerticalScroll(savedScroll)
-                if restoreFrame.UpdateScrollBar then
-                    restoreFrame.UpdateScrollBar()
-                end
-            end
-        end)
+    -- BuildGatheringLocationsFrame always resets scroll to 0 as part of its
+    -- own layout pass, so this has to happen synchronously right after it
+    -- returns — a deferred (C_Timer.After) restore would let that reset
+    -- render for one visible frame first, showing up as a flash-to-top on
+    -- every single rebuild.
+    if savedScroll and savedScroll > 0 and gatheringLocationsFrame._scroll then
+        gatheringLocationsFrame._scroll:SetVerticalScroll(savedScroll)
+        if gatheringLocationsFrame.UpdateScrollBar then
+            gatheringLocationsFrame.UpdateScrollBar()
+        end
     end
 end
 
