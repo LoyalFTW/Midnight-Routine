@@ -32,7 +32,6 @@ Modules/PvP.lua
 Modules/GreatVault.lua
 Modules/Crests.lua
 Modules/CurrencyBrowser.lua
-Modules/Professions.lua
 Modules/Delves.lua
 Modules/Prey.lua
 Modules/StoryCampaign.lua
