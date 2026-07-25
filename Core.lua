@@ -1993,9 +1993,18 @@ function MR:ResetRowColor(modKey, rowKey)
     self:RefreshProfessionKnowledgeSurfaces()
 end
 
-local PARENT_TO_MIDNIGHT = {
-    [171]=2906, [164]=2907, [333]=2909, [202]=2910, [182]=2912,
-    [773]=2913, [755]=2914, [165]=2915, [186]=2916, [393]=2917, [197]=2918,
+local PARENT_TO_EXPANSION_SKILLLINES = {
+    [171] = { 2906, 2871, 2823 }, 
+    [164] = { 2907, 2872, 2822 }, 
+    [333] = { 2909, 2874, 2825 }, 
+    [202] = { 2910, 2875, 2827 }, 
+    [182] = { 2912, 2877, 2832 }, 
+    [773] = { 2913, 2878, 2828 },
+    [755] = { 2914, 2879, 2829 },
+    [165] = { 2915, 2880, 2830 }, 
+    [186] = { 2916, 2881, 2833 },
+    [393] = { 2917, 2882, 2834 }, 
+    [197] = { 2918, 2883, 2831 }, 
 }
 
 local PROFESSION_CONCENTRATION_CURRENCIES = {
@@ -2131,9 +2140,11 @@ function MR:RefreshPlayerProfessions()
                     self.playerProfessions[skillLineID] = true
                     found = true
                     if info.parentProfessionID then
-                        local mid = PARENT_TO_MIDNIGHT[info.parentProfessionID]
-                        if mid then
-                            self.playerProfessions[mid] = true
+                        local tiers = PARENT_TO_EXPANSION_SKILLLINES[info.parentProfessionID]
+                        if tiers then
+                            for _, tierSkillLine in ipairs(tiers) do
+                                self.playerProfessions[tierSkillLine] = true
+                            end
                             found = true
                         end
                     end
@@ -2148,9 +2159,11 @@ function MR:RefreshPlayerProfessions()
             if idx then
                 local _, _, _, _, _, _, parentSkillLine = GetProfessionInfo(idx)
                 if parentSkillLine then
-                    local mid = PARENT_TO_MIDNIGHT[parentSkillLine]
-                    if mid then
-                        self.playerProfessions[mid] = true
+                    local tiers = PARENT_TO_EXPANSION_SKILLLINES[parentSkillLine]
+                    if tiers then
+                        for _, tierSkillLine in ipairs(tiers) do
+                            self.playerProfessions[tierSkillLine] = true
+                        end
                         found = true
                     end
                 end

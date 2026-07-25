@@ -94,9 +94,15 @@ local Slug
 
 local pendingLabelRows
 local itemLabelWatchFrame
+local questTitleWatchFrame
 local TrackPendingLabel
+local TrackPendingQuestTitle
+local EnsureQuestTitleWatchFrame
 local itemNameCache = {}
 local questTitleCache = {}
+local questTitlePending = {}
+local pendingQuestTitleRows = {}
+local questRewardItemCache = {}
 local labelRefreshPending
 
 local function RequestLabelRefresh()
@@ -108,6 +114,10 @@ local function RequestLabelRefresh()
             MR:RequestUIRefresh(0.02)
         elseif MR.RefreshUI then
             MR:RefreshUI()
+        end
+
+        if MR.RequestGatheringLocationsRefresh then
+            MR.RequestGatheringLocationsRefresh()
         end
     end)
 end
@@ -149,6 +159,27 @@ local function GetWeeklyEntryRowKey(entry, index, rowKeyCounts)
     return rowKey .. "_" .. tostring(entry.itemID or entry.questID or index)
 end
 
+local function GetQuestRewardItemID(questID, dataLoaded)
+    if not questID then return nil end
+    if questRewardItemCache[questID] ~= nil then
+        return questRewardItemCache[questID] or nil
+    end
+    if GetNumQuestLogRewards and GetQuestLogRewardInfo then
+        local ok, numRewards = pcall(GetNumQuestLogRewards, questID)
+        if ok and numRewards and numRewards > 0 then
+            local okInfo, _, _, _, _, _, itemID = pcall(GetQuestLogRewardInfo, 1, questID)
+            if okInfo and itemID then
+                questRewardItemCache[questID] = itemID
+                return itemID
+            end
+        end
+        if dataLoaded then
+            questRewardItemCache[questID] = false
+        end
+    end
+    return nil
+end
+
 local function GetQuestTitle(entry)
     local questID = entry and (entry.questID or (entry.questIDs and entry.questIDs[1]))
     if questID and C_QuestLog and C_QuestLog.GetTitleForQuestID then
@@ -160,11 +191,73 @@ local function GetQuestTitle(entry)
             questTitleCache[questID] = title
             return title
         end
+        if C_QuestLog.RequestLoadQuestByID and not questTitlePending[questID] then
+            pcall(C_QuestLog.RequestLoadQuestByID, questID)
+            questTitlePending[questID] = true
+            EnsureQuestTitleWatchFrame()
+        end
     end
     return nil
 end
 
-function ns.ResolveProfessionEntryLabel(entry, fallback)
+local function IsGenericKnowledgeTreasureTitle(title)
+    title = tostring(title or ""):lower()
+    title = title:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    title = title:gsub("[^%w%s]", ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return title == "knowledge treasure" or title == "knowledge treasures"
+end
+
+function EnsureQuestTitleWatchFrame()
+    if questTitleWatchFrame then return end
+    questTitleWatchFrame = CreateFrame("Frame")
+    questTitleWatchFrame:RegisterEvent("QUEST_DATA_LOAD_RESULT")
+    questTitleWatchFrame:SetScript("OnEvent", function(_, _, loadedQuestID, success)
+        if not loadedQuestID then return end
+
+        questTitlePending[loadedQuestID] = nil
+        if success then
+            local loadedTitle = C_QuestLog.GetTitleForQuestID(loadedQuestID)
+            if loadedTitle and loadedTitle ~= "" then
+                questTitleCache[loadedQuestID] = loadedTitle
+            end
+            local rewardItemID = GetQuestRewardItemID(loadedQuestID, true)
+            if rewardItemID and not GetItemInfo(rewardItemID) then
+                TrackPendingLabel({}, rewardItemID)
+            end
+        end
+
+        local registrations = pendingQuestTitleRows[loadedQuestID]
+        if registrations then
+            pendingQuestTitleRows[loadedQuestID] = nil
+            for _, registration in ipairs(registrations) do
+                registration.row.label = ns.ResolveProfessionEntryLabel(registration.entry, registration.fallback, registration.preferFallback)
+            end
+        end
+        RequestLabelRefresh()
+    end)
+end
+
+function ns.GetCoordinateFallback(entry, prefix)
+    local zoneName
+    if entry and entry.zone and C_Map and C_Map.GetMapInfo then
+        local ok, info = pcall(C_Map.GetMapInfo, entry.zone)
+        if ok and info and info.name and info.name ~= "" then
+            zoneName = info.name
+        end
+    end
+    if entry and entry.x and entry.y then
+        if zoneName then
+            return ("%s - %s (%.1f, %.1f)"):format(prefix or "Knowledge Treasure", zoneName, entry.x, entry.y)
+        end
+        return ("%s (%.1f, %.1f)"):format(prefix or "Knowledge Treasure", entry.x, entry.y)
+    end
+    if zoneName then
+        return ("%s - %s"):format(prefix or "Knowledge Treasure", zoneName)
+    end
+    return prefix
+end
+
+function ns.ResolveProfessionEntryLabel(entry, fallback, preferFallback)
     if entry and entry.itemID then
         if itemNameCache[entry.itemID] then
             return itemNameCache[entry.itemID]
@@ -174,14 +267,50 @@ function ns.ResolveProfessionEntryLabel(entry, fallback)
             itemNameCache[entry.itemID] = itemName
             return itemName
         end
+
+        TrackPendingLabel({}, entry.itemID)
+    end
+
+    if entry and not entry.itemID then
+        local questID = entry.questID or (entry.questIDs and entry.questIDs[1])
+        local rewardItemID = GetQuestRewardItemID(questID)
+        if rewardItemID then
+            if itemNameCache[rewardItemID] then
+                return itemNameCache[rewardItemID]
+            end
+            local rewardName = GetItemInfo(rewardItemID)
+            if rewardName and rewardName ~= "" then
+                itemNameCache[rewardItemID] = rewardName
+                return rewardName
+            end
+            TrackPendingLabel({}, rewardItemID)
+        end
     end
 
     local questTitle = GetQuestTitle(entry)
     if questTitle then
+        if preferFallback and IsGenericKnowledgeTreasureTitle(questTitle) then
+            return fallback or questTitle
+        end
         return questTitle
     end
 
-    return entry and (entry.label or entry.mainMenuLabel or entry.note) or fallback
+    return entry and (entry.label or entry.mainMenuLabel or (preferFallback and fallback) or entry.note or fallback) or fallback
+end
+
+function TrackPendingQuestTitle(row, entry, fallback, preferFallback)
+    local questID = entry and (entry.questID or (entry.questIDs and entry.questIDs[1]))
+    if not (row and questID) then return end
+    if questTitleCache[questID] then return end
+
+    pendingQuestTitleRows[questID] = pendingQuestTitleRows[questID] or {}
+    table.insert(pendingQuestTitleRows[questID], {
+        row = row,
+        entry = entry,
+        fallback = fallback,
+        preferFallback = preferFallback,
+    })
+    EnsureQuestTitleWatchFrame()
 end
 
 local function GetWeeklyEntryLabel(entry)
@@ -229,6 +358,9 @@ local function BuildWeeklyGroupedRows(section)
 
         if entry.itemID and TrackPendingLabel and not GetItemInfo(entry.itemID) then
             TrackPendingLabel(row, entry.itemID)
+        end
+        if #questIds > 0 then
+            TrackPendingQuestTitle(row, entry, (entry and entry.itemID and WEEKLY_DROP_ITEM_LABELS[entry.itemID]) or "Weekly Knowledge")
         end
     end
     table.sort(rows, function(a, b) return orderByKey[a.key] < orderByKey[b.key] end)
@@ -361,10 +493,15 @@ function ns.BuildMainMenuRows(profession, expansion)
             for _, entry in ipairs(section.entries) do
                 local key = ns.GetEntryMainMenuKey(sectionKey, entry)
                 if key then
+                    local fallbackLabel = ns.GetRowGroupLabel(sectionKey) or profession.label
+                    local preferFallback = sectionKey == "treasures"
+                    if preferFallback then
+                        fallbackLabel = ns.GetCoordinateFallback(entry, "Knowledge Treasure")
+                    end
                     local row = {
                         key = key,
                         questIds = entry.questIDs or { entry.questID },
-                        label = ns.ResolveProfessionEntryLabel(entry, ns.GetRowGroupLabel(sectionKey) or profession.label),
+                        label = ns.ResolveProfessionEntryLabel(entry, fallbackLabel, preferFallback),
                         max = 1,
                         note = entry.note,
                         itemID = entry.itemID,
@@ -378,6 +515,9 @@ function ns.BuildMainMenuRows(profession, expansion)
                     rows[#rows + 1] = row
                     if entry.itemID and not GetItemInfo(entry.itemID) then
                         TrackPendingLabel(row, entry.itemID)
+                    end
+                    if entry.questID or entry.questIDs then
+                        TrackPendingQuestTitle(row, entry, fallbackLabel, preferFallback)
                     end
                 end
             end

@@ -361,6 +361,25 @@ local function GetProfessionCatchupAmount(profession, expansion)
     return 0
 end
 
+local function GetProfessionCatchupProgress(profession)
+    if not (profession.catchupCurrency and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo) then
+        return nil
+    end
+    local info = C_CurrencyInfo.GetCurrencyInfo(profession.catchupCurrency)
+    if not info then
+        return nil
+    end
+
+    if info.maxQuantity and info.maxQuantity > 0 then
+        local done = (info.useTotalEarnedForMaxQty and info.totalEarned) or info.quantity or 0
+        return done, info.maxQuantity
+    elseif info.maxWeeklyQuantity and info.maxWeeklyQuantity > 0 then
+        return info.quantityEarnedThisWeek or 0, info.maxWeeklyQuantity
+    end
+
+    return nil
+end
+
 local function GetProfessionTaskCategory(row)
     local key = row and row.key or ""
     if key:find("treatise") then
@@ -681,7 +700,15 @@ local function SetProfessionCollapsed(expansionKey, professionKey, collapsed)
     end
 end
 
-local function EntryDisplayLabel(entry)
+local function EntryDisplayLabel(entry, sectionKey)
+    if sectionKey == "treasures" and ns.ResolveProfessionEntryLabel and ns.GetCoordinateFallback then
+        local fallback = ns.GetCoordinateFallback(entry, L["ProfKnowledge_Section_Treasures"] or "Knowledge Treasure")
+        local resolved = ns.ResolveProfessionEntryLabel(entry, fallback, true)
+        if resolved and resolved ~= "" then
+            return resolved
+        end
+    end
+
     local name = EntryName(entry)
     if name and name ~= "|cffaaaaaa...|r" then
         return name
@@ -801,7 +828,7 @@ local function GetMainMenuEntryColor(expansionKey, profession, sectionKey, entry
     return fallbackR, fallbackG, fallbackB
 end
 
-local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, cr, cg, cb, db, entry)
+local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, cr, cg, cb, db, entry, sectionKey)
     local current, required = Progress(entry)
     local done = current >= required
     if done and db.gatheringHideCompleted then return cardY end
@@ -866,13 +893,13 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     nameText:SetPoint("RIGHT", statusText, "LEFT", -8, 0)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
-    nameText:SetText(EntryDisplayLabel(entry))
+    nameText:SetText(EntryDisplayLabel(entry, sectionKey))
     nameText:SetTextColor(done and 0.45 or cr, done and 0.45 or cg, done and 0.45 or cb)
 
     row:SetScript("OnEnter", function()
         hover:SetColorTexture(cr, cg, cb, 0.12 * accentAlpha)
         GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetText(EntryDisplayLabel(entry), 1, 1, 1)
+        GameTooltip:SetText(EntryDisplayLabel(entry, sectionKey), 1, 1, 1)
         GameTooltip:AddLine(string.format(L["ProfKnowledge_KPValue"], KPDone(entry), KPTotal(entry)), 0.80, 0.80, 0.90)
         GameTooltip:AddLine(string.format(L["ProfKnowledge_RowProgress"], current, required), 0.70, 0.90, 1)
         if entry.zone and entry.x and entry.y then
@@ -917,13 +944,13 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         local target = useAlt and { itemID = entry.itemID, label = entry.label, zone = entry.altZone, x = entry.altX, y = entry.altY } or entry
         if entry.altZone then waypointAlt[altKey] = not waypointAlt[altKey] end
         local ok, source = SetGatheringWaypoint(target)
-        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry), target.x, target.y)) else print(L["Waypoint_Unavailable"]) end
+        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), target.x, target.y)) else print(L["Waypoint_Unavailable"]) end
     end)
 
     return cardY + rowHeight + 6
 end
 
-local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, cr, cg, cb, entry)
+local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, cr, cg, cb, entry, sectionKey)
     local row = CreateFrame("Button", nil, card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     row:SetSize(cardW - 24, rowHeight + 4)
@@ -968,13 +995,13 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     nameText:SetPoint("RIGHT", kpText, "LEFT", -8, 0)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
-    nameText:SetText(EntryDisplayLabel(entry))
+    nameText:SetText(EntryDisplayLabel(entry, sectionKey))
     nameText:SetTextColor(cr, cg, cb)
 
     row:SetScript("OnEnter", function()
         hover:SetColorTexture(cr, cg, cb, 0.12 * chromeAlpha)
         GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetText(EntryDisplayLabel(entry), 1, 1, 1)
+        GameTooltip:SetText(EntryDisplayLabel(entry, sectionKey), 1, 1, 1)
         GameTooltip:AddLine(string.format(L["ProfKnowledge_KPValue"], 0, entry.kp or 0), 0.80, 0.80, 0.90)
         if entry.note and entry.note ~= "" then
             GameTooltip:AddLine(" ")
@@ -997,7 +1024,7 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     row:SetScript("OnClick", function()
         if not (entry.zone and entry.x and entry.y) then return end
         local ok, source = SetGatheringWaypoint(entry)
-        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry), entry.x, entry.y)) else print(L["Waypoint_Unavailable"]) end
+        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), entry.x, entry.y)) else print(L["Waypoint_Unavailable"]) end
     end)
 
     return cardY + rowHeight + 6
@@ -1053,10 +1080,31 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     icon:SetTexture((currencyInfo and currencyInfo.iconFileID) or "Interface\\Icons\\INV_Misc_Coin_01")
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
+    local done, max = GetProfessionCatchupProgress(profession)
+
+    local statusText
+    if done and max then
+        statusText = row:CreateFontString(nil, "OVERLAY")
+        statusText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+        statusText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        statusText:SetWidth(56)
+        statusText:SetJustifyH("RIGHT")
+        statusText:SetText(string.format("%d/%d", done, max))
+        if ns.CountColor then
+            statusText:SetTextColor(ns.CountColor(done, max))
+        else
+            statusText:SetTextColor(cr, cg, cb)
+        end
+    end
+
     local nameText = row:CreateFontString(nil, "OVERLAY")
     nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", icon, "RIGHT", 6, 0)
-    nameText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    if statusText then
+        nameText:SetPoint("RIGHT", statusText, "LEFT", -8, 0)
+    else
+        nameText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    end
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
     nameText:SetText(L["Prof_Catchup"] or "Catch-Up Knowledge")
@@ -1103,9 +1151,17 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
     local function RenderTaskRow(task)
         local row = task.row
         local mod = task.mod
+        local catchupDone, catchupMax
         if row.key == "prof_catchup" then
-            task.max = GetProfessionCatchupAmount(profession)
-            task.done = (task.current or 0) >= task.max
+            catchupDone, catchupMax = GetProfessionCatchupProgress(profession)
+            if catchupMax then
+                task.current = catchupDone or 0
+                task.max = catchupMax
+                task.done = (catchupDone or 0) >= catchupMax
+            else
+                task.max = GetProfessionCatchupAmount(profession)
+                task.done = (task.current or 0) >= task.max
+            end
         end
 
         local rr, rg, rb = cr, cg, cb
@@ -1179,10 +1235,17 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         local valueText = taskFrame:CreateFontString(nil, "OVERLAY")
         valueText:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         valueText:SetPoint("RIGHT", taskFrame, "RIGHT", -8, 0)
-        valueText:SetWidth(44)
+        valueText:SetWidth(row.key == "prof_catchup" and 56 or 44)
         valueText:SetJustifyH("RIGHT")
         valueText:SetWordWrap(false)
-        if task.done then
+        if row.key == "prof_catchup" and catchupDone and catchupMax then
+            valueText:SetText(string.format("%d/%d", catchupDone, catchupMax))
+            if ns.CountColor then
+                valueText:SetTextColor(ns.CountColor(catchupDone, catchupMax))
+            else
+                valueText:SetTextColor(rr, rg, rb, 0.95)
+            end
+        elseif task.done then
             valueText:SetText(L["Done"] or "Done")
             valueText:SetTextColor(0.32, 0.80, 0.50, 0.95)
         elseif (row.kpTotal or 0) > 0 then
@@ -1600,9 +1663,9 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                             for _, entry in ipairs(VisibleSortedEntries(visibleEntries)) do
                                 local rr, rg, rb = GetMainMenuEntryColor(expansion.key, profession, section.key, entry, cr, cg, cb)
                                 if entry.questID or entry.questIDs or entry.spellID then
-                                    cardY = RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, rr, rg, rb, db, entry)
+                                    cardY = RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, rr, rg, rb, db, entry, section.key)
                                 else
-                                    cardY = RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, rr, rg, rb, entry)
+                                    cardY = RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, rr, rg, rb, entry, section.key)
                                 end
                             end
                             cardY = cardY + 4
@@ -2141,9 +2204,28 @@ end
 RebuildGatheringLocationsFrame = function()
     RefreshFonts()
     local wasShown = gatheringLocationsFrame and gatheringLocationsFrame:IsShown()
+    local savedScroll = gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
     if gatheringLocationsFrame then gatheringLocationsFrame:Hide() end
     gatheringLocationsFrame = BuildGatheringLocationsFrame()
     if not wasShown then gatheringLocationsFrame:Hide() end
+
+    if savedScroll and savedScroll > 0 then
+        local restoreFrame = gatheringLocationsFrame
+        C_Timer.After(0, function()
+            if restoreFrame and restoreFrame._scroll then
+                restoreFrame._scroll:SetVerticalScroll(savedScroll)
+                if restoreFrame.UpdateScrollBar then
+                    restoreFrame.UpdateScrollBar()
+                end
+            end
+        end)
+    end
+end
+
+function MR.RequestGatheringLocationsRefresh()
+    if gatheringLocationsFrame then
+        RebuildGatheringLocationsFrame()
+    end
 end
 
 local function SetProfessionColor(professionKey, r, g, b)
@@ -2325,8 +2407,8 @@ PopulateGatheringConfig = function(frame)
     elseif activePage == "modules" then
         db.gatheringEntryVisibility = db.gatheringEntryVisibility or {}
         local entryVisibility = db.gatheringEntryVisibility
-        local function EntryCheck(indent, entry, getValue, setValue, r, g, b)
-            yOff = OptionsCheckbox(body, yOff, EntryDisplayLabel(entry), getValue, function(value)
+        local function EntryCheck(indent, entry, sectionKey, getValue, setValue, r, g, b)
+            yOff = OptionsCheckbox(body, yOff, EntryDisplayLabel(entry, sectionKey), getValue, function(value)
                 setValue(value)
                 PopulateGatheringConfig(frame)
             end, r or 0.78, g or 0.78, b or 0.88, indent, function() end, cfgFs)
@@ -2658,7 +2740,7 @@ PopulateGatheringConfig = function(frame)
 
                                         for i, entry in ipairs(section.entries) do
                                             local entryId = GetEntryVisibilityId(expansion.key, profession.key, section.key, i)
-                                            EntryCheck(pad + 26, entry, function()
+                                            EntryCheck(pad + 26, entry, section.key, function()
                                                 return entryVisibility[entryId] ~= false
                                             end, function(value)
                                                 entryVisibility[entryId] = value and true or false
