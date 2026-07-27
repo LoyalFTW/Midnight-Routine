@@ -67,7 +67,7 @@ L["Config_TabLayout"] = "Макет"
 L["Config_TabModules"] = "Модули"
 L["Config_TabColors"] = "Цвета"
 L["Config_TabReset"] = "Сброс"
-L["Config_TabSupport"] = "Support"
+L["Config_TabSupport"] = "Поддержка"
 
 -- UI Config - Support / Translators (placeholder English, needs translation)
 L["Config_SupportUs"] = "Поддержать нас"
@@ -173,7 +173,7 @@ L["Delves_T8_Note"] = "Пройдите 8 вылазок 8+ уровня для 
 L["Delves_GildedStash_Label"] = "|cffc8956cПозолоченный тайник:|r"
 L["Delves_GildedStash_Note"] = "Проходите Вылазки 11-го уровня, чтобы заработать Позолоченный тайник."
 L["Delves_GildedStash_Refresh"] = "Посетите Луносвет, чтобы обновить прогресс Позолоченного тайника."
-L["Delves_Bounty_Label"] = "|cffc8956cTrovehunter's Bounty Used:|r"
+L["Delves_Bounty_Label"] = "|cffc8956cИспользуйте Трофей охотника за сокровищами:|r"
 L["Delves_Bounty_Note"] = "Добыча с Нуллэй - используйте перед убийством босса вылазки"
 L["Delves_Bountiful_Label"] = "|cffc8956cМногообещающие вылазки:|r"
 L["Delves_Bountiful_Note"] = "Количество завершенных многообещающих вылазок за сегодня."
