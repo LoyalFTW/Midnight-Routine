@@ -2317,16 +2317,24 @@ end
 local function SetProfessionColor(professionKey, r, g, b)
     if not MR.db.profile.gatheringProfColors then MR.db.profile.gatheringProfColors = {} end
     MR.db.profile.gatheringProfColors[professionKey] = { r, g, b }
-    RebuildGatheringLocationsFrame()
-    if MR.RepopulateConfigFrame then MR:RepopulateConfigFrame() end
-    if MR.RepopulateGatheringConfig then MR:RepopulateGatheringConfig() end
+    if MR.RequestVisualRefresh then
+        MR:RequestVisualRefresh({ main = false })
+    else
+        RebuildGatheringLocationsFrame()
+        if MR.RepopulateConfigFrame then MR:RepopulateConfigFrame() end
+        if MR.RepopulateGatheringConfig then MR:RepopulateGatheringConfig() end
+    end
 end
 
 local function ResetProfessionColor(professionKey)
     if MR.db.profile.gatheringProfColors then MR.db.profile.gatheringProfColors[professionKey] = nil end
-    RebuildGatheringLocationsFrame()
-    if MR.RepopulateConfigFrame then MR:RepopulateConfigFrame() end
-    if MR.RepopulateGatheringConfig then MR:RepopulateGatheringConfig() end
+    if MR.RequestVisualRefresh then
+        MR:RequestVisualRefresh({ main = false })
+    else
+        RebuildGatheringLocationsFrame()
+        if MR.RepopulateConfigFrame then MR:RepopulateConfigFrame() end
+        if MR.RepopulateGatheringConfig then MR:RepopulateGatheringConfig() end
+    end
 end
 
 local function BuildGatheringConfigFrame()

@@ -2626,6 +2626,11 @@ MR.ApplyHeight = ApplyHeight
 
 local function ApplyFontSize(newSize)
     newSize = math.max(FONT_SIZE_MIN, math.min(FONT_SIZE_MAX, math.floor(newSize)))
+    if MR.db and MR.db.profile and MR.db.profile.syncWindowFontSize == true and MR.ApplyFontSizeToAll then
+        MR:ApplyFontSizeToAll(newSize)
+        return
+    end
+
     MR.db.profile.fontSize = newSize
     RecalcLayout()
     if MR.ApplySharedMediaSettings then
@@ -4198,10 +4203,16 @@ function MR:ApplySharedMediaSettings()
     if self.raresFrame and self.raresFrame.IsShown and self.raresFrame:IsShown() and self.RebuildRaresFrame then
         self:RebuildRaresFrame()
     end
-    if self.RebuildGatheringLocationsFrame then self:RebuildGatheringLocationsFrame() end
+    if self.RequestProfessionKnowledgeSurfaceRefresh then
+        self:RequestProfessionKnowledgeSurfaceRefresh(0.04)
+    elseif self.RebuildGatheringLocationsFrame then
+        self:RebuildGatheringLocationsFrame()
+    end
     if self.RebuildRenownFrame then self:RebuildRenownFrame() end
     if self.RepopulateRaresConfig then self:RepopulateRaresConfig() end
-    if self.RepopulateGatheringConfig then self:RepopulateGatheringConfig() end
+    if self.RepopulateGatheringConfig and not self.RequestProfessionKnowledgeSurfaceRefresh then
+        self:RepopulateGatheringConfig()
+    end
     if self.RepopulateRenownConfig then self:RepopulateRenownConfig() end
     if self.altBoardFrame and self.RefreshWarbandBoard then
         self:RefreshWarbandBoard()

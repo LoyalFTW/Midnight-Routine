@@ -1046,7 +1046,11 @@ function MR:ApplyScaleToAll(v)
     if self.RepopulateRaresConfig     then self:RepopulateRaresConfig() end
     if self.RepopulateGatheringConfig then self:RepopulateGatheringConfig() end
     if self.RepopulateRenownConfig    then self:RepopulateRenownConfig() end
-    if self.RepopulateConfigFrame     then self:RepopulateConfigFrame() end
+    if self.RequestConfigRepopulate then
+        self:RequestConfigRepopulate(nil, 0.06)
+    elseif self.RepopulateConfigFrame then
+        self:RepopulateConfigFrame()
+    end
 end
 
 function MR:ApplyFontSizeToAll(v)
@@ -1054,16 +1058,23 @@ function MR:ApplyFontSizeToAll(v)
     self.db.profile.raresFontSize     = v
     self.db.profile.gatheringFontSize = v
     self.db.profile.renownFontSize    = v
-    if self.ApplyFontSize then self.ApplyFontSize(v) end
+    if self.ApplySharedMediaSettings then
+        self:ApplySharedMediaSettings()
+    elseif self.RequestVisualRefresh then
+        self:RequestVisualRefresh({ config = false })
+    end
     if self.raresFrame and self.raresFrame.IsShown and self.raresFrame:IsShown() and self.RebuildRaresFrame then
         self:RebuildRaresFrame()
     end
-    if self.RebuildGatheringLocationsFrame then self:RebuildGatheringLocationsFrame() end
     if self.RebuildRenownFrame            then self:RebuildRenownFrame() end
     if self.RepopulateRaresConfig     then self:RepopulateRaresConfig() end
     if self.RepopulateGatheringConfig then self:RepopulateGatheringConfig() end
     if self.RepopulateRenownConfig    then self:RepopulateRenownConfig() end
-    if self.RepopulateConfigFrame     then self:RepopulateConfigFrame() end
+    if self.RequestConfigRepopulate then
+        self:RequestConfigRepopulate(nil, 0.06)
+    elseif self.RepopulateConfigFrame then
+        self:RepopulateConfigFrame()
+    end
 end
 
 function MR:BumpProgress(moduleKey, rowKey, delta, maxVal, bypassInstanceSuspend)
@@ -1544,6 +1555,67 @@ function MR:RequestConfigRefresh()
     self:RequestUIRefresh(0.04)
 end
 
+function MR:RequestConfigRepopulate(reason, delay)
+    if not self.ScheduleTimer then
+        if self.RepopulateConfigFrame then
+            self:RepopulateConfigFrame(reason)
+        end
+        return
+    end
+
+    delay = tonumber(delay) or 0.06
+    self._configRepopulatePending = reason or true
+    if self._configRepopulateTimer and self.CancelTimer then
+        self:CancelTimer(self._configRepopulateTimer)
+        self._configRepopulateTimer = nil
+    end
+
+    self._configRepopulateTimer = self:ScheduleTimer(function()
+        local pendingReason = self._configRepopulatePending
+        self._configRepopulateTimer = nil
+        self._configRepopulatePending = nil
+        if pendingReason and self.RepopulateConfigFrame then
+            self:RepopulateConfigFrame(pendingReason == true and nil or pendingReason)
+        end
+    end, delay)
+end
+
+function MR:RequestVisualRefresh(opts)
+    opts = type(opts) == "table" and opts or {}
+
+    if opts.applySharedMedia and ns.ApplySharedMedia then
+        ns.ApplySharedMedia(self.GetActiveMediaSettings and self:GetActiveMediaSettings() or (self.db and self.db.profile))
+    end
+
+    if opts.refreshBackgrounds and ns.RefreshAllFrameBackgrounds then
+        ns.RefreshAllFrameBackgrounds()
+    end
+
+    if opts.main ~= false then
+        if self.RequestUIRefresh then
+            self:RequestUIRefresh(opts.mainDelay or 0.02)
+        elseif self.RefreshUI then
+            self:RefreshUI()
+        end
+    end
+
+    if opts.profession ~= false then
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh(opts.professionDelay or 0.04)
+        elseif self.RefreshGatheringLocationsFrame then
+            self:RefreshGatheringLocationsFrame()
+        end
+    end
+
+    if opts.config ~= false then
+        if self.RequestConfigRepopulate then
+            self:RequestConfigRepopulate(opts.configReason, opts.configDelay or 0.06)
+        elseif self.RepopulateConfigFrame then
+            self:RepopulateConfigFrame(opts.configReason)
+        end
+    end
+end
+
 function MR:IsModuleHideComplete(modKey)
     local storage = self:GetActiveModuleStorage()
     local s = storage and storage[modKey]
@@ -1815,29 +1887,14 @@ function MR:SetHeaderColor(modKey, hexColor)
         self.db.profile.headerColors = {}
     end
     self.db.profile.headerColors[modKey] = hexColor
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
-    if self.RequestConfigRepopulate then
-        self:RequestConfigRepopulate(nil, 0.06)
-    elseif self.RepopulateConfigFrame then
-        self:RepopulateConfigFrame()
-    end
-    self:RequestProfessionKnowledgeSurfaceRefresh()
+    self:RequestVisualRefresh()
 end
 
 function MR:ResetHeaderColor(modKey)
     if self.db.profile.headerColors then
         self.db.profile.headerColors[modKey] = nil
     end
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
-    self:RequestProfessionKnowledgeSurfaceRefresh()
+    self:RequestVisualRefresh()
 end
 
 function MR:GetHeaderBackgroundColor(modKey)
@@ -1852,27 +1909,14 @@ function MR:SetHeaderBackgroundColor(modKey, hexColor)
         self.db.profile.headerBackgroundColors = {}
     end
     self.db.profile.headerBackgroundColors[modKey] = hexColor
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
-    if self.RequestConfigRepopulate then
-        self:RequestConfigRepopulate(nil, 0.06)
-    elseif self.RepopulateConfigFrame then
-        self:RepopulateConfigFrame()
-    end
+    self:RequestVisualRefresh()
 end
 
 function MR:ResetHeaderBackgroundColor(modKey)
     if self.db.profile.headerBackgroundColors then
         self.db.profile.headerBackgroundColors[modKey] = nil
     end
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
+    self:RequestVisualRefresh()
 end
 
 function MR:GetActiveMediaSettings()
@@ -1901,13 +1945,19 @@ function MR:GetMediaSetting(key)
     return self.db.profile[key]
 end
 
-function MR:SetMediaSetting(key, value)
+function MR:SetMediaSetting(key, value, skipRefresh)
     if not (self and self.db and key) then
         return
     end
 
     local active = self:GetActiveMediaSettings()
     active[key] = value
+    if not skipRefresh then
+        self:RequestVisualRefresh({
+            applySharedMedia = true,
+            refreshBackgrounds = true,
+        })
+    end
 end
 
 function MR:IsCursorWithinBounds(target)
@@ -1992,17 +2042,7 @@ function MR:SetRowColor(modKey, rowKey, hexColor)
     if not self.db.profile.rowColors then self.db.profile.rowColors = {} end
     if not self.db.profile.rowColors[modKey] then self.db.profile.rowColors[modKey] = {} end
     self.db.profile.rowColors[modKey][rowKey] = hexColor
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
-    if self.RequestConfigRepopulate then
-        self:RequestConfigRepopulate(nil, 0.06)
-    elseif self.RepopulateConfigFrame then
-        self:RepopulateConfigFrame()
-    end
-    self:RequestProfessionKnowledgeSurfaceRefresh()
+    self:RequestVisualRefresh()
 end
 
 function MR:ResetRowColor(modKey, rowKey)
@@ -2010,17 +2050,7 @@ function MR:ResetRowColor(modKey, rowKey)
     if p and p[modKey] then
         p[modKey][rowKey] = nil
     end
-    if self.RequestUIRefresh then
-        self:RequestUIRefresh(0.02)
-    else
-        self:RefreshUI()
-    end
-    if self.RequestConfigRepopulate then
-        self:RequestConfigRepopulate(nil, 0.06)
-    elseif self.RepopulateConfigFrame then
-        self:RepopulateConfigFrame()
-    end
-    self:RequestProfessionKnowledgeSurfaceRefresh()
+    self:RequestVisualRefresh()
 end
 
 local PARENT_TO_MIDNIGHT = {
