@@ -31,6 +31,8 @@ local gatheringMinimized = false
 local gatheringCfgFrame
 local PopulateGatheringConfig
 local RebuildGatheringLocationsFrame
+local gatheringFrameInteractionActive = false
+local gatheringRebuildPending
 local configExpandedProfessions = {} 
 
 local function RefreshFonts()
@@ -157,6 +159,7 @@ end
 
 local function QuestIDs(entry)
     if entry.questIDs then return entry.questIDs end
+    if entry.questIds then return entry.questIds end
     if entry.questID then return { entry.questID } end
     return {}
 end
@@ -621,14 +624,14 @@ end
 local itemCacheFrame = CreateFrame("Frame")
 itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 itemCacheFrame:RegisterEvent("QUEST_TURNED_IN")
-itemCacheFrame:RegisterEvent("QUEST_LOG_UPDATE")
 itemCacheFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
 itemCacheFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 itemCacheFrame:RegisterEvent("TRADE_SKILL_SHOW")
 itemCacheFrame:RegisterEvent("TRADE_SKILL_DATA_SOURCE_CHANGED")
 local itemCacheRefreshPending
-local function QueueGatheringLocationsRebuild()
+local function QueueGatheringLocationsRebuild(force)
     if not (gatheringLocationsFrame and gatheringLocationsFrame:IsShown()) then return end
+    if gatheringLocationsFrame._professionKnowledgeEmptyState and not force then return end
     if itemCacheRefreshPending then return end
     itemCacheRefreshPending = true
     C_Timer.After(0.12, function()
@@ -642,11 +645,19 @@ end
 itemCacheFrame:SetScript("OnEvent", function(self, event, itemID)
     if event == "GET_ITEM_INFO_RECEIVED" then
         if not watchedItemIDs[itemID] then return end
+        QueueGatheringLocationsRebuild()
+        return
     end
+
     if event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
-        if MR.RefreshPlayerProfessions then MR:RefreshPlayerProfessions() end
-        if MR.RequestScan then MR:RequestScan(1) end
+        local changed = MR.RefreshPlayerProfessions and MR:RefreshPlayerProfessions()
+        if changed then
+            if MR.RequestScan then MR:RequestScan(1) end
+            QueueGatheringLocationsRebuild(true)
+        end
+        return
     end
+
     QueueGatheringLocationsRebuild()
 end)
 
@@ -667,6 +678,11 @@ local function StripInlineColor(text)
     text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
     text = text:gsub("|r", "")
     return text
+end
+
+local function NormalizeTooltipLabel(text)
+    text = StripInlineColor(text):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return text:lower()
 end
 
 local function GetProfessionStateKey(expansionKey, professionKey)
@@ -764,6 +780,193 @@ local function EntryDisplayLabel(entry, sectionKey)
         return name
     end
     return entry.note or entry.label or L["ProfKnowledge_WeeklyDrop"] or "Weekly source"
+end
+
+local function ResolveProfessionKnowledgeTooltipEntry(entry)
+    return (entry and entry.professionKnowledgeEntry) or entry
+end
+
+function MR:GetProfessionKnowledgeTooltipEntry(entry)
+    return ResolveProfessionKnowledgeTooltipEntry(entry)
+end
+
+local function IsDuplicateSourceLabel(label, entry, sectionKey, displayLabel)
+    local normalized = NormalizeTooltipLabel(label)
+    if normalized == "" then
+        return true
+    end
+
+    local candidates = {
+        displayLabel,
+        entry and entry.label,
+        entry and entry.mainMenuLabel,
+        entry and entry.note,
+    }
+    if entry then
+        candidates[#candidates + 1] = EntryDisplayLabel(entry, sectionKey)
+        candidates[#candidates + 1] = EntryName(entry)
+        if ns.ResolveProfessionEntryLabel then
+            candidates[#candidates + 1] = ns.ResolveProfessionEntryLabel(entry)
+        end
+    end
+
+    for _, candidate in ipairs(candidates) do
+        if candidate and NormalizeTooltipLabel(candidate) == normalized then
+            return true
+        end
+    end
+    return false
+end
+
+local function AddProfessionKnowledgeTooltip(tooltip, entry, sectionKey, current, required, opts)
+    entry = ResolveProfessionKnowledgeTooltipEntry(entry)
+    if not (tooltip and entry) then
+        return nil, 0
+    end
+
+    opts = opts or {}
+    sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
+    local displayLabel = EntryDisplayLabel(entry, sectionKey)
+    local cleanDisplayLabel = NormalizeTooltipLabel(displayLabel)
+    current = current ~= nil and current or Progress(entry)
+    required = required or Required(entry)
+    if current == true then
+        current = required or 1
+    elseif current == false then
+        current = 0
+    end
+
+    tooltip:SetText(displayLabel, 1, 1, 1)
+
+    local cycleKey = entry.rowKey or entry.key or entry.itemID or entry.label
+    local target, targetCount = GetWaypointTarget(entry, cycleKey)
+    if target then
+        local altKey = entry.itemID or entry.label
+        local useAlt = entry.altZone and waypointAlt[altKey]
+        local mapID = useAlt and entry.altZone or target.zone
+        local mapX = useAlt and entry.altX or target.x
+        local mapY = useAlt and entry.altY or target.y
+
+        tooltip:AddLine(" ")
+        if not opts.sourceOnly and target.label and not IsDuplicateSourceLabel(target.label, entry, sectionKey, displayLabel) then
+            tooltip:AddLine(target.label, 0.75, 0.90, 1)
+        end
+        tooltip:AddLine(GetGatheringZoneName(mapID), 0.85, 0.85, 0.85)
+        tooltip:AddLine(string.format(L["Gathering_Coords"], mapX, mapY), 0.7, 1, 0.9)
+        if entry.altZone then
+            tooltip:AddLine(" ")
+            tooltip:AddLine(L["Gathering_AltLocationLabel"], 0.65, 0.65, 0.65)
+            tooltip:AddLine(GetGatheringZoneName(useAlt and entry.zone or entry.altZone), 0.6, 0.6, 0.6)
+            tooltip:AddLine(string.format("%.1f, %.1f", useAlt and entry.x or entry.altX, useAlt and entry.y or entry.altY), 0.45, 0.7, 0.55)
+        end
+    else
+        tooltip:AddLine(" ")
+        tooltip:AddLine(L["ProfKnowledge_NoWaypoint"], 0.65, 0.65, 0.65)
+    end
+
+    if entry.note and entry.note ~= "" and NormalizeTooltipLabel(entry.note) ~= cleanDisplayLabel then
+        tooltip:AddLine(" ")
+        tooltip:AddLine(entry.note, 0.65, 0.85, 0.95, true)
+    end
+
+    if entry.reference then
+        tooltip:AddLine(" ")
+        tooltip:AddLine(L["ProfKnowledge_ReferenceOnly"] or "One-time source, not auto-tracked.", 0.6, 0.6, 0.6, true)
+    end
+
+    tooltip:AddLine(" ")
+    if opts.sourceOnly and target then
+        tooltip:AddLine((entry.altZone or targetCount > 1) and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+    elseif (current or 0) >= (required or 1) then
+        tooltip:AddLine(L["Gathering_AlreadyCollected"], 0, 0.8, 0.27)
+    elseif target then
+        tooltip:AddLine((entry.altZone or targetCount > 1) and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+    end
+
+    return target, targetCount
+end
+
+function MR:ShowProfessionKnowledgeTooltip(owner, entry, sectionKey, current, required)
+    entry = ResolveProfessionKnowledgeTooltipEntry(entry)
+    if not (owner and GameTooltip and entry) then
+        return false
+    end
+
+    sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.ClearLines then
+        GameTooltip:ClearLines()
+    end
+    AddProfessionKnowledgeTooltip(GameTooltip, entry, sectionKey, current, required)
+    GameTooltip:Show()
+    return true
+end
+
+function MR:ShowProfessionKnowledgeSourceTooltip(owner, entry, sectionKey)
+    entry = ResolveProfessionKnowledgeTooltipEntry(entry)
+    if not (owner and GameTooltip and entry) then
+        return false
+    end
+
+    sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.ClearLines then
+        GameTooltip:ClearLines()
+    end
+    AddProfessionKnowledgeTooltip(GameTooltip, entry, sectionKey, nil, nil, { sourceOnly = true })
+    GameTooltip:Show()
+    return true
+end
+
+function MR:ShowProfessionKnowledgeCatchupTooltip(owner, entry)
+    if not (owner and GameTooltip and entry) then
+        return false
+    end
+
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if GameTooltip.ClearLines then
+        GameTooltip:ClearLines()
+    end
+    GameTooltip:SetText(StripInlineColor(L["Prof_Catchup"] or "Catch-Up Knowledge"), 1, 1, 1)
+    if entry.profKnowledgeProfessionLabel then
+        GameTooltip:AddLine(entry.profKnowledgeProfessionLabel, 0.85, 0.85, 0.85)
+    end
+    if entry.note and entry.note ~= "" then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(entry.note, 0.70, 0.82, 0.92, true)
+    end
+    GameTooltip:Show()
+    return true
+end
+
+function MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
+    entry = ResolveProfessionKnowledgeTooltipEntry(entry)
+    if not entry then
+        return false
+    end
+
+    sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
+    local cycleKey = entry.rowKey or entry.key or entry.itemID or entry.label
+    local target, targetCount = GetWaypointTarget(entry, cycleKey)
+    if not target then
+        return false
+    end
+
+    local altKey = entry.itemID or entry.label
+    local useAlt = entry.altZone and waypointAlt[altKey]
+    target = useAlt and { itemID = entry.itemID, label = entry.label, zone = entry.altZone, x = entry.altX, y = entry.altY } or target
+    if entry.altZone then waypointAlt[altKey] = not waypointAlt[altKey] end
+    if targetCount > 1 then
+        waypointLocationIndex[cycleKey] = ((waypointLocationIndex[cycleKey] or 1) % targetCount) + 1
+    end
+
+    local ok, source = SetGatheringWaypoint(target)
+    if ok then
+        print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), target.x, target.y))
+    else
+        print(L["Waypoint_Unavailable"])
+    end
+    return ok
 end
 
 local function ApplyGatheringFrameTheme(frame, opts)
@@ -948,63 +1151,14 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
 
     row:SetScript("OnEnter", function()
         hover:SetColorTexture(cr, cg, cb, 0.12 * accentAlpha)
-        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetText(EntryDisplayLabel(entry, sectionKey), 1, 1, 1)
-        GameTooltip:AddLine(string.format(L["ProfKnowledge_KPValue"], KPDone(entry), KPTotal(entry)), 0.80, 0.80, 0.90)
-        GameTooltip:AddLine(string.format(L["ProfKnowledge_RowProgress"], current, required), 0.70, 0.90, 1)
-        local cycleKey = entry.rowKey or entry.itemID or entry.label
-        local target, targetCount = GetWaypointTarget(entry, cycleKey)
-        if target then
-            local altKey = entry.itemID or entry.label
-            local useAlt = entry.altZone and waypointAlt[altKey]
-            local mapID = useAlt and entry.altZone or target.zone
-            local mapX = useAlt and entry.altX or target.x
-            local mapY = useAlt and entry.altY or target.y
-            GameTooltip:AddLine(" ")
-            if target.label then
-                GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
-            end
-            GameTooltip:AddLine(GetGatheringZoneName(mapID), 0.85, 0.85, 0.85)
-            GameTooltip:AddLine(string.format(L["Gathering_Coords"], mapX, mapY), 0.7, 1, 0.9)
-            if entry.altZone then
-                GameTooltip:AddLine(" ")
-                GameTooltip:AddLine(L["Gathering_AltLocationLabel"], 0.65, 0.65, 0.65)
-                GameTooltip:AddLine(GetGatheringZoneName(useAlt and entry.zone or entry.altZone), 0.6, 0.6, 0.6)
-                GameTooltip:AddLine(string.format("%.1f, %.1f", useAlt and entry.x or entry.altX, useAlt and entry.y or entry.altY), 0.45, 0.7, 0.55)
-            end
-        else
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(L["ProfKnowledge_NoWaypoint"], 0.65, 0.65, 0.65)
-        end
-        if entry.note and entry.note ~= "" then
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(entry.note, 0.65, 0.85, 0.95, true)
-        end
-        GameTooltip:AddLine(" ")
-        if done then
-            GameTooltip:AddLine(L["Gathering_AlreadyCollected"], 0, 0.8, 0.27)
-        elseif target then
-            GameTooltip:AddLine((entry.altZone or targetCount > 1) and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
-        end
-        GameTooltip:Show()
+        MR:ShowProfessionKnowledgeSourceTooltip(row, entry, sectionKey)
     end)
     row:SetScript("OnLeave", function()
         hover:SetColorTexture(cr, cg, cb, 0)
         GameTooltip:Hide()
     end)
     row:SetScript("OnClick", function()
-        local cycleKey = entry.rowKey or entry.itemID or entry.label
-        local target, targetCount = GetWaypointTarget(entry, cycleKey)
-        if not target then return end
-        local altKey = entry.itemID or entry.label
-        local useAlt = entry.altZone and waypointAlt[altKey]
-        target = useAlt and { itemID = entry.itemID, label = entry.label, zone = entry.altZone, x = entry.altX, y = entry.altY } or target
-        if entry.altZone then waypointAlt[altKey] = not waypointAlt[altKey] end
-        if targetCount > 1 then
-            waypointLocationIndex[cycleKey] = ((waypointLocationIndex[cycleKey] or 1) % targetCount) + 1
-        end
-        local ok, source = SetGatheringWaypoint(target)
-        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), target.x, target.y)) else print(L["Waypoint_Unavailable"]) end
+        MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
     end)
 
     return cardY + rowHeight + 6
@@ -1060,31 +1214,14 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
 
     row:SetScript("OnEnter", function()
         hover:SetColorTexture(cr, cg, cb, 0.12 * chromeAlpha)
-        GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-        GameTooltip:SetText(EntryDisplayLabel(entry, sectionKey), 1, 1, 1)
-        GameTooltip:AddLine(string.format(L["ProfKnowledge_KPValue"], 0, entry.kp or 0), 0.80, 0.80, 0.90)
-        if entry.note and entry.note ~= "" then
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(entry.note, 0.70, 0.82, 0.92, true)
-        end
-        if entry.zone and entry.x and entry.y then
-            GameTooltip:AddLine(" ")
-            GameTooltip:AddLine(GetGatheringZoneName(entry.zone), 0.85, 0.85, 0.85)
-            GameTooltip:AddLine(string.format(L["Gathering_Coords"], entry.x, entry.y), 0.7, 1, 0.9)
-            GameTooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
-        end
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["ProfKnowledge_ReferenceOnly"] or "One-time source, not auto-tracked.", 0.6, 0.6, 0.6, true)
-        GameTooltip:Show()
+        MR:ShowProfessionKnowledgeSourceTooltip(row, entry, sectionKey)
     end)
     row:SetScript("OnLeave", function()
         hover:SetColorTexture(cr, cg, cb, 0)
         GameTooltip:Hide()
     end)
     row:SetScript("OnClick", function()
-        if not (entry.zone and entry.x and entry.y) then return end
-        local ok, source = SetGatheringWaypoint(entry)
-        if ok then print(string.format(L["Waypoint_Set"], source, EntryDisplayLabel(entry, sectionKey), entry.x, entry.y)) else print(L["Waypoint_Unavailable"]) end
+        MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
     end)
 
     return cardY + rowHeight + 6
@@ -1117,9 +1254,14 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     local row = CreateFrame("Frame", nil, card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     row:SetSize(cardW - 24, rowHeight + 4)
+    row:EnableMouse(true)
     row:SetBackdrop(MakeBackdrop())
     row:SetBackdropColor(0, 0, 0, 0)
     row:SetBackdropBorderColor(0, 0, 0, 0)
+
+    local hover = row:CreateTexture(nil, "BACKGROUND")
+    hover:SetAllPoints()
+    hover:SetColorTexture(cr, cg, cb, 0)
 
     local statusBox = CreateFrame("Frame", nil, row, "BackdropTemplate")
     statusBox:SetSize(14, 14)
@@ -1171,6 +1313,22 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     nameText:SetWordWrap(false)
     nameText:SetText(L["Prof_Catchup"] or "Catch-Up Knowledge")
     nameText:SetTextColor(cr, cg, cb)
+
+    local catchupTooltip = {
+        profKnowledgeCatchup = true,
+        profKnowledgeProfessionLabel = profession and profession.label,
+        profKnowledgeProfessionKey = profession and profession.key,
+        profKnowledgeExpansionKey = expansion and expansion.key,
+        note = L["Prof_Catchup_Note"],
+    }
+    row:SetScript("OnEnter", function()
+        hover:SetColorTexture(cr, cg, cb, 0.10 * accentAlpha)
+        MR:ShowProfessionKnowledgeCatchupTooltip(row, catchupTooltip)
+    end)
+    row:SetScript("OnLeave", function()
+        hover:SetColorTexture(cr, cg, cb, 0)
+        GameTooltip:Hide()
+    end)
 
     return cardY + rowHeight + 10
 end
@@ -1334,28 +1492,38 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
 
         taskFrame:SetScript("OnEnter", function()
             hover:SetColorTexture(rr, rg, rb, 0.10 * accentAlpha)
-            GameTooltip:SetOwner(taskFrame, "ANCHOR_RIGHT")
-            GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
-            if row.note and row.note ~= "" then
-                GameTooltip:AddLine(row.note, 0.70, 0.82, 0.92, true)
-            end
-            local target, targetCount = GetWaypointTarget(row, row.key)
-            if target then
-                GameTooltip:AddLine(" ")
-                if target.label then
-                    GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
+            if row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+                MR:ShowProfessionKnowledgeCatchupTooltip(taskFrame, row)
+            elseif row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
+                MR:ShowProfessionKnowledgeSourceTooltip(taskFrame, row, row.profKnowledgeSectionKey)
+            else
+                GameTooltip:SetOwner(taskFrame, "ANCHOR_RIGHT")
+                GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
+                if row.note and row.note ~= "" then
+                    GameTooltip:AddLine(row.note, 0.70, 0.82, 0.92, true)
                 end
-                GameTooltip:AddLine(GetGatheringZoneName(target.zone), 0.85, 0.85, 0.85)
-                GameTooltip:AddLine(string.format(L["Gathering_Coords"], target.x, target.y), 0.7, 1, 0.9)
-                GameTooltip:AddLine(targetCount > 1 and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                local target, targetCount = GetWaypointTarget(row, row.key)
+                if target then
+                    GameTooltip:AddLine(" ")
+                    if target.label then
+                        GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
+                    end
+                    GameTooltip:AddLine(GetGatheringZoneName(target.zone), 0.85, 0.85, 0.85)
+                    GameTooltip:AddLine(string.format(L["Gathering_Coords"], target.x, target.y), 0.7, 1, 0.9)
+                    GameTooltip:AddLine(targetCount > 1 and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                end
+                GameTooltip:Show()
             end
-            GameTooltip:Show()
         end)
         taskFrame:SetScript("OnLeave", function()
             hover:SetColorTexture(rr, rg, rb, 0)
             GameTooltip:Hide()
         end)
         taskFrame:SetScript("OnClick", function()
+            if row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
+                MR:SetProfessionKnowledgeWaypoint(row, row.profKnowledgeSectionKey)
+                return
+            end
             local target, targetCount = GetWaypointTarget(row, row.key)
             if target then
                 if targetCount > 1 then
@@ -1381,6 +1549,14 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         statusBtn:SetScript("OnEnter", function()
             if not canManualToggle then return end
             hover:SetColorTexture(rr, rg, rb, 0.10 * accentAlpha)
+            if row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+                MR:ShowProfessionKnowledgeCatchupTooltip(statusBtn, row)
+                return
+            elseif row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
+                MR:ShowProfessionKnowledgeSourceTooltip(statusBtn, row, row.profKnowledgeSectionKey)
+                return
+            end
+
             GameTooltip:SetOwner(statusBtn, "ANCHOR_RIGHT")
             GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
             GameTooltip:AddLine(" ")
@@ -2042,6 +2218,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     local hadProfCache = MR.playerProfessions and next(MR.playerProfessions) ~= nil
     if not hadProfCache and MR.RefreshPlayerProfessions then MR:RefreshPlayerProfessions() end
     local hasProfCache = MR.playerProfessions and next(MR.playerProfessions) ~= nil
+    local professionsScanned = MR.db and MR.db.char and MR.db.char.professionsScanned == true
     local alpha = db.gatheringAlpha or 1.0
     local width = db.gatheringWidth or DEFAULT_W
     local height = db.gatheringHeight or DEFAULT_H
@@ -2074,6 +2251,7 @@ local function BuildGatheringLocationsFrame(isRetry)
 
     local titleBar = TitleBar(frame, TITLE_H)
     frame.titleBar = titleBar
+    titleBar:SetFrameLevel(frame:GetFrameLevel() + 20)
     titleBar:SetBackdropColor(0, 0, 0, 0)
     titleBar:ClearAllPoints()
     if headerBottom then
@@ -2083,17 +2261,47 @@ local function BuildGatheringLocationsFrame(isRetry)
         titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
         titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
     end
-    titleBar:SetScript("OnDragStart", function() if not db.gatheringLocked then frame:StartMoving() end end)
+    local function StartGatheringFrameMove()
+        local currentDb = MR.db and MR.db.profile or db
+        if currentDb.gatheringLocked then return end
+        gatheringFrameInteractionActive = true
+        frame._gatheringMoving = true
+        frame:StartMoving()
+    end
+
+    local function StopGatheringFrameMove()
+        if frame._gatheringMoving then
+            frame._gatheringMoving = nil
+            frame:StopMovingOrSizing()
+            SaveManagedFramePos(frame, "gatheringLocPos", headerBottom and "bottom" or "top")
+        end
+        gatheringFrameInteractionActive = false
+        if gatheringRebuildPending then
+            local pendingResetScroll = gatheringRebuildPending == "reset"
+            gatheringRebuildPending = nil
+            RebuildGatheringLocationsFrame(pendingResetScroll)
+        end
+    end
+
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", StartGatheringFrameMove)
+    frame:SetScript("OnDragStop", StopGatheringFrameMove)
+    titleBar:SetScript("OnDragStart", StartGatheringFrameMove)
     titleBar:SetScript("OnDragStop", function()
-        frame:StopMovingOrSizing()
-        SaveManagedFramePos(frame, "gatheringLocPos", headerBottom and "bottom" or "top")
+        StopGatheringFrameMove()
     end)
     if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(frame, titleBar) end
 
     local closeBtn = CloseButton(titleBar, function()
+        gatheringFrameInteractionActive = false
+        gatheringRebuildPending = nil
+        gatheringLocationsFrame = nil
+        MR.gatheringLocationsFrame = nil
         frame:Hide()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", false) end
     end)
+    closeBtn:SetFrameLevel(titleBar:GetFrameLevel() + 2)
 
     local gearBtn = HeaderIconButton(
         titleBar,
@@ -2103,9 +2311,11 @@ local function BuildGatheringLocationsFrame(isRetry)
         L["ProfKnowledge_OptionsTitle"],
         function() MR:ToggleGatheringLocationsConfig() end
     )
+    gearBtn:SetFrameLevel(titleBar:GetFrameLevel() + 2)
 
     local expansionDropdown, selectedExpansion = CreateKnowledgeExpansionDropdown(titleBar, gearBtn)
     frame.expansionDropdown = expansionDropdown
+    expansionDropdown:SetFrameLevel(titleBar:GetFrameLevel() + 2)
     expansionDropdown:ClearAllPoints()
     expansionDropdown:SetPoint("LEFT", titleBar, "LEFT", 8, -1)
 
@@ -2119,6 +2329,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     titleTxt:Hide()
 
     local scroll = CreateFrame("ScrollFrame", nil, frame)
+    scroll:SetFrameLevel(frame:GetFrameLevel() + 1)
     if headerBottom then
         scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -4)
         scroll:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -8, 1)
@@ -2127,10 +2338,12 @@ local function BuildGatheringLocationsFrame(isRetry)
         scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 4)
     end
     local content = CreateFrame("Frame", nil, scroll)
+    content:SetFrameLevel(scroll:GetFrameLevel() + 1)
     content:SetWidth(width - 8)
     content:SetHeight(1)
 
     local track = CreateFrame("Frame", nil, frame)
+    track:SetFrameLevel(frame:GetFrameLevel() + 1)
     track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 1, 0)
     track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 1, 0)
     track:SetWidth(5)
@@ -2151,6 +2364,7 @@ local function BuildGatheringLocationsFrame(isRetry)
         if MR.db then MR.db.profile.gatheringMinimized = gatheringMinimized end
         ApplyMinimized(gatheringMinimized)
     end)
+    minBtn:SetFrameLevel(titleBar:GetFrameLevel() + 2)
     minBtn:SetPoint("RIGHT", closeBtn, "LEFT", -3, 0)
     gearBtn:SetPoint("RIGHT", minBtn, "LEFT", -3, 0)
     if chromeAlpha <= 0.001 then
@@ -2167,6 +2381,7 @@ local function BuildGatheringLocationsFrame(isRetry)
 
     yOff = BuildProfessionCards(content, width, yOff, fontSize, contentAlpha, borderAlpha, chromeAlpha, accentAlpha, db, selectedExpansion)
 
+    frame._professionKnowledgeEmptyState = yOff == 0
     if yOff == 0 then
         local emptyText = content:CreateFontString(nil, "OVERLAY")
         emptyText:SetFont(FONT_ROWS, fontSize, GetFontFlags())
@@ -2174,17 +2389,18 @@ local function BuildGatheringLocationsFrame(isRetry)
         emptyText:SetPoint("TOPRIGHT", content, "TOPRIGHT", -10, -10)
         emptyText:SetJustifyH("LEFT")
         emptyText:SetTextColor(0.72, 0.72, 0.72, 0.95)
-        emptyText:SetText(hasProfCache and L["Gathering_NoProfessions"] or L["Gathering_Loading"])
+        emptyText:SetText((hasProfCache or professionsScanned) and L["Gathering_NoProfessions"] or L["Gathering_Loading"])
         yOff = 32
-        if not hasProfCache and not isRetry and C_Timer then
-            C_Timer.After(0.75, function()
-                if gatheringLocationsFrame and gatheringLocationsFrame:IsShown() then
-                    if MR.RefreshPlayerProfessions then MR:RefreshPlayerProfessions() end
-                    gatheringLocationsFrame:Hide()
-                    gatheringLocationsFrame = BuildGatheringLocationsFrame(true)
-                end
-            end)
-        end
+
+        local emptyDrag = CreateFrame("Frame", nil, frame)
+        emptyDrag:SetFrameLevel(scroll:GetFrameLevel() + 3)
+        emptyDrag:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
+        emptyDrag:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 0, 0)
+        emptyDrag:EnableMouse(true)
+        emptyDrag:RegisterForDrag("LeftButton")
+        emptyDrag:SetScript("OnDragStart", StartGatheringFrameMove)
+        emptyDrag:SetScript("OnDragStop", StopGatheringFrameMove)
+        frame._emptyDrag = emptyDrag
     end
 
     content:SetHeight(yOff)
@@ -2209,12 +2425,14 @@ local function BuildGatheringLocationsFrame(isRetry)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
     dragger:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" and not db.gatheringLocked then
+        local currentDb = MR.db and MR.db.profile or db
+        if button == "LeftButton" and not currentDb.gatheringLocked then
             dragStartW, dragStartH = frame:GetWidth(), frame:GetHeight()
             local scale = frame:GetEffectiveScale()
             dragStartX, dragStartY = GetCursorPosition()
             dragStartX, dragStartY = dragStartX / scale, dragStartY / scale
             dragger._dragging = true
+            gatheringFrameInteractionActive = true
         end
     end)
     dragger:SetScript("OnMouseUp", function(_, button)
@@ -2224,7 +2442,10 @@ local function BuildGatheringLocationsFrame(isRetry)
                 MR.db.profile.gatheringWidth = math.max(MIN_W, math.min(MAX_W, math.floor(frame:GetWidth())))
                 MR.db.profile.gatheringHeight = math.max(MIN_H, math.min(MAX_H, math.floor(frame:GetHeight())))
             end
-            RebuildGatheringLocationsFrame()
+            gatheringFrameInteractionActive = false
+            local pendingResetScroll = gatheringRebuildPending == "reset"
+            gatheringRebuildPending = nil
+            RebuildGatheringLocationsFrame(pendingResetScroll)
             if gatheringCfgFrame and gatheringCfgFrame:IsShown() then PopulateGatheringConfig(gatheringCfgFrame) end
         end
     end)
@@ -2248,6 +2469,7 @@ local function BuildGatheringLocationsFrame(isRetry)
             if frame._scroll then frame._scroll:Hide() end
             if frame._scrollTrack then frame._scrollTrack:Hide() end
             if frame._dragger then frame._dragger:Hide() end
+            if frame._gatheringHeaderGlow then frame._gatheringHeaderGlow:Hide() end
             frame._mrAnimTick = nil
             frame:SetScript("OnUpdate", nil)
             frame:SetHeight(TITLE_H)
@@ -2256,6 +2478,10 @@ local function BuildGatheringLocationsFrame(isRetry)
             if frame._scroll then frame._scroll:Show() end
             if frame._scrollTrack then frame._scrollTrack:Show() end
             if frame._dragger then frame._dragger:Show() end
+            if frame._gatheringHeaderGlow then
+                frame._gatheringHeaderGlow:SetHeight(64)
+                frame._gatheringHeaderGlow:Show()
+            end
             local savedH = db.gatheringHeight or DEFAULT_H
             local naturalH = TITLE_H + 1 + yOff + 6
             ApplyFrameHeight(frame, math.min(savedH, naturalH))
@@ -2275,6 +2501,11 @@ end
 
 RebuildGatheringLocationsFrame = function(resetScroll)
     RefreshFonts()
+    if gatheringFrameInteractionActive then
+        gatheringRebuildPending = resetScroll and "reset" or true
+        return
+    end
+
     local wasShown = gatheringLocationsFrame and gatheringLocationsFrame:IsShown()
     -- Preserving scroll position only makes sense when the rebuild is for
     -- the SAME content (e.g. a label finished resolving in the background).

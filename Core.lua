@@ -1871,7 +1871,17 @@ function MR:SetManagedWindowOpen(key, value)
         return
     end
 
-    self:SetWindowLayoutValue(key, value and true or false)
+    local newValue = value and true or false
+    local oldValue = self:GetWindowLayoutValue(key) == true
+    self:SetWindowLayoutValue(key, newValue)
+
+    if oldValue ~= newValue then
+        if self.RequestConfigRepopulate then
+            self:RequestConfigRepopulate(nil, 0.01)
+        elseif self.RepopulateConfigFrame then
+            self:RepopulateConfigFrame()
+        end
+    end
 end
 
 function MR:GetHeaderColor(modKey)
@@ -2114,6 +2124,29 @@ local function HasAnyProfessionRecord(source)
     return false
 end
 
+local function ProfessionMapsEqual(a, b)
+    if a == b then
+        return true
+    end
+    if type(a) ~= "table" or type(b) ~= "table" then
+        return false
+    end
+
+    for skillLineID, learned in pairs(a) do
+        if learned and not b[skillLineID] then
+            return false
+        end
+    end
+
+    for skillLineID, learned in pairs(b) do
+        if learned and not a[skillLineID] then
+            return false
+        end
+    end
+
+    return true
+end
+
 local function CharacterDataHasProfession(charData, skillLineID)
     if type(charData) ~= "table" then
         return false
@@ -2191,6 +2224,7 @@ function MR:RefreshPlayerProfessions()
         return
     end
 
+    local previousProfessions = CopyProfessionMap(self.playerProfessions)
     wipe(self.playerProfessions)
     local found = false
     local scanned = false
@@ -2260,14 +2294,18 @@ function MR:RefreshPlayerProfessions()
         end
     end
 
-    if self.RefreshProfessionKnowledgeSurfaces then
+    local changed = not ProfessionMapsEqual(previousProfessions, self.playerProfessions)
+
+    if changed and self.RefreshProfessionKnowledgeSurfaces then
         self:RequestProfessionKnowledgeSurfaceRefresh()
     end
-    if self.RequestConfigRefresh then
+    if changed and self.RequestConfigRefresh then
         self:RequestConfigRefresh()
-    elseif self.RefreshUI then
+    elseif changed and self.RefreshUI then
         self:RefreshUI()
     end
+
+    return changed, found, scanned
 end
 
 function MR:RefreshProfessionConcentration()

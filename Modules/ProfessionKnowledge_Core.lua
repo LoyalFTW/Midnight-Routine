@@ -55,6 +55,12 @@ end
 
 local function NormalizeProfessionSections(profession)
     if profession.sections then
+        for _, section in ipairs(profession.sections) do
+            for _, entry in ipairs(section.entries or {}) do
+                entry.profKnowledgeSectionKey = entry.profKnowledgeSectionKey or section.key
+                entry.profKnowledgeProfessionKey = entry.profKnowledgeProfessionKey or profession.key
+            end
+        end
         return profession.sections
     end
 
@@ -72,6 +78,12 @@ local function NormalizeProfessionSections(profession)
         end
     end
     profession.sections = sections
+    for _, section in ipairs(sections) do
+        for _, entry in ipairs(section.entries or {}) do
+            entry.profKnowledgeSectionKey = entry.profKnowledgeSectionKey or section.key
+            entry.profKnowledgeProfessionKey = entry.profKnowledgeProfessionKey or profession.key
+        end
+    end
     return sections
 end
 ns.NormalizeProfessionSections = NormalizeProfessionSections
@@ -79,6 +91,11 @@ ns.NormalizeProfessionSections = NormalizeProfessionSections
 function ns.RegisterProfessionExpansion(def)
     for _, profession in ipairs(def.professions or {}) do
         NormalizeProfessionSections(profession)
+        for _, section in ipairs(profession.sections or {}) do
+            for _, entry in ipairs(section.entries or {}) do
+                entry.profKnowledgeExpansionKey = entry.profKnowledgeExpansionKey or def.key
+            end
+        end
     end
     table.insert(ALL_EXPANSIONS, def)
     if MR and MR.RegisterExpansion then
@@ -377,18 +394,24 @@ local function BuildWeeklyGroupedRows(section)
         local label = GetWeeklyEntryLabel(entry)
         local row = {
             key = key,
+            professionKnowledgeEntry = entry,
             colorKey = rowKey,
             questIds = questIds,
             label = label,
             max = (entry.mode == "count") and (entry.required or #questIds) or 1,
+            mode = entry.mode,
+            required = entry.required,
             note = entry.note,
             itemID = entry.itemID,
             kind = entry.kind,
+            kp = entry.kp,
             kpTotal = ((entry.mode == "count") and (entry.required or #questIds) or 1) * (entry.kp or 0),
             zone = entry.zone,
             x = entry.x,
             y = entry.y,
             questLocations = entry.questLocations,
+            profKnowledgeSectionKey = (entry.kind == "darkmoon") and "darkmoon" or "weekly",
+            rowKey = entry.rowKey or key,
             isVisible = (entry.kind == "darkmoon") and function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end or nil,
             group = (entry.kind == "darkmoon") and "darkmoon" or "weekly",
         }
@@ -516,6 +539,10 @@ function ns.BuildMainMenuRows(profession, expansion)
     if profession.catchupCurrency or sharedCatchupItemID then
         rows[#rows + 1] = {
             key = "prof_catchup",
+            profKnowledgeCatchup = true,
+            profKnowledgeProfessionLabel = profession.label,
+            profKnowledgeProfessionKey = profession.key,
+            profKnowledgeExpansionKey = (expansion and expansion.key) or "midnight",
             currencyId = profession.catchupCurrency,
             itemId = sharedCatchupItemID,
             itemID = sharedCatchupItemID,
@@ -543,17 +570,21 @@ function ns.BuildMainMenuRows(profession, expansion)
                     end
                     local row = {
                         key = key,
+                        professionKnowledgeEntry = entry,
                         questIds = entry.questIDs or { entry.questID },
                         label = ns.ResolveProfessionEntryLabel(entry, fallbackLabel, preferFallback),
                         max = 1,
                         note = entry.note,
                         itemID = entry.itemID,
                         kind = entry.kind,
+                        kp = entry.kp,
                         kpTotal = entry.kp or 0,
                         zone = entry.zone,
                         x = entry.x,
                         y = entry.y,
                         questLocations = entry.questLocations,
+                        profKnowledgeSectionKey = sectionKey,
+                        rowKey = entry.rowKey or key,
                         group = sectionKey,
                     }
                     rows[#rows + 1] = row
@@ -574,17 +605,21 @@ function ns.BuildMainMenuRows(profession, expansion)
             if entry.rowKey and entry.questID then
                 darkmoonRows[#darkmoonRows + 1] = {
                     key = entry.rowKey,
+                    professionKnowledgeEntry = entry,
                     questIds = { entry.questID },
                     label = ns.ResolveProfessionEntryLabel(entry, entry.mainMenuLabel),
                     max = 1,
                     note = entry.note,
                     itemID = entry.itemID,
                     kind = entry.kind,
+                    kp = entry.kp,
                     kpTotal = entry.kp or 0,
                     zone = entry.zone,
                     x = entry.x,
                     y = entry.y,
                     questLocations = entry.questLocations,
+                    profKnowledgeSectionKey = "darkmoon",
+                    rowKey = entry.rowKey,
                     isVisible = function() return MR.IsDarkmoonVisible and MR.IsDarkmoonVisible() end,
                     group = "darkmoon",
                 }
@@ -608,17 +643,21 @@ function ns.BuildLureRows(profession)
         if entry.rowKey and entry.questID then
             rows[#rows + 1] = {
                 key = entry.rowKey,
+                professionKnowledgeEntry = entry,
                 questIds = { entry.questID },
                 label = ns.ResolveProfessionEntryLabel(entry, entry.mainMenuLabel or entry.label),
                 max = 1,
                 note = entry.note,
                 itemID = entry.itemID,
                 kind = entry.kind,
+                kp = entry.kp,
                 kpTotal = entry.kp or 0,
                 zone = entry.zone,
                 x = entry.x,
                 y = entry.y,
                 questLocations = entry.questLocations,
+                profKnowledgeSectionKey = "lures",
+                rowKey = entry.rowKey,
                 isVisible = entry.isVisible,
                 group = "lures",
             }

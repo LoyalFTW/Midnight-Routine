@@ -37,6 +37,11 @@ local UATV_META_QUEST_IDS = {
     93744,
 }
 
+local UATV_SHARED_BRANCH_QUEST_IDS = {
+    [94385] = true,
+    [94386] = true,
+}
+
 local UATV_BRANCH_QUEST_IDS = {}
 for _, branch in ipairs(UATV_BRANCHES) do
     UATV_BRANCH_QUEST_IDS[#UATV_BRANCH_QUEST_IDS + 1] = branch.quest
@@ -332,6 +337,53 @@ local function FindActiveQuestVariant(variants)
         end
     end
     return nil
+end
+
+local function IsAnyQuestActive(questIds)
+    for _, questId in ipairs(questIds or {}) do
+        if IsQuestCurrentlyActive(questId) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function IsAnyQuestCompleted(questIds)
+    if not (C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted) then
+        return false
+    end
+
+    for _, questId in ipairs(questIds or {}) do
+        if C_QuestLog.IsQuestFlaggedCompleted(questId) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function FindActiveUATVBranch(metaActive)
+    local activeBranch = FindActiveQuestVariant(UATV_BRANCHES)
+    if activeBranch and UATV_SHARED_BRANCH_QUEST_IDS[activeBranch.quest] and not metaActive then
+        return nil
+    end
+
+    return activeBranch
+end
+
+local function IsSharedUATVBranchName(name)
+    if type(name) ~= "string" or name == "" then
+        return false
+    end
+
+    for _, branch in ipairs(UATV_BRANCHES) do
+        if UATV_SHARED_BRANCH_QUEST_IDS[branch.quest] and name == ResolveVariantName(branch) then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function CollectQuestVariants(variants)
@@ -769,25 +821,29 @@ MR:RegisterModule({
             end
         end
 
-        local activeUATVBranch = FindActiveQuestVariant(UATV_BRANCHES)
+        local uatvMetaActive = IsAnyQuestActive(UATV_META_QUEST_IDS)
+        local uatvMetaCompleted = IsAnyQuestCompleted(UATV_META_QUEST_IDS)
+        local activeUATVBranch = FindActiveUATVBranch(uatvMetaActive)
+        local previousUATVNameUsable = not IsSharedUATVBranchName(previousUATVActiveName)
+            or uatvMetaActive
+            or uatvMetaCompleted
+        db[mod.key]["uatv_meta_active"] = uatvMetaActive and true or nil
         db[mod.key]["uatv_branch_name"] = activeUATVBranch and activeUATVBranch.name or nil
         db[mod.key]["uatv_branch_quest"] = activeUATVBranch and activeUATVBranch.quest or nil
         db[mod.key]["uatv_completed_branch_name"] = nil
-        db[mod.key]["unity_against_void"] = db[mod.key]["unity_against_void"] or 0
+        db[mod.key]["unity_against_void"] = 0
 
-        for _, questId in ipairs(UATV_META_QUEST_IDS) do
-            if C_QuestLog.IsQuestFlaggedCompleted(questId) then
-                db[mod.key]["unity_against_void"] = 1
-                db[mod.key]["uatv_completed_branch_name"] = previousUATVCompletedName
-                    or previousUATVActiveName
-                    or db[mod.key]["uatv_branch_name"]
-                break
-            end
+        if uatvMetaCompleted then
+            db[mod.key]["unity_against_void"] = 1
+            db[mod.key]["uatv_completed_branch_name"] = previousUATVCompletedName
+                or (previousUATVNameUsable and previousUATVActiveName or nil)
+                or db[mod.key]["uatv_branch_name"]
         end
 
         if db[mod.key]["unity_against_void"] < 1 then
             for _, branch in ipairs(UATV_BRANCHES) do
-                if C_QuestLog.IsQuestFlaggedCompleted(branch.quest) then
+                if C_QuestLog.IsQuestFlaggedCompleted(branch.quest)
+                    and (not UATV_SHARED_BRANCH_QUEST_IDS[branch.quest] or uatvMetaActive or uatvMetaCompleted) then
                     db[mod.key]["unity_against_void"] = 1
                     db[mod.key]["uatv_completed_branch_name"] = branch.name
                     break
@@ -807,7 +863,7 @@ MR:RegisterModule({
         if (tonumber(db[mod.key]["unity_against_void"]) or 0) >= 1
             and not db[mod.key]["uatv_completed_branch_name"] then
             db[mod.key]["uatv_completed_branch_name"] = previousUATVCompletedName
-                or previousUATVActiveName
+                or (previousUATVNameUsable and previousUATVActiveName or nil)
                 or db[mod.key]["uatv_branch_name"]
         end
 
@@ -1210,12 +1266,13 @@ MR:RegisterModule({
             branchQuestIds = UATV_BRANCH_QUEST_IDS,
             completedNameKey = "uatv_completed_branch_name",
             activeNameKey = "uatv_branch_name",
+            activeNameRequiredKey = "uatv_meta_active",
 
             tooltipFunc = function(tip)
                 local s1db = GetMainWeeklyProgress()
-                local activeBranchInfo = FindActiveQuestVariant(UATV_BRANCHES)
+                local activeBranchInfo = FindActiveUATVBranch(IsAnyQuestActive(UATV_META_QUEST_IDS))
                 local completedBranch = (MR:GetProgress("s1_weekly", "unity_against_void") >= 1 and s1db["uatv_completed_branch_name"]) or nil
-                local activeBranch = (activeBranchInfo and activeBranchInfo.name) or s1db["uatv_branch_name"]
+                local activeBranch = (activeBranchInfo and activeBranchInfo.name) or (s1db["uatv_meta_active"] and s1db["uatv_branch_name"] or nil)
 
                 tip:AddLine(" ")
                 if completedBranch or MR:GetProgress("s1_weekly", "unity_against_void") >= 1 then

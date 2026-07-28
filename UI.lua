@@ -524,6 +524,16 @@ local function MainRowOnEnter(selfRow)
     end
 
     local row = data.row
+    if data.mod and data.mod.profSkillLine and row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+        MR:ShowProfessionKnowledgeCatchupTooltip(selfRow, row)
+        return
+    end
+
+    if data.mod and data.mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.ShowProfessionKnowledgeSourceTooltip then
+        MR:ShowProfessionKnowledgeSourceTooltip(selfRow, row, row.profKnowledgeSectionKey)
+        return
+    end
+
     GameTooltip:SetOwner(selfRow, "ANCHOR_RIGHT")
     if row.currencyId and not row.noBlizzardTooltip then
         GameTooltip:SetCurrencyByID(row.currencyId)
@@ -598,7 +608,10 @@ local function MainRowOnMouseDown(selfRow, button)
         end
     end
 
-    if button == "LeftButton" and data.hasWaypoint then
+    if button == "LeftButton" and mod and mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.SetProfessionKnowledgeWaypoint then
+        MR:SetProfessionKnowledgeWaypoint(row, row.profKnowledgeSectionKey)
+        return
+    elseif button == "LeftButton" and data.hasWaypoint then
         local ok, source = MR:SetWaypoint(row)
         if ok then
             print(string.format(L["Waypoint_Set"], source, row.waypointTitle or row.label, row.x, row.y))
@@ -659,6 +672,15 @@ local function MainStatusButtonOnEnter(selfBtn)
     end
 
     local row = data.row
+    if data.mod and data.mod.profSkillLine and row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+        MR:ShowProfessionKnowledgeCatchupTooltip(selfBtn, row)
+        return
+    end
+    if data.mod and data.mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.ShowProfessionKnowledgeSourceTooltip then
+        MR:ShowProfessionKnowledgeSourceTooltip(selfBtn, row, row.profKnowledgeSectionKey)
+        return
+    end
+
     local mo = row.toggleStatus and MR:GetProgress(data.mod.key, row.key) or MR:GetManualOverride(data.mod.key, row.key)
     GameTooltip:SetOwner(selfBtn, "ANCHOR_RIGHT")
     GameTooltip:SetText(row.label, 1, 1, 1, 1, true)
@@ -1052,6 +1074,9 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local customColor = MR:GetHeaderColor(mod.key)
     local headerColor = customColor or mod.labelColor or "#ffffff"
+    if mod.profSkillLine and not explicitColor then
+        headerColor = "#f5f7fa"
+    end
     local lr, lg, lb = hex(headerColor)
     local accentA = transparent and textOnlyHeaderAlpha or ((showSectionHeaders and 1 or 0) * frameAlpha)
     local accentR, accentG, accentB = lr, lg, lb
@@ -1327,7 +1352,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         rowFrame._headerText:SetPoint("RIGHT", rowFrame, "RIGHT", -84, 0)
         rowFrame._headerText:SetJustifyH("LEFT")
         rowFrame._headerText:SetText(row.label)
-        rowFrame._headerText:SetTextColor(0.82, 0.66, 0.98)
+        rowFrame._headerText:SetTextColor(0.84, 0.70, 0.95, 0.95)
         rowFrame._headerText:Show()
 
         local headerActionButton = nil
@@ -1500,7 +1525,8 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     local rowCustom = MR:GetRowColor(mod.key, row.key) or (row.colorKey and MR:GetRowColor(mod.key, row.colorKey))
     local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local inlineColor = ExtractInlineLabelColor(row.label)
-    local effectiveColor = rowCustom or headerCustom or inlineColor
+    local professionFallbackColor = isProfessionRow and mod.labelColor or nil
+    local effectiveColor = rowCustom or headerCustom or inlineColor or professionFallbackColor
     local cleanLabel = CleanLabelText(row.label)
     if isComplete then
         rowFrame._label:SetText(cleanLabel)
@@ -1851,6 +1877,9 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local customColor = MR:GetHeaderColor(mod.key)
     local headerColor = customColor or mod.labelColor or "#ffffff"
+    if mod.profSkillLine and not explicitColor then
+        headerColor = "#f5f7fa"
+    end
     local lr, lg, lb = hex(headerColor)
     local accentA = transparent and textOnlyHeaderAlpha or ((showSectionHeaders and 1 or 0) * frameAlpha)
     local accentR, accentG, accentB = lr, lg, lb
@@ -2863,6 +2892,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     local characterBarHeight = GetMainCharacterBarHeight()
     local chromeHeight = headerHeight + characterBarHeight
     local headerBottom = IsMainHeaderAtBottom()
+    local minimized = MR and MR.db and MR.db.profile and MR.db.profile.minimized == true
 
     if titleBar then
         titleBar:ClearAllPoints()
@@ -2890,6 +2920,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if scrollBg then
         scrollBg:ClearAllPoints()
+        scrollBg:SetShown(not minimized)
         if headerBottom then
             scrollBg:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
             scrollBg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, chromeHeight)
@@ -2901,6 +2932,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if scroll then
         scroll:ClearAllPoints()
+        scroll:SetShown(not minimized)
         if headerBottom then
             scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -4)
             scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -9, chromeHeight + 6)
@@ -2911,6 +2943,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     end
 
     if track and scroll then
+        track:SetShown(not minimized)
         track:ClearAllPoints()
         track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 1, 0)
         track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 1, 0)
@@ -2918,6 +2951,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if dragger then
         dragger:ClearAllPoints()
+        dragger:SetShown(not minimized)
         if headerBottom then
             dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
         else
@@ -2925,6 +2959,9 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
         end
     end
 
+    if minimized then
+        frame:SetHeight(GetMainFrameCollapsedHeight())
+    end
     ApplyMainFrameAnchor(frame, GetMainHeaderPosition(), preserveScreenPosition == true)
 end
 
@@ -2981,7 +3018,7 @@ function MR:BuildUI()
 
     RecalcLayout()
     local w = MR.db.profile.width or 260
-    local h = MR.db.profile.height or 400
+    local h = MR.db.profile.minimized and GetMainFrameCollapsedHeight() or (MR.db.profile.height or 400)
 
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     f:SetWidth(w)
@@ -4094,7 +4131,11 @@ function MR:RefreshUI()
 
         self.content:SetHeight(math.max(totalH, 1))
         local userH = MR.db.profile.height or 400
-        self.frame:SetHeight(math.max(PANEL_MIN_HEIGHT, math.min(userH, PANEL_MAX_HEIGHT)))
+        if MR.db.profile.minimized then
+            self.frame:SetHeight(GetMainFrameCollapsedHeight())
+        else
+            self.frame:SetHeight(math.max(PANEL_MIN_HEIGHT, math.min(userH, PANEL_MAX_HEIGHT)))
+        end
 
         if self.scroll then
             local maxScroll = math.max(math.max(totalH, 1) - self.scroll:GetHeight(), 0)
@@ -4411,6 +4452,9 @@ function MR:BuildSection(mod, yOff, xOff, colW, col, parent, widgetBucket, opts)
     local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local customColor = MR:GetHeaderColor(mod.key)
     local headerColor = customColor or mod.labelColor or "#ffffff"
+    if mod.profSkillLine and not explicitColor then
+        headerColor = "#f5f7fa"
+    end
     local lr,lg,lb = hex(headerColor)
     local accentA = transparent and textOnlyHeaderAlpha or ((showSectionHeaders and 1 or 0) * frameAlpha)
     local accentR, accentG, accentB = lr, lg, lb
@@ -4604,7 +4648,7 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
         headerText:SetPoint("RIGHT", rowFrame, "RIGHT", -84, 0)
         headerText:SetJustifyH("LEFT")
         headerText:SetText(row.label)
-        headerText:SetTextColor(0.82, 0.66, 0.98)
+        headerText:SetTextColor(0.84, 0.70, 0.95, 0.95)
 
         local headerActionButton
         if ((row.headerActionText and row.headerActionText ~= "") or row.headerActionStyle == "visibility") and row.onHeaderActionClick then
@@ -4740,7 +4784,11 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
 
     rowFrame:SetScript("OnEnter", function()
         hover:SetColorTexture(1, 1, 1, transparent and 0 or (0.04 * frameAlpha))
-        if row.currencyId and not row.noBlizzardTooltip then
+        if mod and mod.profSkillLine and row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+            MR:ShowProfessionKnowledgeCatchupTooltip(rowFrame, row)
+        elseif mod and mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.ShowProfessionKnowledgeSourceTooltip then
+            MR:ShowProfessionKnowledgeSourceTooltip(rowFrame, row, row.profKnowledgeSectionKey)
+        elseif row.currencyId and not row.noBlizzardTooltip then
             GameTooltip:SetOwner(rowFrame, "ANCHOR_RIGHT")
             GameTooltip:SetCurrencyByID(row.currencyId)
             GameTooltip:AddLine(L["Tooltip_AutoBlizzard"], 0.4, 0.8, 1)
@@ -4800,7 +4848,10 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
             end
         end
 
-        if button == "LeftButton" and hasWaypoint then
+        if button == "LeftButton" and mod and mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.SetProfessionKnowledgeWaypoint then
+            MR:SetProfessionKnowledgeWaypoint(row, row.profKnowledgeSectionKey)
+            return
+        elseif button == "LeftButton" and hasWaypoint then
             local ok, source = MR:SetWaypoint(row)
             if ok then
                 print(string.format(L["Waypoint_Set"], source, row.waypointTitle or row.label, row.x, row.y))
@@ -4885,6 +4936,15 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
         end)
         statusBtn:SetScript("OnEnter", function()
             hover:SetColorTexture(1, 1, 1, transparent and 0 or (0.04 * frameAlpha))
+            if mod and mod.profSkillLine and row.profKnowledgeCatchup and MR.ShowProfessionKnowledgeCatchupTooltip then
+                MR:ShowProfessionKnowledgeCatchupTooltip(statusBtn, row)
+                return
+            end
+            if mod and mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.ShowProfessionKnowledgeSourceTooltip then
+                MR:ShowProfessionKnowledgeSourceTooltip(statusBtn, row, row.profKnowledgeSectionKey)
+                return
+            end
+
             local mo = row.toggleStatus and MR:GetProgress(mod.key, row.key) or MR:GetManualOverride(mod.key, row.key)
             GameTooltip:SetOwner(statusBtn, "ANCHOR_RIGHT")
             GameTooltip:SetText(row.label, 1, 1, 1, 1, true)
@@ -4951,7 +5011,8 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
     local rowCustom    = MR:GetRowColor(mod.key, row.key) or (row.colorKey and MR:GetRowColor(mod.key, row.colorKey))
     local headerCustom = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local inlineColor  = ExtractInlineLabelColor(row.label)
-    local effectiveColor = rowCustom or headerCustom or inlineColor
+    local professionFallbackColor = isProfessionRow and mod.labelColor or nil
+    local effectiveColor = rowCustom or headerCustom or inlineColor or professionFallbackColor
     local cleanLabel = CleanLabelText(row.label)
 
     if isComplete then
