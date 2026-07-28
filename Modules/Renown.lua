@@ -464,15 +464,9 @@ local function BuildRenownFrame()
         end)
     end
 
-    local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
-    titleIcon:SetSize(20, 20)
-    titleIcon:SetPoint("LEFT", titleBar, "LEFT", 10, 0)
-    titleIcon:SetTexture("Interface\\AddOns\\MidnightRoutine\\Media\\Icon")
-    titleIcon:SetVertexColor(0.85, 0.65, 0.10, 1)
-
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
     titleTxt:SetFont(FONT_HEADERS, math.max(9, fontSize + 1), GetFontFlags())
-    titleTxt:SetPoint("LEFT", titleIcon, "RIGHT", 7, 0)
+    titleTxt:SetPoint("LEFT", titleBar, "LEFT", 10, 0)
     titleTxt:SetText(L["Renown_Title"])
 
     local closeBtn = CloseButton(titleBar, function()

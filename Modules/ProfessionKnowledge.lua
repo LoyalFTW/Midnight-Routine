@@ -2090,13 +2090,6 @@ local function BuildGatheringLocationsFrame(isRetry)
     end)
     if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(frame, titleBar) end
 
-    local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
-    titleIcon:SetSize(16, 16)
-    titleIcon:SetPoint("LEFT", titleBar, "LEFT", 9, 0)
-    titleIcon:SetTexture("Interface\\AddOns\\MidnightRoutine\\Media\\Icon")
-    titleIcon:SetVertexColor(0.18, 0.82, 0.74, 1)
-    titleIcon:Hide()
-
     local closeBtn = CloseButton(titleBar, function()
         frame:Hide()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", false) end
@@ -2118,7 +2111,7 @@ local function BuildGatheringLocationsFrame(isRetry)
 
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
     titleTxt:SetFont(FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
-    titleTxt:SetPoint("LEFT", titleIcon, "RIGHT", 5, 0)
+    titleTxt:SetPoint("LEFT", titleBar, "LEFT", 9, 0)
     titleTxt:SetPoint("RIGHT", expansionDropdown, "LEFT", -6, 0)
     titleTxt:SetJustifyH("LEFT")
     titleTxt:SetText(StripInlineColor(L["ProfKnowledge_Title"] or "Profession Knowledge"))

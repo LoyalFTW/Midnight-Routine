@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r 可用指令: show, hide, toggle, main, lo
 L["Config_ShowMainFrame"] = "顯示主框架"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6至暗之夜例行公事|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "左鍵：顯示 / 隱藏"
 L["Minimap_RightClick"] = "右鍵：打開選項"
 L["Minimap_HideHint"] = "/mr minimap — 隱藏此圖示"
 
 -- UI Header
 L["Close"] = "關閉"
-L["UI_HideAddon"] = "隱藏至暗之夜例行公事"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "最小化"
 L["UI_CollapseHint"] = "摺疊為標題欄"
 L["Options"] = "選項"
@@ -118,10 +118,10 @@ L["Config_RowsCollapsed"] = "已折疊完成的欄目 — 點擊展開"
 L["Config_RowsShown"] = "已顯示完成的欄目 — 點擊折疊"
 L["Config_ExpandCollapseRows"] = "展開/折疊欄"
 L["Config_Collapsed"] = "已摺疊"
-
 L["%d / %d complete"] = "%d / %d 完成"
+
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6至暗之夜例行公事|r |cff8899aa設定|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffff選擇你想要啟用的模組：|r"
 L["Welcome_Hint"] = "|cff99aabb你可以隨時在選項中更改。|r"
 L["Welcome_Renown"] = "|cffd9b82e名望視窗|r"

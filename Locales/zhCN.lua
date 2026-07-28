@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r 可用命令: show, hide, toggle, main, lo
 L["Config_ShowMainFrame"] = "显示主界面"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6至暗之夜日常|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "左键：显示 / 隐藏"
 L["Minimap_RightClick"] = "右键：打开选项"
 L["Minimap_HideHint"] = "/mr minimap — 隐藏图标"
 
 -- UI Header
 L["Close"] = "关闭"
-L["UI_HideAddon"] = "隐藏至暗之夜日常"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "最小化"
 L["UI_CollapseHint"] = "收起为标题栏"
 L["Options"] = "选项"
@@ -118,10 +118,10 @@ L["Config_RowsCollapsed"] = "已完成行已折叠 — 点击展开"
 L["Config_RowsShown"] = "已完成行已显示 — 点击折叠"
 L["Config_ExpandCollapseRows"] = "展开/折叠行"
 L["Config_Collapsed"] = "默认折叠"
-
 L["%d / %d complete"] = "完成：%d / %d"
+
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6至暗之夜日常|r  |cff8899aa设置|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffff选择你想要启用的模块：|r"
 L["Welcome_Hint"] = "|cff99aabb你可以随时在选项中更改。|r"
 L["Welcome_Renown"] = "|cffd9b82e声望界面|r"

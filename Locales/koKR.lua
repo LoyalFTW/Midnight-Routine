@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r 명령어: show, hide, toggle, main, lock,
 L["Config_ShowMainFrame"] = "메인 프레임 표시"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6Midnight Routine|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "좌클릭: 표시 / 숨기기"
 L["Minimap_RightClick"] = "우클릭: 옵션"
 L["Minimap_HideHint"] = "/mr minimap - 이 아이콘 숨기기"
 
 -- UI Header
 L["Close"] = "닫기"
-L["UI_HideAddon"] = "Midnight Routine 숨기기"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "최소화"
 L["UI_CollapseHint"] = "헤더 바만 남기기"
 L["Options"] = "옵션"
@@ -124,7 +124,7 @@ L["Config_Collapsed"] = "Collapsed"
 L["%d / %d complete"] = "%d / %d 완료"
 
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6Midnight Routine|r  |cff8899aa설정|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffff어떤 모듈을 활성화하시겠습니까?|r"
 L["Welcome_Hint"] = "|cff99aabb옵션에서 언제든지 변경할 수 있습니다.|r"
 L["Welcome_Renown"] = "|cffd9b82e명성 창|r"

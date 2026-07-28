@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r commands: show, hide, toggle, main, lock, 
 L["Config_ShowMainFrame"] = "Show Main Frame"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6Midnight Routine|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "Left-click: Show / Hide"
 L["Minimap_RightClick"] = "Right-click: Options"
 L["Minimap_HideHint"] = "/mr minimap — hide this icon"
 
 -- UI Header
 L["Close"] = "Close"
-L["UI_HideAddon"] = "Hide Midnight Routine"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "Minimize"
 L["UI_CollapseHint"] = "Collapse to header bar"
 L["Options"] = "Options"
@@ -126,7 +126,7 @@ L["Config_PatchFilter"] = "Patch filter"
 L["%d / %d complete"] = "%d / %d complete"
 
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6Midnight Routine|r  |cff8899aaSetup|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffffWhich modules would you like active?|r"
 L["Welcome_Hint"] = "|cff99aabbYou can change these any time in Options.|r"
 L["Welcome_Renown"] = "|cffd9b82eRenown Window|r"

@@ -558,12 +558,6 @@ BuildRaresFrame = function()
     end)
     if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(f, titleBar) end
 
-    local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
-    titleIcon:SetSize(16, 16)
-    titleIcon:SetPoint("LEFT", titleBar, "LEFT", 9, 0)
-    titleIcon:SetTexture("Interface\\AddOns\\MidnightRoutine\\Media\\Icon")
-    titleIcon:SetVertexColor(0.25, 0.85, 0.72, 1)
-
     local closeBtn = CloseButton(titleBar, function()
         f:Hide()
         if raresCfgFrame then raresCfgFrame:Hide() end
@@ -595,7 +589,7 @@ BuildRaresFrame = function()
     local titleFontSize = math.max(9, (db.raresFontSize or 9) + 1)
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
     titleTxt:SetFont(FONT_HEADERS, titleFontSize, GetFontFlags())
-    titleTxt:SetPoint("LEFT",  titleIcon, "RIGHT", 5, 0)
+    titleTxt:SetPoint("LEFT",  titleBar, "LEFT", 9, 0)
     titleTxt:SetPoint("RIGHT", gearBtn, "LEFT", -6, 0)
     titleTxt:SetJustifyH("LEFT")
     titleTxt:SetWordWrap(false)

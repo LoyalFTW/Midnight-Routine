@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r команды: show, hide, toggle, lock, 
 L["Config_ShowMainFrame"] = "Отображать основное окно"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6Midnight Routine|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "ЛКМ: Показать / Скрыть"
 L["Minimap_RightClick"] = "ПКМ: Настройки"
 L["Minimap_HideHint"] = "/mr minimap - скрыть эту иконку"
 
 -- UI Header
 L["Close"] = "Закрыть"
-L["UI_HideAddon"] = "Скрыть Midnight Routine"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "Свернуть"
 L["UI_CollapseHint"] = "Свернуть в заголовок"
 L["Options"] = "Настройки"
@@ -118,10 +118,10 @@ L["Config_RowsCollapsed"] = "Завершенные строки скрыты - 
 L["Config_RowsShown"] = "Завершенные строки показаны - нажмите, чтобы свернуть"
 L["Config_ExpandCollapseRows"] = "Развернуть/свернуть строки"
 L["Config_Collapsed"] = "Свернуто"
-
 L["%d / %d complete"] = "%d / %d завершено"
+
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6Midnight Routine|r  |cff8899aaНастройка|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffffКакие модули вы хотите включить?|r"
 L["Welcome_Hint"] = "|cff99aabbВы можете изменить это в любое время в настройках.|r"
 L["Welcome_Renown"] = "|cffd9b82eОкно известности|r"

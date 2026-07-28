@@ -11,14 +11,14 @@ L["Chat_Commands"] = "|cff2ae7c6/mr|r Befehle: show, hide, toggle, main, lock, u
 L["Config_ShowMainFrame"] = "Zeige Hauptfenster"
 
 -- MinimapButton / Title
-L["Title"] = "|cff2ae7c6Midnight Routine|r"
+L["Title"] = "|cff2ae7c6Routine|r"
 L["Minimap_LeftClick"] = "Linksklick: Anzeigen / Ausblenden"
 L["Minimap_RightClick"] = "Rechtsklick: Optionen"
 L["Minimap_HideHint"] = "/mr minimap - dieses Symbol ausblenden"
 
 -- UI Header
 L["Close"] = "Schließen"
-L["UI_HideAddon"] = "Midnight Routine ausblenden"
+L["UI_HideAddon"] = "Hide Routine"
 L["Minimize"] = "Minimieren oder Maximieren"
 L["UI_CollapseHint"] = "Auf die Kopfzeile einklappen"
 L["Options"] = "Optionen"
@@ -121,7 +121,7 @@ L["Config_Collapsed"] = "Collapsed"
 
 L["%d / %d complete"] = "%d / %d Komplett"
 -- WelcomeScreen
-L["Welcome_Title"] = "|cff2ae7c6Midnight Routine|r  |cff8899aaEinrichtung|r"
+L["Welcome_Title"] = "|cff2ae7c6Routine|r  |cff8899aaSetup|r"
 L["Welcome_Heading"] = "|cffffffffWelche Module sollen aktiv sein?|r"
 L["Welcome_Hint"] = "|cff99aabbDu kannst diese jederzeit in den Optionen ändern.|r"
 L["Welcome_Renown"] = "|cffd9b82eRuhmfenster|r"

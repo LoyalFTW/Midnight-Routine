@@ -417,12 +417,42 @@ end
 local function StyleSectionCollapseIndicator(indicator, isOpen)
     if not indicator then return end
     indicator:ClearAllPoints()
-    indicator:SetSize(12, HEADER_HEIGHT)
-    indicator:SetPoint("RIGHT", indicator:GetParent(), "RIGHT", -5, 0)
-    indicator:SetFont(FONT_ROWS, math.max(9, GetFontSize() - 1), GetFontFlags())
-    indicator:SetJustifyH("CENTER")
-    indicator:SetText(isOpen and "-" or "+")
-    indicator:SetTextColor(0.50, 0.95, 0.80)
+    indicator:SetSize(14, 14)
+    indicator:SetPoint("RIGHT", indicator:GetParent(), "RIGHT", -6, 0)
+
+    if not indicator._lineA then
+        indicator._lineA = indicator:CreateTexture(nil, "OVERLAY")
+        indicator._lineA:SetTexture("Interface\\Buttons\\WHITE8X8")
+        indicator._lineB = indicator:CreateTexture(nil, "OVERLAY")
+        indicator._lineB:SetTexture("Interface\\Buttons\\WHITE8X8")
+    end
+
+    local r, g, b, a = 0.50, 0.95, 0.80, 1
+    indicator._lineA:SetColorTexture(r, g, b, a)
+    indicator._lineB:SetColorTexture(r, g, b, a)
+    indicator._lineA:ClearAllPoints()
+    indicator._lineB:ClearAllPoints()
+
+    if isOpen then
+        indicator._lineA:SetSize(8, 2)
+        indicator._lineB:SetSize(8, 2)
+        indicator._lineA:SetPoint("CENTER", indicator, "CENTER", -2, 0)
+        indicator._lineB:SetPoint("CENTER", indicator, "CENTER", 2, 0)
+        if indicator._lineA.SetRotation then
+            indicator._lineA:SetRotation(math.rad(35))
+            indicator._lineB:SetRotation(math.rad(-35))
+        end
+        indicator._lineB:Show()
+    else
+        indicator._lineA:SetSize(10, 2)
+        indicator._lineA:SetPoint("CENTER", indicator, "CENTER", 0, 0)
+        if indicator._lineA.SetRotation then
+            indicator._lineA:SetRotation(0)
+            indicator._lineB:SetRotation(0)
+        end
+        indicator._lineB:Hide()
+    end
+    indicator._lineA:Show()
 end
 
 local function StyleCurrencyBrowserButton(button, transparent, frameAlpha)
@@ -886,7 +916,7 @@ local function EnsureMainSectionWidget(self, modKey)
     card._hdrFrame._currencyBrowserText:SetFont(FONT_ROWS, 12, GetFontFlags())
     card._hdrFrame._currencyBrowserText:SetPoint("CENTER", card._hdrFrame._currencyBrowserButton, "CENTER", 0, 0)
     card._hdrFrame._currencyBrowserText:SetText(L["CurrencyBrowser_All"] or "ALL")
-    card._hdrFrame._arrow = card._hdrFrame:CreateFontString(nil, "OVERLAY")
+    card._hdrFrame._arrow = CreateFrame("Frame", nil, card._hdrFrame)
     card._hdrFrame:SetScript("OnMouseDown", MainSectionHeaderOnMouseDown)
     card._hdrFrame:SetScript("OnMouseUp", MainSectionHeaderOnMouseUp)
     card._hdrFrame:SetScript("OnDragStart", MainSectionHeaderOnDragStart)
@@ -941,7 +971,7 @@ local function EnsureDetachedSectionWidget(frame, modKey)
     card._hdrFrame._currencyBrowserText:SetFont(FONT_ROWS, 12, GetFontFlags())
     card._hdrFrame._currencyBrowserText:SetPoint("CENTER", card._hdrFrame._currencyBrowserButton, "CENTER", 0, 0)
     card._hdrFrame._currencyBrowserText:SetText(L["CurrencyBrowser_All"] or "ALL")
-    card._hdrFrame._arrow = card._hdrFrame:CreateFontString(nil, "OVERLAY")
+    card._hdrFrame._arrow = CreateFrame("Frame", nil, card._hdrFrame)
     card._hdrFrame:SetScript("OnMouseDown", MainSectionHeaderOnMouseDown)
     card._hdrFrame:SetScript("OnMouseUp", MainSectionHeaderOnMouseUp)
     card._hdrFrame:SetScript("OnDragStart", MainSectionHeaderOnDragStart)
@@ -1070,7 +1100,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
         card._hdrFrame._count:SetPoint("RIGHT", currencyBrowserButton, "LEFT", -8, 0)
     else
         currencyBrowserButton:Hide()
-        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -18, 0)
+        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)
@@ -1869,7 +1899,7 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         card._hdrFrame._count:SetPoint("RIGHT", currencyBrowserButton, "LEFT", -8, 0)
     else
         currencyBrowserButton:Hide()
-        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -18, 0)
+        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)
@@ -2318,11 +2348,7 @@ local MODULE_HEADER_ICON_KEYS = {
 }
 
 ShouldShowModuleHeaderIcon = function(modKey)
-    if type(modKey) == "string" and modKey:match("^story_campaign_") then
-        return true
-    end
-
-    return MODULE_HEADER_ICON_KEYS[modKey] == true
+    return false
 end
 
 GetModuleFallbackIconInfo = function(modKey)
@@ -3016,15 +3042,9 @@ function MR:BuildUI()
     titleAccent:SetWidth(0)
     titleAccent:SetColorTexture(0.92, 0.72, 0.20, 1)
 
-    local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
-    titleIcon:SetSize(22, 22)
-    titleIcon:SetPoint("LEFT", titleBar, "LEFT", 12, 0)
-    titleIcon:SetTexture("Interface\\AddOns\\MidnightRoutine\\Media\\Icon")
-    titleIcon:SetVertexColor(1, 0.84, 0.24, 1)
-
     local title = titleBar:CreateFontString(nil, "OVERLAY")
     title:SetFont(FONT_HEADERS, math.max(8, GetFontSize() - 2), GetFontFlags())
-    title:SetPoint("LEFT", titleIcon, "RIGHT", 5, 0)
+    title:SetPoint("LEFT", titleBar, "LEFT", 12, 0)
     title:SetPoint("RIGHT", titleBar, "RIGHT", -110, 0)
     title:SetJustifyH("LEFT")
     title:SetText(L["Title"])
@@ -3358,14 +3378,13 @@ function MR:BuildUI()
 
     titleCount:SetPoint("RIGHT", warbandBtn, "LEFT", -6, 0)
     title:ClearAllPoints()
-    title:SetPoint("LEFT", titleIcon, "RIGHT", 5, 0)
+    title:SetPoint("LEFT", titleBar, "LEFT", 12, 0)
     title:SetPoint("RIGHT", titleCount, "LEFT", -8, 0)
     title:SetJustifyH("LEFT")
 
     local function RefreshMainHeaderChrome()
         local metrics = GetMainHeaderMetrics()
         titleBar:SetHeight(metrics.headerHeight)
-        titleIcon:SetSize(metrics.iconSize, metrics.iconSize)
         closeBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
         minBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
         cfgBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
@@ -4433,13 +4452,13 @@ function MR:BuildSection(mod, yOff, xOff, colW, col, parent, widgetBucket, opts)
 
     local cnt = hdrFrame:CreateFontString(nil, "OVERLAY")
     cnt:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
-    cnt:SetPoint("RIGHT", hdrFrame, "RIGHT", -18, 0)
+    cnt:SetPoint("RIGHT", hdrFrame, "RIGHT", -22, 0)
     cnt:SetText(string.format("%d / %d", secDone, secTotal))
     cnt:SetTextColor(countColor(secDone, secTotal))
     cnt:SetJustifyH("RIGHT")
     lbl:SetPoint("RIGHT", cnt, "LEFT", -8, 0)
 
-    local arrow = hdrFrame:CreateFontString(nil, "OVERLAY")
+    local arrow = CreateFrame("Frame", nil, hdrFrame)
     StyleSectionCollapseIndicator(arrow, isOpen)
 
     hdrFrame:EnableMouse(true)

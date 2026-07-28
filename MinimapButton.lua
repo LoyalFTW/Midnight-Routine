@@ -6,6 +6,8 @@ local LDBIcon = LibStub("LibDBIcon-1.0")
 local L       = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local GLOW_PULSE_INTERVAL = 1.5
+local LDB_NAME = "MidnightRoutine"
+local MINIMAP_ICON = "Interface\\AddOns\\MidnightRoutine\\Media\\MinimapIcon.tga"
 
 local function StopGlow()
     if MR._firstSeenGlowTimer then
@@ -50,7 +52,7 @@ end
 local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     type = "launcher",
     text = "MidnightRoutine",
-    icon = "Interface\\AddOns\\MidnightRoutine\\Media\\Icon.tga",
+    icon = MINIMAP_ICON,
 
     OnClick = function(_, button)
         if button == "LeftButton" then
@@ -70,6 +72,17 @@ local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     end,
 })
 
+local function StyleMinimapButton()
+    if not LDBIcon:IsRegistered(LDB_NAME) then
+        return
+    end
+
+    LDBIcon:SetButtonSize(LDB_NAME, 34)
+    LDBIcon:RemoveButtonBorder(LDB_NAME)
+    LDBIcon:RemoveButtonBackground(LDB_NAME)
+    LDBIcon:SetButtonIcon(LDB_NAME, MINIMAP_ICON, 34, "CENTER", 0, 0)
+end
+
 local mmLoader = CreateFrame("Frame")
 mmLoader:RegisterEvent("PLAYER_LOGIN")
 mmLoader:SetScript("OnEvent", function(self)
@@ -81,9 +94,10 @@ mmLoader:SetScript("OnEvent", function(self)
 
     MR.db.profile.minimap = MR.db.profile.minimap or { hide = false }
 
-    if not LDBIcon:IsRegistered("MidnightRoutine") then
-        LDBIcon:Register("MidnightRoutine", minimapObject, MR.db.profile.minimap)
+    if not LDBIcon:IsRegistered(LDB_NAME) then
+        LDBIcon:Register(LDB_NAME, minimapObject, MR.db.profile.minimap)
     end
+    StyleMinimapButton()
 
     if not MR.db.profile.firstSeen then
         C_Timer.After(2.0, function()
@@ -98,8 +112,8 @@ function MR:SetMinimapHidden(hide)
     if not self.db or not self.db.profile then return end
     self.db.profile.minimap = self.db.profile.minimap or { hide = false }
     self.db.profile.minimap.hide = hide and true or false
-    if LDBIcon:IsRegistered("MidnightRoutine") then
-        if hide then LDBIcon:Hide("MidnightRoutine")
-        else         LDBIcon:Show("MidnightRoutine") end
+    if LDBIcon:IsRegistered(LDB_NAME) then
+        if hide then LDBIcon:Hide(LDB_NAME)
+        else         LDBIcon:Show(LDB_NAME) end
     end
 end
