@@ -496,7 +496,14 @@ end
 local function RebuildRaresFrame()
     RefreshFonts()
     local wasShown = raresFrame and raresFrame:IsShown()
-    if raresFrame then raresFrame:Hide(); raresFrame = nil end
+    if raresFrame and MR.ReleaseFrameTree then
+        MR:ReleaseFrameTree(raresFrame)
+        raresFrame = nil
+    elseif raresFrame then
+        raresFrame:Hide()
+        raresFrame:SetParent(nil)
+        raresFrame = nil
+    end
     if MR.db and MR.db.profile.raresCollapsed then
         for k, v in pairs(MR.db.profile.raresCollapsed) do collapsed[k] = v end
     end
@@ -1151,10 +1158,19 @@ end
 
 PopulateRaresConfig = function(f)
     RefreshFonts()
+    local keepLeft, keepTop
+    if f.IsShown and f:IsShown() and MR.CaptureFrameScreenPosition then
+        keepLeft, keepTop = MR:CaptureFrameScreenPosition(f)
+    end
+
     if f.body then
-        f.body:EnableMouse(false)
-        f.body:Hide()
-        f.body:SetParent(UIParent)
+        if MR.ReleaseFrameTree then
+            MR:ReleaseFrameTree(f.body)
+        else
+            f.body:EnableMouse(false)
+            f.body:Hide()
+            f.body:SetParent(nil)
+        end
         f.body = nil
     end
 
@@ -1397,6 +1413,9 @@ PopulateRaresConfig = function(f)
     local totalH = math.abs(yOff) + 10
     f:SetHeight(totalH)
     body:SetHeight(totalH)
+    if keepLeft and keepTop and MR.RestoreFrameScreenPosition then
+        MR:RestoreFrameScreenPosition(f, keepLeft, keepTop)
+    end
 end
 
 function MR:ToggleRaresConfig()
@@ -1407,16 +1426,23 @@ function MR:ToggleRaresConfig()
         raresCfgFrame:Hide()
         return
     end
+    raresCfgFrame:ClearAllPoints()
     if raresFrame and raresFrame:IsShown() then
         raresCfgFrame:SetPoint("TOPLEFT", raresFrame, "TOPRIGHT", 4, 0)
         raresCfgFrame:SetScale(raresFrame:GetScale())
     elseif MR.frame then
         raresCfgFrame:SetPoint("TOPLEFT", MR.frame, "TOPRIGHT", 4, 0)
+        raresCfgFrame:SetScale(MR.frame:GetScale())
     else
         raresCfgFrame:SetPoint("CENTER")
+        raresCfgFrame:SetScale(1)
     end
     PopulateRaresConfig(raresCfgFrame)
     raresCfgFrame:Show()
+    if MR.CaptureFrameScreenPosition and MR.RestoreFrameScreenPosition then
+        local left, top = MR:CaptureFrameScreenPosition(raresCfgFrame)
+        MR:RestoreFrameScreenPosition(raresCfgFrame, left, top)
+    end
 end
 
 function MR:ToggleRares()

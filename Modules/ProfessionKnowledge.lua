@@ -2515,7 +2515,12 @@ RebuildGatheringLocationsFrame = function(resetScroll)
     -- past the new list's own header/top cards — resetScroll opts out of
     -- that for callers where the content is genuinely changing.
     local savedScroll = not resetScroll and gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
-    if gatheringLocationsFrame then gatheringLocationsFrame:Hide() end
+    if gatheringLocationsFrame and MR.ReleaseFrameTree then
+        MR:ReleaseFrameTree(gatheringLocationsFrame)
+    elseif gatheringLocationsFrame then
+        gatheringLocationsFrame:Hide()
+        gatheringLocationsFrame:SetParent(nil)
+    end
     gatheringLocationsFrame = BuildGatheringLocationsFrame()
     if not wasShown then gatheringLocationsFrame:Hide() end
 
@@ -2610,10 +2615,19 @@ end
 
 PopulateGatheringConfig = function(frame)
     RefreshFonts()
+    local keepLeft, keepTop
+    if frame.IsShown and frame:IsShown() and MR.CaptureFrameScreenPosition then
+        keepLeft, keepTop = MR:CaptureFrameScreenPosition(frame)
+    end
+
     if frame.body then
-        frame.body:EnableMouse(false)
-        frame.body:Hide()
-        frame.body:SetParent(UIParent)
+        if MR.ReleaseFrameTree then
+            MR:ReleaseFrameTree(frame.body)
+        else
+            frame.body:EnableMouse(false)
+            frame.body:Hide()
+            frame.body:SetParent(nil)
+        end
         frame.body = nil
     end
 
@@ -3095,6 +3109,9 @@ PopulateGatheringConfig = function(frame)
     else
         frame:SetHeight(totalH)
     end
+    if keepLeft and keepTop and MR.RestoreFrameScreenPosition then
+        MR:RestoreFrameScreenPosition(frame, keepLeft, keepTop)
+    end
 end
 
 function MR:ToggleGatheringLocationsConfig()
@@ -3105,13 +3122,26 @@ function MR:ToggleGatheringLocationsConfig()
     if gatheringCfgFrame:IsShown() then gatheringCfgFrame:Hide()
     else
         gatheringCfgFrame:Show()
+        gatheringCfgFrame:ClearAllPoints()
+        local anchored = false
         if gatheringLocationsFrame then
             local x, y = gatheringLocationsFrame:GetCenter()
             if x and y then
-                gatheringCfgFrame:ClearAllPoints()
                 gatheringCfgFrame:SetPoint("LEFT", gatheringLocationsFrame, "RIGHT", 10, 0)
                 gatheringCfgFrame:SetScale(gatheringLocationsFrame:GetScale())
+                anchored = true
             end
+        end
+        if not anchored and MR.frame then
+            gatheringCfgFrame:SetPoint("TOPLEFT", MR.frame, "TOPRIGHT", 4, 0)
+            gatheringCfgFrame:SetScale(MR.frame:GetScale())
+        elseif not anchored then
+            gatheringCfgFrame:SetPoint("CENTER")
+            gatheringCfgFrame:SetScale(1)
+        end
+        if MR.CaptureFrameScreenPosition and MR.RestoreFrameScreenPosition then
+            local left, top = MR:CaptureFrameScreenPosition(gatheringCfgFrame)
+            MR:RestoreFrameScreenPosition(gatheringCfgFrame, left, top)
         end
     end
 end

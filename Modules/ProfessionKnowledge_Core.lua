@@ -148,6 +148,24 @@ local questTitlePending = {}
 local pendingQuestTitleRows = {}
 local questRewardItemCache = {}
 local labelRefreshPending
+local PENDING_PLACEHOLDER = {}
+
+local function UpsertPendingRow(bucket, row, payload)
+    if type(bucket) ~= "table" or type(row) ~= "table" then
+        return
+    end
+
+    local rowKey = row.key
+    for index, existing in ipairs(bucket) do
+        local existingRow = type(existing) == "table" and (existing.row or existing) or nil
+        if existing == row or existingRow == row or (rowKey and existingRow and existingRow.key == rowKey) then
+            bucket[index] = payload or row
+            return
+        end
+    end
+
+    bucket[#bucket + 1] = payload or row
+end
 
 local function RequestLabelRefresh()
     if labelRefreshPending then return end
@@ -270,7 +288,7 @@ function EnsureQuestTitleWatchFrame()
             end
             local rewardItemID = GetQuestRewardItemID(loadedQuestID, true)
             if rewardItemID and not GetItemInfo(rewardItemID) then
-                TrackPendingLabel({}, rewardItemID)
+                TrackPendingLabel(PENDING_PLACEHOLDER, rewardItemID)
             end
         end
 
@@ -316,7 +334,7 @@ function ns.ResolveProfessionEntryLabel(entry, fallback, preferFallback)
             return itemName
         end
 
-        TrackPendingLabel({}, entry.itemID)
+        TrackPendingLabel(PENDING_PLACEHOLDER, entry.itemID)
     end
 
     if entry and entry.preferFallbackLabel then
@@ -338,7 +356,7 @@ function ns.ResolveProfessionEntryLabel(entry, fallback, preferFallback)
                 itemNameCache[rewardItemID] = rewardName
                 return rewardName
             end
-            TrackPendingLabel({}, rewardItemID)
+            TrackPendingLabel(PENDING_PLACEHOLDER, rewardItemID)
         end
     end
 
@@ -359,7 +377,7 @@ function TrackPendingQuestTitle(row, entry, fallback, preferFallback)
     if questTitleCache[questID] then return end
 
     pendingQuestTitleRows[questID] = pendingQuestTitleRows[questID] or {}
-    table.insert(pendingQuestTitleRows[questID], {
+    UpsertPendingRow(pendingQuestTitleRows[questID], row, {
         row = row,
         entry = entry,
         fallback = fallback,
@@ -432,7 +450,7 @@ end
 function TrackPendingLabel(row, itemID)
     pendingLabelRows = pendingLabelRows or {}
     pendingLabelRows[itemID] = pendingLabelRows[itemID] or {}
-    table.insert(pendingLabelRows[itemID], row)
+    UpsertPendingRow(pendingLabelRows[itemID], row)
 
     if not itemLabelWatchFrame then
         itemLabelWatchFrame = CreateFrame("Frame")

@@ -1079,8 +1079,12 @@ end
 RebuildRenownFrame = function()
     RefreshFonts()
     local wasShown = renownFrame and renownFrame:IsShown()
-    if renownFrame then
+    if renownFrame and MR.ReleaseFrameTree then
+        MR:ReleaseFrameTree(renownFrame)
+        renownFrame = nil
+    elseif renownFrame then
         renownFrame:Hide()
+        renownFrame:SetParent(nil)
         renownFrame = nil
     end
     renownFrame = BuildRenownFrame()
@@ -1115,10 +1119,19 @@ end
 
 PopulateRenownConfig = function(f)
     RefreshFonts()
+    local keepLeft, keepTop
+    if f.IsShown and f:IsShown() and MR.CaptureFrameScreenPosition then
+        keepLeft, keepTop = MR:CaptureFrameScreenPosition(f)
+    end
+
     if f.body then
-        f.body:EnableMouse(false)
-        f.body:Hide()
-        f.body:SetParent(UIParent)
+        if MR.ReleaseFrameTree then
+            MR:ReleaseFrameTree(f.body)
+        else
+            f.body:EnableMouse(false)
+            f.body:Hide()
+            f.body:SetParent(nil)
+        end
         f.body = nil
     end
 
@@ -1496,6 +1509,9 @@ PopulateRenownConfig = function(f)
     local totalH = math.abs(yOff) + 10
     f:SetHeight(totalH)
     body:SetHeight(totalH)
+    if keepLeft and keepTop and MR.RestoreFrameScreenPosition then
+        MR:RestoreFrameScreenPosition(f, keepLeft, keepTop)
+    end
 end
 
 function MR:ToggleRenownConfig()
@@ -1506,16 +1522,23 @@ function MR:ToggleRenownConfig()
         renownCfgFrame:Hide()
         return
     end
+    renownCfgFrame:ClearAllPoints()
     if renownFrame and renownFrame:IsShown() then
         renownCfgFrame:SetPoint("TOPLEFT", renownFrame, "TOPRIGHT", 4, 0)
         renownCfgFrame:SetScale(renownFrame:GetScale())
     elseif MR.frame then
         renownCfgFrame:SetPoint("TOPLEFT", MR.frame, "TOPRIGHT", 4, 0)
+        renownCfgFrame:SetScale(MR.frame:GetScale())
     else
         renownCfgFrame:SetPoint("CENTER")
+        renownCfgFrame:SetScale(1)
     end
     PopulateRenownConfig(renownCfgFrame)
     renownCfgFrame:Show()
+    if MR.CaptureFrameScreenPosition and MR.RestoreFrameScreenPosition then
+        local left, top = MR:CaptureFrameScreenPosition(renownCfgFrame)
+        MR:RestoreFrameScreenPosition(renownCfgFrame, left, top)
+    end
 end
 
 function MR:ToggleRenown()

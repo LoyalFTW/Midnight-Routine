@@ -4,12 +4,21 @@ local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local HOLIDAY_TIMEWALKING = {
-    1056,
-    1063,
-    1326,
-    1400,
-    1404,
-    1500,
+    { id = 559, key = "burning" },
+    { id = 562, key = "wrath" },
+    { id = 587, key = "cataclysm" },
+    { id = 643, key = "mists" },
+    { id = 1056, key = "draenor" },
+    { id = 1263, key = "legion" },
+    { id = 1271, key = "legion" },
+    { id = 1326 },
+    { id = 1400 },
+    { id = 1404 },
+    { id = 1500 },
+    { id = 1508, key = "classic" },
+    { id = 1669, key = "bfa" },
+    { id = 1703, key = "shadowlands" },
+    { id = 1722, key = "dragonflight" },
 }
 
 local function CombineQuestIds(...)
@@ -26,19 +35,24 @@ local function CombineQuestIds(...)
 end
 
 local TIMEWALKING_DUNGEON_QUESTS = {
+    classic = {
+        current = { 83274, 85947 },
+        compat = {},
+        fallbackName = "An Original Path Through Time",
+    },
     burning = {
         current = { 93608, 83363 },
-        compat = { 39020, 40753 },
+        compat = { 39020 },
         fallbackName = "A Burning Path Through Time",
     },
     wrath = {
-        current = { 83365 },
-        compat = { 39021, 40173 },
+        current = { 83365, 85949 },
+        compat = { 39021 },
         fallbackName = "A Frozen Path Through Time",
     },
     cataclysm = {
         current = { 93611, 83359 },
-        compat = { 40786, 40792 },
+        compat = { 40792 },
         fallbackName = "A Shattered Path Through Time",
     },
     mists = {
@@ -63,12 +77,19 @@ local TIMEWALKING_DUNGEON_QUESTS = {
     },
     shadowlands = {
         current = { 93628 },
-        compat = { 92649 },
+        compat = {},
         fallbackName = "A Shadowed Path Through Time",
+    },
+    dragonflight = {
+        current = { 93497, 93495 },
+        compat = {},
+        fallbackName = "A Soaring Path Through Time",
     },
 }
 
 local TIMEWALKING_DUNGEON_WEEKLIES = CombineQuestIds(
+    TIMEWALKING_DUNGEON_QUESTS.classic.current,
+    TIMEWALKING_DUNGEON_QUESTS.classic.compat,
     TIMEWALKING_DUNGEON_QUESTS.burning.current,
     TIMEWALKING_DUNGEON_QUESTS.burning.compat,
     TIMEWALKING_DUNGEON_QUESTS.wrath.current,
@@ -83,10 +104,13 @@ local TIMEWALKING_DUNGEON_WEEKLIES = CombineQuestIds(
     TIMEWALKING_DUNGEON_QUESTS.legion.compat,
     TIMEWALKING_DUNGEON_QUESTS.bfa.current,
     TIMEWALKING_DUNGEON_QUESTS.shadowlands.current,
-    TIMEWALKING_DUNGEON_QUESTS.shadowlands.compat
+    TIMEWALKING_DUNGEON_QUESTS.shadowlands.compat,
+    TIMEWALKING_DUNGEON_QUESTS.dragonflight.current,
+    TIMEWALKING_DUNGEON_QUESTS.dragonflight.compat
 )
 
 local TIMEWALKING_RAID_WEEKLIES = {
+    82817,
     47523,
     50316,
     57637,
@@ -99,6 +123,10 @@ local TIMEWALKING_DUNGEON_PICKUP_LOCATION = {
 }
 
 local TIMEWALKING_RAID_PICKUP_LOCATIONS = {
+    [82817] = {
+        alliance = { zone = 84, x = 56.0, y = 19.0 },
+        horde = { zone = 85, x = 52.8, y = 83.0 },
+    },
     [47523] = { zone = 111, x = 54.6, y = 39.6 },
     [50316] = { zone = 125, x = 51.0, y = 47.6 },
     [57637] = {
@@ -108,6 +136,15 @@ local TIMEWALKING_RAID_PICKUP_LOCATIONS = {
 }
 
 local TIMEWALKING_EVENT_HINTS = {
+    {
+        key = "classic",
+        holidayMatches = { "classic", "original", "past" },
+        dungeonQuestIds = CombineQuestIds(TIMEWALKING_DUNGEON_QUESTS.classic.current, TIMEWALKING_DUNGEON_QUESTS.classic.compat),
+        dungeonFallbackName = TIMEWALKING_DUNGEON_QUESTS.classic.fallbackName,
+        raidQuestIds = { 82817 },
+        raidFallbackName = "Disturbance Detected: Blackrock Depths",
+        hasRaid = true,
+    },
     {
         key = "burning",
         holidayMatches = { "burning", "outland", "twistingnether" },
@@ -171,10 +208,28 @@ local TIMEWALKING_EVENT_HINTS = {
         dungeonFallbackName = TIMEWALKING_DUNGEON_QUESTS.shadowlands.fallbackName,
         hasRaid = false,
     },
+    {
+        key = "dragonflight",
+        holidayMatches = { "soaring", "dragonflight", "dragonflights", "dragonisles" },
+        dungeonQuestIds = CombineQuestIds(TIMEWALKING_DUNGEON_QUESTS.dragonflight.current, TIMEWALKING_DUNGEON_QUESTS.dragonflight.compat),
+        dungeonFallbackName = TIMEWALKING_DUNGEON_QUESTS.dragonflight.fallbackName,
+        hasRaid = false,
+    },
+}
+
+local TURBULENT_TIMEWAYS_EVENT_WINDOWS = {
+    { startDate = 20260630, endDate = 20260707, key = "dragonflight" },
+    { startDate = 20260707, endDate = 20260714, key = "bfa" },
+    { startDate = 20260714, endDate = 20260721, key = "shadowlands" },
+    { startDate = 20260721, endDate = 20260728, key = "classic" },
+    { startDate = 20260728, endDate = 20260804, key = "burning" },
+    { startDate = 20260804, endDate = 20260811, key = "dragonflight" },
 }
 
 local IsQuestCurrentlyActive
 local PlayerHasAuraSpell
+local GetActiveTimewalkingEventHint
+local GetActiveTimewalkingHolidayInfo
 
 local function ColorsEqual(a, b)
     if a == b then
@@ -195,16 +250,162 @@ local function NormalizeText(text)
     return text:lower():gsub("[^%a%d]", "")
 end
 
-local function IsHolidayActive(holidayId)
-    if not C_DateAndTime or not C_DateAndTime.GetHolidayInfo then
-        return false
+local function CalendarTimeToEpoch(value)
+    if type(value) == "number" then
+        return value
+    end
+    if type(value) ~= "table" or not time then
+        return nil
+    end
+    return time({
+        year = value.year,
+        month = value.month,
+        day = value.monthDay or value.day,
+        hour = value.hour or 0,
+        min = value.minute or 0,
+        sec = 0,
+    })
+end
+
+local function GetHolidayEntryId(entry)
+    if type(entry) == "table" then
+        return entry.id
+    end
+    return entry
+end
+
+local function GetHolidayEntryKey(entry)
+    if type(entry) == "table" then
+        return entry.key
+    end
+    return nil
+end
+
+local function GetHolidayInfoIfActive(entry)
+    local holidayId = GetHolidayEntryId(entry)
+    if not holidayId or not C_DateAndTime or not C_DateAndTime.GetHolidayInfo then
+        return nil
     end
 
     local info = C_DateAndTime.GetHolidayInfo(holidayId)
-    return info ~= nil and info.startTime ~= nil and GetServerTime() >= info.startTime and GetServerTime() <= info.endTime
+    if not info then
+        return nil
+    end
+
+    local startTime = CalendarTimeToEpoch(info.startTime)
+    local endTime = CalendarTimeToEpoch(info.endTime)
+    local now = GetServerTime and GetServerTime() or (time and time()) or nil
+    if startTime ~= nil and endTime ~= nil and now and now >= startTime and now <= endTime then
+        return info
+    end
+
+    return nil
+end
+
+local function IsHolidayActive(entry)
+    return GetHolidayInfoIfActive(entry) ~= nil
+end
+
+local function GetCurrentCalendarDate()
+    if C_DateAndTime and C_DateAndTime.GetCurrentCalendarTime then
+        return C_DateAndTime.GetCurrentCalendarTime()
+    end
+
+    if C_Calendar and C_Calendar.GetDate then
+        local dateOrWeekday, month, monthDay, year = C_Calendar.GetDate()
+        if type(dateOrWeekday) == "table" then
+            return dateOrWeekday
+        end
+
+        return {
+            weekday = dateOrWeekday,
+            month = month,
+            monthDay = monthDay,
+            year = year,
+        }
+    end
+
+    return nil
+end
+
+local function GetTodayTimewalkingHolidayInfo()
+    if not (C_Calendar and C_Calendar.GetHolidayInfo) then
+        return nil
+    end
+
+    local today = GetCurrentCalendarDate()
+    if not today or not today.monthDay then
+        return nil
+    end
+
+    for index = 1, 20 do
+        local info = C_Calendar.GetHolidayInfo(0, today.monthDay, index)
+        if not info then
+            break
+        end
+
+        local name = NormalizeText(info.name)
+        local description = NormalizeText(info.description)
+        local text = name .. description
+        if text:find("timewalking", 1, true) or text:find("turbulenttimeways", 1, true) then
+            local startTime = CalendarTimeToEpoch(info.startTime)
+            local endTime = CalendarTimeToEpoch(info.endTime)
+            local now = GetServerTime and GetServerTime() or (time and time()) or nil
+            if not startTime or not endTime or (now and now >= startTime and now <= endTime) then
+                return info
+            end
+        end
+    end
+
+    return nil
+end
+
+local function GetDateStamp(dateInfo)
+    if type(dateInfo) ~= "table" or not dateInfo.year or not dateInfo.month or not dateInfo.monthDay then
+        return nil
+    end
+
+    return (dateInfo.year * 10000) + (dateInfo.month * 100) + dateInfo.monthDay
+end
+
+local function GetScheduledTurbulentTimewaysKey()
+    local todayStamp = GetDateStamp(GetCurrentCalendarDate())
+    if not todayStamp then
+        return nil
+    end
+
+    for _, window in ipairs(TURBULENT_TIMEWAYS_EVENT_WINDOWS) do
+        if todayStamp >= window.startDate and todayStamp < window.endDate then
+            return window.key
+        end
+    end
+
+    return nil
+end
+
+local function GetTurbulentTimewaysFallbackKey(holidayInfo)
+    local text = NormalizeText(holidayInfo and holidayInfo.name) .. NormalizeText(holidayInfo and holidayInfo.description)
+    if text:find("turbulenttimeways", 1, true) then
+        return GetScheduledTurbulentTimewaysKey()
+    end
+
+    return nil
 end
 
 local function IsTimewalkingActive()
+    if GetActiveTimewalkingEventHint and GetActiveTimewalkingEventHint() then
+        return true
+    end
+
+    local _, holidayInfo = GetActiveTimewalkingHolidayInfo()
+    if holidayInfo then
+        return true
+    end
+
+    if GetScheduledTurbulentTimewaysKey() then
+        return true
+    end
+
     for _, id in ipairs(HOLIDAY_TIMEWALKING) do
         if IsHolidayActive(id) then
             return true
@@ -232,22 +433,24 @@ local function IsTimewalkingActive()
     return false
 end
 
-local function GetActiveTimewalkingHolidayInfo()
+GetActiveTimewalkingHolidayInfo = function()
     if not (C_DateAndTime and C_DateAndTime.GetHolidayInfo) then
-        return nil, nil
+        return nil, nil, nil
     end
 
-    for _, holidayId in ipairs(HOLIDAY_TIMEWALKING) do
-        local info = C_DateAndTime.GetHolidayInfo(holidayId)
-        if info and info.startTime and info.endTime then
-            local now = GetServerTime()
-            if now >= info.startTime and now <= info.endTime then
-                return holidayId, info
-            end
+    for _, entry in ipairs(HOLIDAY_TIMEWALKING) do
+        local info = GetHolidayInfoIfActive(entry)
+        if info then
+            return GetHolidayEntryId(entry), info, GetHolidayEntryKey(entry)
         end
     end
 
-    return nil, nil
+    local todayHolidayInfo = GetTodayTimewalkingHolidayInfo()
+    if todayHolidayInfo then
+        return nil, todayHolidayInfo, nil
+    end
+
+    return nil, nil, nil
 end
 
 IsQuestCurrentlyActive = function(questId)
@@ -298,16 +501,36 @@ PlayerHasAuraSpell = function(spellId)
     return false
 end
 
-local function GetActiveTimewalkingEventHint()
-    local _, holidayInfo = GetActiveTimewalkingHolidayInfo()
-    local holidayName = NormalizeText(holidayInfo and holidayInfo.name)
+GetActiveTimewalkingEventHint = function()
+    local _, holidayInfo, holidayKey = GetActiveTimewalkingHolidayInfo()
+    if holidayKey then
+        for _, hint in ipairs(TIMEWALKING_EVENT_HINTS) do
+            if hint.key == holidayKey then
+                return hint
+            end
+        end
+    end
 
-    if holidayName ~= "" then
+    local holidayName = NormalizeText(holidayInfo and holidayInfo.name)
+    local holidayDescription = NormalizeText(holidayInfo and holidayInfo.description)
+    local holidayText = holidayName .. holidayDescription
+
+    if holidayText ~= "" then
         for _, hint in ipairs(TIMEWALKING_EVENT_HINTS) do
             for _, match in ipairs(hint.holidayMatches or {}) do
-                if holidayName:find(NormalizeText(match), 1, true) then
+                if holidayText:find(NormalizeText(match), 1, true) then
                     return hint
                 end
+            end
+        end
+    end
+
+    local turbulentFallbackKey = GetTurbulentTimewaysFallbackKey(holidayInfo)
+        or GetScheduledTurbulentTimewaysKey()
+    if turbulentFallbackKey then
+        for _, hint in ipairs(TIMEWALKING_EVENT_HINTS) do
+            if hint.key == turbulentFallbackKey then
+                return hint
             end
         end
     end
@@ -374,6 +597,11 @@ end
 
 local function GetLocalizedRaidPickupNote(questId)
     local npcName = L["TW_NPC_Vormu"] or "Vormu"
+    if questId == 82817 then
+        local classicNpcName = L["TW_NPC_Grannadormu"] or "Grannadormu"
+        local pattern = L["TW_RaidPickup_BlackrockDepths"] or "Pick up the raid quest from %s at the Timewalking hub in Stormwind or Orgrimmar."
+        return string.format(pattern, classicNpcName)
+    end
     if questId == 47523 then
         local pattern = L["TW_RaidPickup_BlackTemple"] or "Pick up the raid quest from %s in Shattrath City."
         return string.format(pattern, npcName)
@@ -460,7 +688,7 @@ local function UpdateTimewalkingQuestRow(progressBucket, row, questIds, storageP
         rowNote = GetLocalizedDungeonPickupNote()
     elseif storagePrefix == "tw_raid" and eventHint then
         if eventHint.hasRaid == false then
-            rowNote = L["TW_Raid_NotAvailable_Mists"] or "There is no Timewalking raid quest during Mists of Pandaria Timewalking."
+            rowNote = L["TW_Raid_NotAvailable_Event"] or "There is no Timewalking raid quest during this Timewalking event."
         else
             rowNote = GetLocalizedRaidPickupNote(activeQuestId or completedQuestId or storedQuestId)
         end
@@ -506,7 +734,7 @@ local function UpdateTimewalkingQuestRow(progressBucket, row, questIds, storageP
                     zone = raidLocation.zone,
                     x = raidLocation.x,
                     y = raidLocation.y,
-                    title = L["TW_NPC_Vormu"] or "Vormu",
+                    title = activeQuestId == 82817 and (L["TW_NPC_Grannadormu"] or "Grannadormu") or (L["TW_NPC_Vormu"] or "Vormu"),
                 }
             end
             ApplyWaypoint(row, raidLocation)

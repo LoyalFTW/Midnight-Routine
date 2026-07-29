@@ -2002,9 +2002,13 @@ end
 
 local function ReleaseConcentrationTrackerConfigBody(frame)
     if frame and frame.body then
-        frame.body:EnableMouse(false)
-        frame.body:Hide()
-        frame.body:SetParent(UIParent)
+        if MR.ReleaseFrameTree then
+            MR:ReleaseFrameTree(frame.body)
+        else
+            frame.body:EnableMouse(false)
+            frame.body:Hide()
+            frame.body:SetParent(nil)
+        end
         frame.body = nil
     end
 end
@@ -2045,6 +2049,11 @@ function MR:PopulateConcentrationTrackerConfigFrame(f)
     end
 
     RefreshFonts()
+    local keepLeft, keepTop
+    if f.IsShown and f:IsShown() and self.CaptureFrameScreenPosition then
+        keepLeft, keepTop = self:CaptureFrameScreenPosition(f)
+    end
+
     ReleaseConcentrationTrackerConfigBody(f)
 
     local body = CreateFrame("Frame", nil, f)
@@ -2132,6 +2141,9 @@ function MR:PopulateConcentrationTrackerConfigFrame(f)
 
     body:SetHeight(math.max(1, -yOff))
     f:SetHeight(math.max(150, -yOff + 10))
+    if keepLeft and keepTop and self.RestoreFrameScreenPosition then
+        self:RestoreFrameScreenPosition(f, keepLeft, keepTop)
+    end
 end
 
 function MR:ToggleConcentrationTrackerConfig()
@@ -2152,6 +2164,10 @@ function MR:ToggleConcentrationTrackerConfig()
         concentrationTrackerConfigFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end
     concentrationTrackerConfigFrame:Show()
+    if self.CaptureFrameScreenPosition and self.RestoreFrameScreenPosition then
+        local left, top = self:CaptureFrameScreenPosition(concentrationTrackerConfigFrame)
+        self:RestoreFrameScreenPosition(concentrationTrackerConfigFrame, left, top)
+    end
 end
 
 function MR:RefreshWarbandBoard()

@@ -382,6 +382,79 @@ local function IsTableEmpty(t)
     return type(t) ~= "table" or next(t) == nil
 end
 
+function MR:ReleaseFrameTree(frame)
+    if not frame then
+        return
+    end
+
+    if frame._mrExternalFrames then
+        for _, external in ipairs(frame._mrExternalFrames) do
+            self:ReleaseFrameTree(external)
+        end
+        frame._mrExternalFrames = nil
+    end
+
+    if frame.GetChildren then
+        local children = { frame:GetChildren() }
+        for _, child in ipairs(children) do
+            self:ReleaseFrameTree(child)
+        end
+    end
+
+    if frame.SetScript and frame.HasScript then
+        for _, scriptName in ipairs({
+            "OnUpdate",
+            "OnEvent",
+            "OnClick",
+            "OnEnter",
+            "OnLeave",
+            "OnMouseDown",
+            "OnMouseUp",
+            "OnDragStart",
+            "OnDragStop",
+            "OnShow",
+            "OnHide",
+        }) do
+            if frame:HasScript(scriptName) then
+                frame:SetScript(scriptName, nil)
+            end
+        end
+    end
+
+    if frame.UnregisterAllEvents then
+        frame:UnregisterAllEvents()
+    end
+    if frame.EnableMouse then
+        frame:EnableMouse(false)
+    end
+    if frame.Hide then
+        frame:Hide()
+    end
+    if frame.SetParent then
+        frame:SetParent(nil)
+    end
+end
+
+function MR:CaptureFrameScreenPosition(frame)
+    if not frame or not frame.GetLeft or not frame.GetTop then
+        return nil, nil
+    end
+
+    return frame:GetLeft(), frame:GetTop()
+end
+
+function MR:RestoreFrameScreenPosition(frame, left, top)
+    if not frame or not left or not top or not UIParent then
+        return
+    end
+    if not frame.ClearAllPoints or not frame.SetPoint then
+        return
+    end
+
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+end
+
 local function IsInRestrictedCombat()
     return InCombatLockdown and InCombatLockdown()
 end
