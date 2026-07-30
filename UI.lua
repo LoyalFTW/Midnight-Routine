@@ -2205,12 +2205,6 @@ function MR:FastToggleMainSection(modKey)
         return false
     end
 
-    RecalcLayout()
-    local newOpen = not MR:IsModuleOpen(modKey)
-    MR:SetModuleOpen(modKey, newOpen)
-    stats.isOpen = newOpen
-    stats.height = stats.shownRows == 0 and 0 or (HEADER_HEIGHT + 1 + SECTION_GAP + (newOpen and (stats.shownRows * ROW_HEIGHT) or 0))
-
     local frameW = MR.db.profile.width or 260
     local usableW = frameW - 9
     local MIN_COL = 200
@@ -2218,6 +2212,13 @@ function MR:FastToggleMainSection(modKey)
     if numCols ~= 1 then
         return false
     end
+
+    RecalcLayout()
+    local newOpen = not MR:IsModuleOpen(modKey)
+    MR:SetModuleOpen(modKey, newOpen)
+    stats.isOpen = newOpen
+    stats.height = stats.shownRows == 0 and 0 or (HEADER_HEIGHT + 1 + SECTION_GAP + (newOpen and (stats.shownRows * ROW_HEIGHT) or 0))
+
     local colW = math.floor(usableW / numCols)
     local xOff = ((registryEntry.col or 1) - 1) * colW
 
@@ -4285,6 +4286,10 @@ end
 function MR:IsRowComplete(mod, row, done)
     if mod and (mod.key == "currencies" or mod.key == "pvp_currencies") and not self:IsModuleHideComplete(mod.key) then
         return false
+    end
+    if row and row.professionKnowledgeEntry and self.GetProfessionKnowledgeEntryProgress then
+        local current, required = self:GetProfessionKnowledgeEntryProgress(row)
+        return (current or 0) >= (required or 1)
     end
     if row.completeFunc then
         return row.completeFunc(done, row, mod) == true

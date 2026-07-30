@@ -35,6 +35,12 @@ local gatheringFrameInteractionActive = false
 local gatheringRebuildPending
 local configExpandedProfessions = {} 
 
+local function StepMemoryCleanup()
+    if collectgarbage then
+        collectgarbage("step", 240)
+    end
+end
+
 local function RefreshFonts()
     if ns.EnsureFonts then
         FONT_HEADERS, FONT_ROWS = ns.EnsureFonts()
@@ -218,6 +224,14 @@ local function Progress(entry)
     end
     if completed > 0 then return 1, 1 end
     return 0, 1
+end
+
+function MR:GetProfessionKnowledgeEntryProgress(entry)
+    entry = (entry and entry.professionKnowledgeEntry) or entry
+    if not entry then
+        return 0, 1
+    end
+    return Progress(entry)
 end
 
 local function IsDone(entry)
@@ -422,6 +436,15 @@ local function GetProfessionTaskModules(profession, filterFn)
 end
 
 local function GetProfessionTaskProgress(mod, row)
+    if row and row.professionKnowledgeEntry then
+        local current, required = Progress(row.professionKnowledgeEntry)
+        local max = tonumber(row.max) or required
+        if max and max > 0 and not row.noMax then
+            return math.min(current or 0, max), max, (current or 0) >= max
+        end
+        return current or 0, nil, (current or 0) > 0
+    end
+
     local current = MR:GetProgress(mod.key, row.key) or 0
     local max = tonumber(row.max)
     if max and max > 0 and not row.noMax then
@@ -2535,6 +2558,8 @@ RebuildGatheringLocationsFrame = function(resetScroll)
             gatheringLocationsFrame.UpdateScrollBar()
         end
     end
+
+    StepMemoryCleanup()
 end
 
 function MR.RequestGatheringLocationsRefresh()
@@ -3112,6 +3137,8 @@ PopulateGatheringConfig = function(frame)
     if keepLeft and keepTop and MR.RestoreFrameScreenPosition then
         MR:RestoreFrameScreenPosition(frame, keepLeft, keepTop)
     end
+
+    StepMemoryCleanup()
 end
 
 function MR:ToggleGatheringLocationsConfig()
