@@ -115,8 +115,50 @@ local function ScanCampaign(mod)
     return dirty
 end
 
+local function AreStoryCampaignsEnabled()
+    local charDB = MR.db and MR.db.char
+    if not charDB then
+        return true
+    end
+    local savedPreference = MR.GetStoryCampaignsEnabledPreference and MR:GetStoryCampaignsEnabledPreference()
+    if savedPreference ~= nil then
+        return savedPreference ~= false
+    end
+
+    local storage = MR.GetActiveModuleStorage and MR:GetActiveModuleStorage() or charDB.modules
+    local sawDisabled = false
+    for key, state in pairs(storage or {}) do
+        if type(key) == "string" and key:match("^story_campaign_") and type(state) == "table" then
+            if state.enabled == true then
+                if MR.SetStoryCampaignsEnabledPreference then
+                    MR:SetStoryCampaignsEnabledPreference(true)
+                end
+                return true
+            elseif state.enabled == false then
+                sawDisabled = true
+            end
+        end
+    end
+
+    if sawDisabled then
+        if MR.SetStoryCampaignsEnabledPreference then
+            MR:SetStoryCampaignsEnabledPreference(false)
+        end
+        return false
+    end
+    return true
+end
+
 TryRegisterCampaigns = function()
     if not C_CampaignInfo then return end
+    local configFrame = MR.GetConfigFrame and MR:GetConfigFrame() or nil
+    local configVisible = configFrame and configFrame.IsShown and configFrame:IsShown()
+    local trackingVisible = MR.HasVisibleMainTrackingSurface and MR:HasVisibleMainTrackingSurface()
+    if not trackingVisible and not configVisible then
+        MR._storyCampaignRegistrationDirty = true
+        if MR.MarkBackgroundDataDirty then MR:MarkBackgroundDataDirty() end
+        return
+    end
     if not (MR.db and MR.db.char and MR.db.char.progress) then
         ScheduleCampaignRegister(1)
         return
@@ -129,10 +171,13 @@ TryRegisterCampaigns = function()
         end
         return
     end
+    local storyCampaignsEnabled = AreStoryCampaignsEnabled()
     local didRegister = false
+    local registeredAny = false
     for _, campaignId in ipairs(ids) do
         if registeredCampaigns[campaignId] then
-            if ScanCampaign(registeredCampaigns[campaignId]) then
+            local mod = registeredCampaigns[campaignId]
+            if MR:IsModuleEnabled(mod.key) and ScanCampaign(mod) then
                 didRegister = true
             end
         else
@@ -160,25 +205,43 @@ TryRegisterCampaigns = function()
                     label = label,
                     labelColor = "#ffff99",
                     configGroup = "story",
-                    defaultEnabled = true,
+                    defaultEnabled = storyCampaignsEnabled,
                     resetType = "never",
                     defaultOpen = true,
+                    skipRegisterScan = true,
+                    scanReturnsChanged = true,
                     rows = rows,
                     _campaignId = campaignId,
                     _chapterIds = chapterIds,
-                    onScan = function(self) ScanCampaign(self) end,
+                    onScan = function(self) return ScanCampaign(self) end,
                     isVisible = function(self)
                         return not IsCampaignFullyComplete(self._campaignId, self._chapterIds)
                     end,
                 }
                 MR:RegisterModule(mod)
-                ScanCampaign(mod)
                 registeredCampaigns[campaignId] = mod
-                didRegister = true
+                registeredAny = true
+                if MR:IsModuleEnabled(mod.key) and ScanCampaign(mod) then
+                    didRegister = true
+                end
             end
         end
     end
-    if didRegister and MR.RefreshUI then MR:RefreshUI() end
+    if didRegister then
+        if MR.RequestUIRefresh then
+            MR:RequestUIRefresh(0.05)
+        elseif MR.RefreshUI then
+            MR:RefreshUI()
+        end
+    end
+    if registeredAny and MR.RequestConfigRepopulate then
+        MR:RequestConfigRepopulate(nil, 0.05)
+    end
+end
+
+function MR:RefreshStoryCampaignRegistration()
+    MR._storyCampaignRegistrationDirty = nil
+    TryRegisterCampaigns()
 end
 
 if CreateFrame then
@@ -187,6 +250,14 @@ if CreateFrame then
     eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
     eventFrame:RegisterEvent("QUEST_LOG_UPDATE")
     eventFrame:SetScript("OnEvent", function(_, event)
+        local configFrame = MR.GetConfigFrame and MR:GetConfigFrame() or nil
+        local configVisible = configFrame and configFrame.IsShown and configFrame:IsShown()
+        local trackingVisible = MR.HasVisibleMainTrackingSurface and MR:HasVisibleMainTrackingSurface()
+        if not trackingVisible and not configVisible then
+            MR._storyCampaignRegistrationDirty = true
+            if MR.MarkBackgroundDataDirty then MR:MarkBackgroundDataDirty() end
+            return
+        end
         if event == "PLAYER_LOGIN" then
             retryAttempts = 0
             ScheduleCampaignRegister(1)

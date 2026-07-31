@@ -143,9 +143,10 @@ MR.CANONICAL_DIFFICULTY = {
     [33] = 14,
 }
 local CANONICAL_DIFFICULTY = MR.CANONICAL_DIFFICULTY
+local GetDiffProgressStorage
 
 local function CountTrackedDifficulties(task)
-    if not task.encounterIds then return 0 end
+    if not (task and task.encounterIds) then return 0 end
 
     if not task.encounterDifficulties then return 4 end
     local n = 0
@@ -156,6 +157,7 @@ end
 local function GetDiffProgress(self, taskId, scope)
     if not self.db then return {} end
     local task = self:GetCustomTaskById(taskId, scope)
+    if not task then return nil end
     local storage = GetDiffProgressStorage(task)
     if not storage then return {} end
     local key = GetTaskProgressKey(taskId, scope)
@@ -290,8 +292,6 @@ local function FormatQuestMoneyReward(copper)
 end
 
 local QUEST_REWARD_CACHE = {}
-local QUEST_REWARD_MAX_ATTEMPTS = 3
-local QUEST_REWARD_RETRY_SECONDS = 6
 
 local function HasLoadedQuestRewardData(questId)
     if HaveQuestRewardData then
@@ -309,32 +309,6 @@ local function HasLoadedQuestRewardData(questId)
     end
 
     return true
-end
-
-local function RequestQuestRewardData(questId)
-    if C_TaskQuest and C_TaskQuest.RequestPreloadRewardData then
-        pcall(C_TaskQuest.RequestPreloadRewardData, questId)
-    end
-
-    if C_QuestLog and C_QuestLog.RequestLoadQuestByID then
-        pcall(C_QuestLog.RequestLoadQuestByID, questId)
-    end
-end
-
-local function QueueRewardRefresh()
-    if not (MR and MR.ScheduleTimer) or MR._customTaskRewardRefreshTimer then
-        return
-    end
-
-    MR._customTaskRewardRefreshTimer = MR:ScheduleTimer(function()
-        MR._customTaskRewardRefreshTimer = nil
-        if MR.RefreshCustomTasksModule then
-            MR:RefreshCustomTasksModule()
-        end
-        if MR.RefreshUI then
-            MR:RefreshUI()
-        end
-    end, 1.5)
 end
 
 local function GetQuestMoneyReward(questId)
@@ -375,22 +349,10 @@ local function GetCachedQuestMoneyReward(questId)
         return money, false
     end
 
-    cached = cached or { attempts = 0 }
-    QUEST_REWARD_CACHE[questId] = cached
-
-    local now = GetTime and GetTime() or 0
-    if (cached.attempts or 0) >= QUEST_REWARD_MAX_ATTEMPTS then
-        return cached.money or 0, false
-    end
-
-    if not cached.nextRequestAt or now >= cached.nextRequestAt then
-        cached.attempts = (cached.attempts or 0) + 1
-        cached.nextRequestAt = now + QUEST_REWARD_RETRY_SECONDS
-        RequestQuestRewardData(questId)
-        return cached.money or 0, true
-    end
-
-    return cached.money or 0, false
+    -- Do not preload complete quest payloads just to decorate a custom row.
+    -- Blizzard retains that data and can charge several MB to this addon. If
+    -- the client already knows the reward, it is cached above and still shown.
+    return 0, false
 end
 
 local function GetQuestRewardSummary(questIds)
@@ -407,10 +369,6 @@ local function GetQuestRewardSummary(questIds)
         if requested then
             pending = true
         end
-    end
-
-    if pending then
-        QueueRewardRefresh()
     end
 
     return totalMoney, pending
@@ -452,7 +410,7 @@ local function WriteCustomTaskValue(target, rowKey, value)
     target[CUSTOM_MODULE_KEY][rowKey] = value
 end
 
-local function GetDiffProgressStorage(task)
+GetDiffProgressStorage = function(task)
     if task and task.accountWideComplete then
         MR.db.global.customTaskDiffProgress = MR.db.global.customTaskDiffProgress or {}
         return MR.db.global.customTaskDiffProgress
@@ -572,14 +530,18 @@ function MR:GetCustomTaskById(taskId, scope)
     return nil
 end
 
-RefreshCustomTaskViews = function(self)
-    if self.RefreshCustomTasksModule then
+RefreshCustomTaskViews = function(self, moduleAlreadyRefreshed)
+    if not moduleAlreadyRefreshed and self.RefreshCustomTasksModule then
         self:RefreshCustomTasksModule()
     end
-    if self.RepopulateConfigFrame then
+    if self.RequestConfigRepopulate then
+        self:RequestConfigRepopulate(nil, 0.04)
+    elseif self.RepopulateConfigFrame then
         self:RepopulateConfigFrame()
     end
-    if self.RefreshUI then
+    if self.RequestUIRefresh then
+        self:RequestUIRefresh(0.01)
+    elseif self.RefreshUI then
         self:RefreshUI()
     end
 end
@@ -813,10 +775,13 @@ function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuest
         encounterDifficulties = encounterDifficulties,
     }
 
-    RefreshCustomTaskViews(self)
-    if questIds and self.RefreshQuestProgress then
-        self:RefreshQuestProgress(nil, true)
+    if self.RefreshCustomTasksModule then
+        self:RefreshCustomTasksModule()
     end
+    if questIds and self.RefreshQuestProgress then
+        self:RefreshQuestProgress(nil, false)
+    end
+    RefreshCustomTaskViews(self, true)
     return taskId
 end
 
@@ -920,10 +885,13 @@ function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allow
         WriteCustomTaskValue(GetAccountWideProgressStorage(), newRowKey, existingProgressValue)
         WriteCustomTaskValue(GetAccountWideManualOverrideStorage(), newRowKey, existingOverrideValue)
     end
-    RefreshCustomTaskViews(self)
-    if questIds and self.RefreshQuestProgress then
-        self:RefreshQuestProgress(nil, true)
+    if self.RefreshCustomTasksModule then
+        self:RefreshCustomTasksModule()
     end
+    if questIds and self.RefreshQuestProgress then
+        self:RefreshQuestProgress(nil, false)
+    end
+    RefreshCustomTaskViews(self, true)
     return true
 end
 
@@ -1129,7 +1097,6 @@ function MR:RefreshEncounterProgress(encounterId, refreshUI, difficultyId)
         return false
     end
 
-
     if difficultyId then
         difficultyId = CANONICAL_DIFFICULTY[difficultyId] or difficultyId
     end
@@ -1138,49 +1105,44 @@ function MR:RefreshEncounterProgress(encounterId, refreshUI, difficultyId)
     local dirty = false
 
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
-            if row.encounterIds then
-                local shouldMark = false
-                if encounterId == nil then
-                    shouldMark = true
-                else
-                    for _, eid in ipairs(row.encounterIds) do
-                        if eid == encounterId then
-                            shouldMark = true
-                            break
-                        end
-                    end
-                end
-
-                if shouldMark and difficultyId and row.encounterDifficulties then
-                    shouldMark = row.encounterDifficulties[difficultyId] == true
-                end
-
-                if shouldMark then
-                    local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
-                    if not progressBucket[mod.key] then
-                        progressBucket[mod.key] = {}
-                    end
-                    local cur = progressBucket[mod.key][row.key] or 0
-                    local maxVal = row.max or 1
-                    if difficultyId and row.taskId then
-                        local diffState = GetDiffProgress(self, row.taskId, row.taskScope)
-                        if not diffState[difficultyId] then
-                            diffState[difficultyId] = true
-                            if cur < maxVal then
-                                progressBucket[mod.key][row.key] = cur + 1
-                                self._moduleStatsCache = nil
-                                dirty = true
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
+                if row.encounterIds then
+                    local shouldMark = encounterId == nil
+                    if not shouldMark then
+                        for _, eid in ipairs(row.encounterIds) do
+                            if eid == encounterId then
+                                shouldMark = true
+                                break
                             end
                         end
-                    elseif not row.taskId then
-                        if cur < maxVal then
+                    end
+
+                    if shouldMark and difficultyId and row.encounterDifficulties then
+                        shouldMark = row.encounterDifficulties[difficultyId] == true
+                    end
+
+                    if shouldMark then
+                        local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
+                        if not progressBucket[mod.key] then
+                            progressBucket[mod.key] = {}
+                        end
+                        local cur = progressBucket[mod.key][row.key] or 0
+                        local maxVal = row.max or 1
+                        if difficultyId and row.taskId then
+                            local diffState = GetDiffProgress(self, row.taskId, row.taskScope)
+                            if diffState and not diffState[difficultyId] then
+                                diffState[difficultyId] = true
+                                if cur < maxVal then
+                                    progressBucket[mod.key][row.key] = cur + 1
+                                    dirty = true
+                                end
+                            end
+                        elseif not row.taskId and cur < maxVal then
                             progressBucket[mod.key][row.key] = maxVal
-                            self._moduleStatsCache = nil
                             dirty = true
                         end
                     end
-
                 end
             end
         end
@@ -1189,7 +1151,11 @@ function MR:RefreshEncounterProgress(encounterId, refreshUI, difficultyId)
     if dirty then
         self._moduleStatsCache = nil
         if refreshUI ~= false then
-            self:RefreshUI()
+            if self.RequestDataRefresh then
+                self:RequestDataRefresh()
+            else
+                self:RefreshUI()
+            end
         end
     end
 

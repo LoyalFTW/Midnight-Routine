@@ -146,6 +146,9 @@ end
 function MR:ToggleConfig()
     if cfgFrame and cfgFrame:IsShown() then cfgFrame:Hide() return end
     if not cfgFrame then cfgFrame = self:BuildConfigFrame() end
+    if self.RefreshStoryCampaignRegistration then
+        self:RefreshStoryCampaignRegistration()
+    end
     self:PopulateConfigFrame(cfgFrame)
     cfgFrame:Show()
 end
@@ -582,18 +585,16 @@ function MR:PopulateConfigFrame(f)
             local thumbCenterY = select(2, selfBtn:GetCenter()) or 0
             local thumbTopY = thumbCenterY + (selfBtn:GetHeight() or 0) * 0.5
             selfBtn._grabOffset = thumbTopY - (cursorY / scale)
+            selfBtn:SetScript("OnUpdate", function(activeThumb)
+                if not activeThumb._grabOffset then return end
+                local _, activeCursorY = GetCursorPosition()
+                local activeScale = UIParent and UIParent:GetEffectiveScale() or 1
+                SetPopupScrollFromCursor(activeCursorY / activeScale, activeThumb._grabOffset)
+            end)
         end)
         scrollThumb:SetScript("OnDragStop", function(selfBtn)
             selfBtn._grabOffset = nil
-        end)
-        scrollThumb:SetScript("OnUpdate", function(selfBtn)
-            if not selfBtn._grabOffset then
-                return
-            end
-
-            local _, cursorY = GetCursorPosition()
-            local scale = UIParent and UIParent:GetEffectiveScale() or 1
-            SetPopupScrollFromCursor(cursorY / scale, selfBtn._grabOffset)
+            selfBtn:SetScript("OnUpdate", nil)
         end)
 
         local resetBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
@@ -1628,15 +1629,12 @@ function MR:PopulateConfigFrame(f)
         end
     end
 
-    f:SetScript("OnUpdate", function()
-        if drag.active then DragOnUpdate() end
-    end)
-
     CommitDrag = function()
         if not drag.active then return end
         local rows = (drag.mode == "row" and drag.moduleKey and _cfgRowRows[drag.moduleKey]) or _cfgRows or {}
         local mode, moduleKey = drag.mode, drag.moduleKey
         drag.active = false
+        f:SetScript("OnUpdate", nil)
         for _, row in ipairs(rows) do row.frame:SetAlpha(1) end
         dragGhost:Hide()
         dragLine:Hide()
@@ -2020,15 +2018,15 @@ function MR:PopulateConfigFrame(f)
         cb:SetChecked(storyEnabled == storyTotal)
         cb:SetScript("OnClick", function(s)
             local enabled = s:GetChecked() and true or false
+            MR:SetStoryCampaignsEnabledPreference(enabled)
             for _, storyMod in ipairs(_allMods) do
                 if IsStoryConfigModule(storyMod) then
                     MR:SetModuleEnabled(storyMod.key, enabled, true)
                 end
             end
-            if MR.RequestConfigRefresh then
-                MR:RequestConfigRefresh()
-            else
-                MR:RefreshUI()
+            MR:RefreshUI()
+            if MR.RequestConfigRepopulate then
+                MR:RequestConfigRepopulate(f, 0.04)
             end
         end)
 
@@ -2180,6 +2178,7 @@ function MR:PopulateConfigFrame(f)
                 grip:SetScript("OnMouseDown", function()
                     if drag.active then return end
                     drag.active = true
+                    f:SetScript("OnUpdate", DragOnUpdate)
                     drag.mode = "module"
                     drag.moduleKey = nil
                     drag.srcKey = key
@@ -2299,6 +2298,7 @@ function MR:PopulateConfigFrame(f)
                                 return
                             end
                             drag.active = true
+                            f:SetScript("OnUpdate", DragOnUpdate)
                             drag.mode = "row"
                             drag.moduleKey = key
                             drag.srcKey = rkey
@@ -2450,7 +2450,12 @@ function MR:PopulateConfigFrame(f)
             cb:SetChecked(MR:IsModuleEnabled(key))
             cb:SetScript("OnClick", function(s)
                 MR:SetModuleEnabled(key, s:GetChecked(), true)
-                if MR.RequestConfigRefresh then
+                if isStoryConfigModule then
+                    MR:RefreshUI()
+                    if MR.RequestConfigRepopulate then
+                        MR:RequestConfigRepopulate(f, 0.04)
+                    end
+                elseif MR.RequestConfigRefresh then
                     MR:RequestConfigRefresh()
                 else
                     MR:RefreshUI()
@@ -2521,6 +2526,7 @@ function MR:PopulateConfigFrame(f)
             grip:SetScript("OnMouseDown", function()
                 if drag.active then return end
                 drag.active = true
+                f:SetScript("OnUpdate", DragOnUpdate)
                 drag.mode = "module"
                 drag.moduleKey = nil
                 drag.srcKey = key
@@ -2579,6 +2585,7 @@ function MR:PopulateConfigFrame(f)
                             return
                         end
                         drag.active = true
+                        f:SetScript("OnUpdate", DragOnUpdate)
                         drag.mode = "row"
                         drag.moduleKey = key
                         drag.srcKey = rkey
@@ -2885,7 +2892,12 @@ function MR:PopulateConfigFrame(f)
 end
 
 function MR:RequestConfigRepopulate(frame, delay)
-    frame = frame or cfgFrame
+    -- Core callers historically pass a reason string here, while config controls
+    -- pass the frame directly. Treat anything that is not a frame as the
+    -- default config frame so either call form remains safe.
+    if type(frame) ~= "table" or type(frame.IsShown) ~= "function" then
+        frame = cfgFrame
+    end
     if not frame or not frame:IsShown() then
         return
     end
@@ -2906,7 +2918,7 @@ function MR:RequestConfigRepopulate(frame, delay)
         local target = self._configRepopulatePendingFrame
         self._configRepopulateTimer = nil
         self._configRepopulatePendingFrame = nil
-        if target and target:IsShown() then
+        if target and type(target.IsShown) == "function" and target:IsShown() then
             self:PopulateConfigFrame(target)
         end
     end, delay)

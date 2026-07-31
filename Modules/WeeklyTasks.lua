@@ -456,6 +456,7 @@ MR:RegisterModule({
         local beforeRows = {}
         for _, row in ipairs(mod.rows) do
             beforeRows[row.key] = {
+                label = row.label,
                 countText = row.countText,
                 countColor = row.countColor and { unpack(row.countColor) } or nil,
                 max = row.max,
@@ -585,21 +586,37 @@ MR:RegisterModule({
 
         local activeLegendVariant = FindActiveQuestVariant(LOST_LEGENDS_ALL_RELICS)
         db[mod.key]["legends_active_name"] = activeLegendVariant and activeLegendVariant.name or nil
-
-        for _, variant in ipairs(LOST_LEGENDS_REPEAT_RELICS) do
-            if C_QuestLog.IsQuestFlaggedCompleted(variant.quest) then
-                db[mod.key]["lost_legends"] = 1
-                db[mod.key]["legends_completed_name"] = variant.name
+        for _, row in ipairs(mod.rows) do
+            if row.key == "lost_legends" then
+                row.label = activeLegendVariant
+                    and ("|cff2ae7c6" .. activeLegendVariant.name .. ":|r")
+                    or L["Weekly_Legends_Label"]
                 break
             end
         end
 
-        if (tonumber(db[mod.key]["lost_legends"]) or 0) >= 1
-            and not db[mod.key]["legends_completed_name"] then
-            for _, variant in ipairs(LOST_LEGENDS_FIRST_TIME_RELICS) do
+        if activeLegendVariant then
+            -- Turning in the parent quest can mark this row complete before the
+            -- chosen relic quest begins. An active relic is the remaining work,
+            -- so it must reopen the row until that specific quest is turned in.
+            db[mod.key]["lost_legends"] = 0
+            db[mod.key]["legends_completed_name"] = nil
+        else
+            for _, variant in ipairs(LOST_LEGENDS_REPEAT_RELICS) do
                 if C_QuestLog.IsQuestFlaggedCompleted(variant.quest) then
+                    db[mod.key]["lost_legends"] = 1
                     db[mod.key]["legends_completed_name"] = variant.name
                     break
+                end
+            end
+
+            if (tonumber(db[mod.key]["lost_legends"]) or 0) >= 1
+                and not db[mod.key]["legends_completed_name"] then
+                for _, variant in ipairs(LOST_LEGENDS_FIRST_TIME_RELICS) do
+                    if C_QuestLog.IsQuestFlaggedCompleted(variant.quest) then
+                        db[mod.key]["legends_completed_name"] = variant.name
+                        break
+                    end
                 end
             end
         end
@@ -916,7 +933,8 @@ MR:RegisterModule({
         for _, row in ipairs(mod.rows) do
             local beforeRow = beforeRows[row.key]
             if beforeRow then
-                if beforeRow.countText ~= row.countText
+                if beforeRow.label ~= row.label
+                    or beforeRow.countText ~= row.countText
                     or beforeRow.max ~= row.max
                     or beforeRow.note ~= row.note
                     or not ColorsEqual(beforeRow.countColor, row.countColor) then

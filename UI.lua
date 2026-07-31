@@ -42,6 +42,22 @@ local BuildModuleStatsCache
 local GetModuleStats
 local IsMainTextOnlyMode
 
+local DIFF_BADGE_DEFS = {
+    { id = 17, label = "L" },
+    { id = 14, label = "N" },
+    { id = 15, label = "H" },
+    { id = 16, label = "M" },
+}
+
+local DIFF_BADGE_ORDER = { 17, 14, 15, 16 }
+
+local DIFF_BADGE_COLORS = {
+    [17] = { done = { 0.30, 0.60, 1.00 }, todo = { 0.08, 0.14, 0.24 }, border_done = { 0.22, 0.50, 0.90 }, border_todo = { 0.08, 0.12, 0.20 }, text_done = { 1, 1, 1 }, text_todo = { 0.22, 0.35, 0.50 } },
+    [14] = { done = { 0.22, 0.72, 0.32 }, todo = { 0.06, 0.16, 0.09 }, border_done = { 0.16, 0.58, 0.26 }, border_todo = { 0.06, 0.14, 0.08 }, text_done = { 1, 1, 1 }, text_todo = { 0.18, 0.38, 0.22 } },
+    [15] = { done = { 1.00, 0.52, 0.08 }, todo = { 0.26, 0.14, 0.04 }, border_done = { 0.88, 0.42, 0.06 }, border_todo = { 0.18, 0.10, 0.03 }, text_done = { 1, 1, 1 }, text_todo = { 0.48, 0.26, 0.10 } },
+    [16] = { done = { 0.85, 0.18, 0.20 }, todo = { 0.24, 0.06, 0.07 }, border_done = { 0.70, 0.12, 0.14 }, border_todo = { 0.18, 0.05, 0.05 }, text_done = { 1, 1, 1 }, text_todo = { 0.46, 0.16, 0.16 } },
+}
+
 local GetWindowLayoutValue
 local SetWindowLayoutValue
 local countColor
@@ -138,7 +154,11 @@ local PEEK_FADE_IN      = 6.0
 local PEEK_FADE_OUT     = 2.5
 
 local function PeekFrameList()
-    local list = {}
+    local list = MR._peekFrameList or {}
+    MR._peekFrameList = list
+    for i = #list, 1, -1 do
+        list[i] = nil
+    end
     if MR.frame                  then list[#list+1] = MR.frame end
     if MR.raresFrame             then list[#list+1] = MR.raresFrame end
     if MR.renownFrame            then list[#list+1] = MR.renownFrame end
@@ -172,28 +192,25 @@ end
 local peekUpdater = CreateFrame("Frame")
 peekUpdater:Hide()
 
-function MR:ApplyPeekOnHover(enable)
-    self.db.profile.peekOnHover = enable
+local function StopPeekAnimation()
+    peekUpdater:SetScript("OnUpdate", nil)
+    peekUpdater:Hide()
+end
 
-    if not enable then
-        peekUpdater:SetScript("OnUpdate", nil)
-        peekUpdater:Hide()
-        for _, f in ipairs(PeekFrameList()) do
-            if f:IsShown() then f:SetAlpha(1.0) end
-        end
-        return
-    end
-
+local function StartPeekAnimation()
+    if not (MR.db and MR.db.profile and MR.db.profile.peekOnHover) then return end
     peekUpdater:Show()
     peekUpdater:SetScript("OnUpdate", function(_, dt)
         local target = AnyFrameHovered() and PEEK_ALPHA_HOVER or PEEK_ALPHA_IDLE
-        local rate   = (target > PEEK_ALPHA_IDLE) and PEEK_FADE_IN or PEEK_FADE_OUT
+        local rate = (target > PEEK_ALPHA_IDLE) and PEEK_FADE_IN or PEEK_FADE_OUT
+        local settled = true
         for _, f in ipairs(PeekFrameList()) do
             if f:IsShown() then
                 local cur = f:GetAlpha()
                 if math.abs(cur - target) < 0.005 then
                     f:SetAlpha(target)
                 else
+                    settled = false
                     local step = rate * dt
                     if cur < target then
                         f:SetAlpha(math.min(cur + step, target))
@@ -203,7 +220,35 @@ function MR:ApplyPeekOnHover(enable)
                 end
             end
         end
+        if settled then StopPeekAnimation() end
     end)
+end
+
+function MR:RegisterPeekFrame(frame)
+    if not frame or frame._mrPeekEventsHooked then return end
+    frame._mrPeekEventsHooked = true
+    frame:HookScript("OnEnter", StartPeekAnimation)
+    frame:HookScript("OnLeave", function()
+        C_Timer.After(0, StartPeekAnimation)
+    end)
+    frame:HookScript("OnShow", StartPeekAnimation)
+end
+
+function MR:ApplyPeekOnHover(enable)
+    self.db.profile.peekOnHover = enable
+
+    if not enable then
+        StopPeekAnimation()
+        for _, f in ipairs(PeekFrameList()) do
+            if f:IsShown() then f:SetAlpha(1.0) end
+        end
+        return
+    end
+
+    for _, frame in ipairs(PeekFrameList()) do
+        self:RegisterPeekFrame(frame)
+    end
+    StartPeekAnimation()
 end
 
 local function RecalcLayout()
@@ -721,6 +766,15 @@ local function HideMainRowWidget(rowFrame)
     rowFrame:Hide()
 end
 
+local function PoolMainRowWidget(section, key, rowFrame)
+    HideMainRowWidget(rowFrame)
+    if section and section._rows and section._rows[key] == rowFrame then
+        section._rows[key] = nil
+    end
+    MR._mainRowWidgetPool = MR._mainRowWidgetPool or {}
+    MR._mainRowWidgetPool[#MR._mainRowWidgetPool + 1] = rowFrame
+end
+
 local function HideMainSectionWidget(section)
     if not section then
         return
@@ -730,8 +784,12 @@ local function HideMainSectionWidget(section)
         HideTooltipIfOwned(section._hdrFrame)
     end
     if section._rows then
-        for _, rowFrame in pairs(section._rows) do
-            HideMainRowWidget(rowFrame)
+        local recycleKeys = section._recycleRowKeys or {}
+        section._recycleRowKeys = recycleKeys
+        for index = #recycleKeys, 1, -1 do recycleKeys[index] = nil end
+        for key in pairs(section._rows) do recycleKeys[#recycleKeys + 1] = key end
+        for _, key in ipairs(recycleKeys) do
+            PoolMainRowWidget(section, key, section._rows[key])
         end
     end
     section:Hide()
@@ -763,46 +821,92 @@ local function GetMainRowGroupKey(row)
     return nil
 end
 
-local function GetVisibleRowsByGroup(mod, rows)
-    local rowsByGroup = {}
+local function IsMainRowVisible(mod, row)
+    return MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+end
+
+local function IsMainRowInGroup(mod, row, group)
+    return GetMainRowGroupKey(row) == group and IsMainRowVisible(mod, row)
+end
+
+local function HasVisibleRowsInMainGroup(mod, rows, group)
     for _, row in ipairs(rows or {}) do
-        local group = GetMainRowGroupKey(row)
-        if group then
-            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
-            if rowVisible then
-                rowsByGroup[group] = rowsByGroup[group] or {}
-                rowsByGroup[group][#rowsByGroup[group] + 1] = row
-            end
+        if IsMainRowInGroup(mod, row, group) then
+            return true
         end
     end
-    return rowsByGroup
+    return false
 end
 
-local function BuildMainRowGroupHeader(mod, group, groupRows)
-    local visible = MR:IsRowGroupEnabled(mod.key, groupRows)
-    local label = (ns.GetRowGroupLabel and ns.GetRowGroupLabel(group)) or tostring(group)
-    return {
-        key = "__group_" .. tostring(group),
-        label = label,
-        control = true,
-        sectionHeader = true,
-        hideStatus = true,
-        noDefaultTooltipHint = true,
-        headerActionStyle = "visibility",
-        headerActionVisible = visible,
-        onHeaderActionClick = function()
-            MR:SetRowGroupEnabled(mod.key, groupRows, not MR:IsRowGroupEnabled(mod.key, groupRows))
-        end,
-    }
-end
-
-local function ShouldRenderMainRowGroupHeader(self, mod, groupRows, hideComplete)
-    if not MR:IsRowGroupEnabled(mod.key, groupRows) then
+local function IsMainRowGroupEnabled(mod, group)
+    if not (mod and mod.key and group) then
         return true
     end
 
-    for _, row in ipairs(groupRows or {}) do
-        if MR:IsRowEnabled(mod.key, row.key) then
+    for _, row in ipairs(mod.rows or {}) do
+        if IsMainRowInGroup(mod, row, group) and not MR:IsRowEnabled(mod.key, row.key) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function SetMainRowGroupEnabled(mod, group, enabled)
+    if not (mod and mod.key and group) then
+        return
+    end
+
+    MR._suspendProfessionKnowledgeSurfaceRefresh = true
+    for _, row in ipairs(mod.rows or {}) do
+        if IsMainRowInGroup(mod, row, group) then
+            MR:SetRowEnabled(mod.key, row.key, enabled, true)
+        end
+    end
+    MR._suspendProfessionKnowledgeSurfaceRefresh = nil
+    MR:RefreshUI()
+    MR:RequestProfessionKnowledgeSurfaceRefresh()
+end
+
+local function BuildMainRowGroupHeader(mod, group)
+    MR._mainRowGroupHeaderCache = MR._mainRowGroupHeaderCache or {}
+    local cacheKey = tostring(mod.key) .. "\001" .. tostring(group)
+    local header = MR._mainRowGroupHeaderCache[cacheKey]
+    if not header then
+        header = {
+            key = "__group_" .. tostring(group),
+            control = true,
+            sectionHeader = true,
+            hideStatus = true,
+            noDefaultTooltipHint = true,
+            headerActionStyle = "visibility",
+            onHeaderActionClick = function(row)
+                local headerRow = row and row._mrGroupHeader or header
+                local headerMod = headerRow._mrMod
+                local headerGroup = headerRow._mrGroup
+                SetMainRowGroupEnabled(headerMod, headerGroup, not IsMainRowGroupEnabled(headerMod, headerGroup))
+            end,
+        }
+        MR._mainRowGroupHeaderCache[cacheKey] = header
+    end
+
+    local visible = IsMainRowGroupEnabled(mod, group)
+    local label = (ns.GetRowGroupLabel and ns.GetRowGroupLabel(group)) or tostring(group)
+    header.label = label
+    header.headerActionVisible = visible
+    header._mrMod = mod
+    header._mrGroup = group
+    header._mrGroupHeader = header
+    return header
+end
+
+local function ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComplete)
+    if not IsMainRowGroupEnabled(mod, group) then
+        return true
+    end
+
+    for _, row in ipairs(rows or {}) do
+        if IsMainRowInGroup(mod, row, group) and MR:IsRowEnabled(mod.key, row.key) then
             local done = MR:GetProgress(mod.key, row.key)
             local rowComplete = self:IsRowComplete(mod, row, done)
             if row.control or not (hideComplete and rowComplete) then
@@ -815,13 +919,12 @@ local function ShouldRenderMainRowGroupHeader(self, mod, groupRows, hideComplete
 end
 
 local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, colW, usedRows, buildRowFunc)
-    local rowsByGroup = GetVisibleRowsByGroup(mod, rows)
     local lastGroup
     for _, row in ipairs(rows or {}) do
-        local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+        local rowVisible = IsMainRowVisible(mod, row)
         local group = GetMainRowGroupKey(row)
-        if rowVisible and group and group ~= lastGroup and rowsByGroup[group] and ShouldRenderMainRowGroupHeader(self, mod, rowsByGroup[group], hideComplete) then
-            local header = BuildMainRowGroupHeader(mod, group, rowsByGroup[group])
+        if rowVisible and group and group ~= lastGroup and HasVisibleRowsInMainGroup(mod, rows, group) and ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComplete) then
+            local header = BuildMainRowGroupHeader(mod, group)
             local rowFrame, nextY, rowId = buildRowFunc(header, 0, yOff)
             yOff = nextY
             if usedRows then usedRows[rowId] = true end
@@ -839,6 +942,36 @@ local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, 
         end
     end
     return yOff
+end
+
+local function CountMainGroupedRows(self, mod, rows, hideComplete, isOpen)
+    local shownRows = 0
+    local extraHeight = 0
+    local lastGroup
+    for _, row in ipairs(rows or {}) do
+        local rowVisible = IsMainRowVisible(mod, row)
+        local group = GetMainRowGroupKey(row)
+        if rowVisible and group and group ~= lastGroup and HasVisibleRowsInMainGroup(mod, rows, group) and ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComplete) then
+            shownRows = shownRows + 1
+            if isOpen then
+                extraHeight = extraHeight + ROW_HEIGHT
+            end
+        end
+        lastGroup = group
+
+        if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
+            local done = MR:GetProgress(mod.key, row.key)
+            local rowComplete = self:IsRowComplete(mod, row, done)
+            if row.control or not (hideComplete and rowComplete) then
+                shownRows = shownRows + 1
+                if isOpen then
+                    extraHeight = extraHeight + ROW_HEIGHT
+                end
+            end
+        end
+    end
+
+    return shownRows, extraHeight
 end
 
 local function EnsureMainSeparator(self, index)
@@ -1157,10 +1290,16 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
         end)
     end
 
+    local recycleKeys = card._recycleRowKeys or {}
+    card._recycleRowKeys = recycleKeys
+    for index = #recycleKeys, 1, -1 do recycleKeys[index] = nil end
     for key, rowFrame in pairs(card._rows or {}) do
         if not usedRows[key] then
-            HideMainRowWidget(rowFrame)
+            recycleKeys[#recycleKeys + 1] = key
         end
+    end
+    for _, key in ipairs(recycleKeys) do
+        PoolMainRowWidget(card, key, card._rows[key])
     end
 
     return card
@@ -1175,7 +1314,18 @@ EnsureMainRowWidget = function(section, rowKey)
         return rowFrame
     end
 
-    rowFrame = CreateFrame("Frame", nil, section)
+    if MR._mainRowWidgetPool and #MR._mainRowWidgetPool > 0 then
+        rowFrame = table.remove(MR._mainRowWidgetPool)
+        rowFrame:SetParent(section)
+    else
+        rowFrame = CreateFrame("Frame", nil, section)
+    end
+    if rowFrame._mrRowWidgetInitialized then
+        section._rows[rowKey] = rowFrame
+        rowFrame:Show()
+        return rowFrame
+    end
+    rowFrame._mrRowWidgetInitialized = true
     rowFrame:EnableMouse(true)
     rowFrame:SetScript("OnEnter", MainRowOnEnter)
     rowFrame:SetScript("OnLeave", MainRowOnLeave)
@@ -1236,13 +1386,15 @@ EnsureMainRowWidget = function(section, rowKey)
     rowFrame._vault = rowFrame:CreateFontString(nil, "OVERLAY")
     rowFrame._vault:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
 
+    section._rows[rowKey] = rowFrame
+    return rowFrame
+end
 
-    local DIFF_BADGE_DEFS = {
-        { id = 17, label = "L" },
-        { id = 14, label = "N" },
-        { id = 15, label = "H" },
-        { id = 16, label = "M" },
-    }
+local function EnsureMainDifficultyBadges(rowFrame)
+    if rowFrame._diffBadges then
+        return
+    end
+
     rowFrame._diffBadges = {}
     for i, def in ipairs(DIFF_BADGE_DEFS) do
         local btn = CreateFrame("Frame", nil, rowFrame, "BackdropTemplate")
@@ -1263,9 +1415,6 @@ EnsureMainRowWidget = function(section, rowKey)
     end
     rowFrame._diffCount = rowFrame:CreateFontString(nil, "OVERLAY")
     rowFrame._diffCount:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
-
-    section._rows[rowKey] = rowFrame
-    return rowFrame
 end
 
 local function GetMainFrameProgressModule(modKey)
@@ -1280,6 +1429,16 @@ local function GetMainFrameRowCount(row)
     end
 
     return row.countText, row.countColor
+end
+
+local function RegisterTimerRow(rowFrame)
+    MR._timerRows = MR._timerRows or {}
+    for _, existing in ipairs(MR._timerRows) do
+        if existing == rowFrame then
+            return
+        end
+    end
+    MR._timerRows[#MR._timerRows + 1] = rowFrame
 end
 
 UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
@@ -1673,19 +1832,9 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         rowFrame._vault:SetTextColor(hex(row.vaultColor or "#ffffff"))
         rowFrame._vault:Show()
     end
-
-
-
-    local DIFF_BADGE_ORDER = { 17, 14, 15, 16 }
-    local DIFF_BADGE_COLORS = {
-        [17] = { done = { 0.30, 0.60, 1.00 }, todo = { 0.08, 0.14, 0.24 }, border_done = { 0.22, 0.50, 0.90 }, border_todo = { 0.08, 0.12, 0.20 }, text_done = { 1, 1, 1 }, text_todo = { 0.22, 0.35, 0.50 } },
-        [14] = { done = { 0.22, 0.72, 0.32 }, todo = { 0.06, 0.16, 0.09 }, border_done = { 0.16, 0.58, 0.26 }, border_todo = { 0.06, 0.14, 0.08 }, text_done = { 1, 1, 1 }, text_todo = { 0.18, 0.38, 0.22 } },
-        [15] = { done = { 1.00, 0.52, 0.08 }, todo = { 0.26, 0.14, 0.04 }, border_done = { 0.88, 0.42, 0.06 }, border_todo = { 0.18, 0.10, 0.03 }, text_done = { 1, 1, 1 }, text_todo = { 0.48, 0.26, 0.10 } },
-        [16] = { done = { 0.85, 0.18, 0.20 }, todo = { 0.24, 0.06, 0.07 }, border_done = { 0.70, 0.12, 0.14 }, border_todo = { 0.18, 0.05, 0.05 }, text_done = { 1, 1, 1 }, text_todo = { 0.46, 0.16, 0.16 } },
-    }
-
-    local hasEncounterDiffTracking = row.encounterIds and rowFrame._diffBadges and row.taskId
+    local hasEncounterDiffTracking = row.encounterIds and row.taskId
     if hasEncounterDiffTracking then
+        EnsureMainDifficultyBadges(rowFrame)
         local diffState = nil
         if row.accountWideComplete and MR.db and MR.db.global and MR.db.global.customTaskDiffProgress then
             diffState = MR.db.global.customTaskDiffProgress[row.key]
@@ -1798,7 +1947,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         end
         UpdateTimer()
         rowFrame._timerUpdate = UpdateTimer
-        table.insert(MR._timerRows, rowFrame)
+        RegisterTimerRow(rowFrame)
     end
 
     return rowFrame, yOff + rowH, rowId
@@ -3036,9 +3185,18 @@ function MR:BuildUI()
     f:SetScale(MR.db.profile.scale or 1)
     self.frame = f
     f:SetScript("OnShow", function()
-        if MR._refreshUIDirty or MR._mainPanelNeedsRefresh then
+        if MR._tickFrame then MR._tickFrame:Show() end
+        if MR.ActivateVisibleTrackingSurface and MR:ActivateVisibleTrackingSurface() then
+            MR:RequestUIRefresh(0.08)
+        elseif MR._refreshUIDirty or MR._mainPanelNeedsRefresh then
             MR:RefreshUI()
         end
+    end)
+    f:SetScript("OnHide", function()
+        if MR._tickFrame and not MR:HasVisibleMainTrackingSurface() then
+            MR._tickFrame:Hide()
+        end
+        if MR.SuspendHiddenSurfaceWork then MR:SuspendHiddenSurfaceWork() end
     end)
 
     local scrollBg = f:CreateTexture(nil, "BACKGROUND")
@@ -3593,6 +3751,23 @@ function MR:BuildUI()
     end)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
+    local function ResizeMainFrame()
+        if not dragger._dragging or not IsMouseButtonDown("LeftButton") then
+            dragger._dragging = false
+            dragger:SetScript("OnUpdate", nil)
+            return
+        end
+        local cx, cy = GetCursorPosition()
+        local scale = f:GetEffectiveScale()
+        cx = cx / scale
+        cy = cy / scale
+        local dx = cx - dragStartX
+        local dy = dragStartY - cy
+        local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, dragStartW + dx))
+        local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
+        f:SetWidth(newW)
+        f:SetHeight(newH)
+    end
     dragger:SetScript("OnMouseDown", function(_, button)
         if button == "LeftButton" and not MR.db.profile.locked then
             dragStartW = f:GetWidth()
@@ -3602,11 +3777,13 @@ function MR:BuildUI()
             dragStartX = dragStartX / scale
             dragStartY = dragStartY / scale
             dragger._dragging = true
+            dragger:SetScript("OnUpdate", ResizeMainFrame)
         end
     end)
     dragger:SetScript("OnMouseUp", function(_, button)
         if button == "LeftButton" and dragger._dragging then
             dragger._dragging = false
+            dragger:SetScript("OnUpdate", nil)
             local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, math.floor(f:GetWidth())))
             local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, math.floor(f:GetHeight())))
             MR.db.profile.width  = newW
@@ -3618,37 +3795,45 @@ function MR:BuildUI()
             if configFrame and configFrame:IsShown() then MR:PopulateConfigFrame(configFrame) end
         end
     end)
-    dragger:SetScript("OnUpdate", function()
-        if not dragger._dragging then return end
-        local cx, cy = GetCursorPosition()
-        local scale = f:GetEffectiveScale()
-        cx = cx / scale
-        cy = cy / scale
-        local dx = cx - dragStartX
-        local dy = dragStartY - cy
-        local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, dragStartW + dx))
-        local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
-        f:SetWidth(newW)
-        f:SetHeight(newH)
-    end)
     self._dragger = dragger
 
     self._timerRows = {}
-    local _tick = 0
     local tickFrame = CreateFrame("Frame")
-    tickFrame:SetScript("OnUpdate", function(_, elapsed)
-        _tick = _tick + elapsed
-        if _tick < 1 then return end
-        _tick = 0
+    local function UpdateTimerRows()
         for _, f in ipairs(MR._timerRows) do
             if f:IsShown() and f._timerUpdate then
                 f._timerUpdate()
             end
         end
-    end)
+    end
+    local function StartTimerRowTicker()
+        if MR._timerRowsTicker or not (MR._timerRows and #MR._timerRows > 0) then return end
+        MR._timerRowsTicker = C_Timer.NewTicker(1, UpdateTimerRows)
+    end
+    local function StopTimerRowTicker()
+        if MR._timerRowsTicker then
+            MR._timerRowsTicker:Cancel()
+            MR._timerRowsTicker = nil
+        end
+    end
+    local function UpdateTimerRowTicker()
+        if MR:HasVisibleMainTrackingSurface() and MR._timerRows and #MR._timerRows > 0 then
+            StartTimerRowTicker()
+        else
+            StopTimerRowTicker()
+        end
+    end
+    self.UpdateTimerRowTicker = UpdateTimerRowTicker
+    tickFrame:SetScript("OnShow", UpdateTimerRowTicker)
+    tickFrame:SetScript("OnHide", StopTimerRowTicker)
     self._tickFrame = tickFrame
+    tickFrame:SetShown(self:HasVisibleMainTrackingSurface())
+    if tickFrame:IsShown() then UpdateTimerRowTicker() end
 
     ApplyMainFrameLayout(f)
+    if self.ActivateVisibleTrackingSurface then
+        self:ActivateVisibleTrackingSurface()
+    end
     self:RefreshUI()
     ApplyTheme()
 end
@@ -3750,30 +3935,12 @@ function MR:EnsureDetachedFrame(mod)
     end)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
-    dragger:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" and not MR.db.profile.locked then
-            dragStartW = title:GetWidth()
-            dragStartH = title:GetHeight()
-            dragStartX, dragStartY = GetCursorPosition()
-            local scale = title:GetEffectiveScale()
-            dragStartX = dragStartX / scale
-            dragStartY = dragStartY / scale
-            dragger._dragging = true
-        end
-    end)
-    dragger:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" and dragger._dragging then
+    local function ResizeDetachedFrame()
+        if not dragger._dragging or not IsMouseButtonDown("LeftButton") then
             dragger._dragging = false
-            local newW = math.max(180, math.min(PANEL_MAX_WIDTH, math.floor(title:GetWidth())))
-            local newH = math.max(HEADER_HEIGHT + 48, math.min(PANEL_MAX_HEIGHT, math.floor(title:GetHeight())))
-            title:SetWidth(newW)
-            title:SetHeight(newH)
-            MR:SetDetachedModuleSize(mod.key, newW, newH)
-            MR:RefreshUI()
+            dragger:SetScript("OnUpdate", nil)
+            return
         end
-    end)
-    dragger:SetScript("OnUpdate", function()
-        if not dragger._dragging then return end
         local cx, cy = GetCursorPosition()
         local scale = title:GetEffectiveScale()
         cx = cx / scale
@@ -3784,6 +3951,30 @@ function MR:EnsureDetachedFrame(mod)
         local newH = math.max(HEADER_HEIGHT + 48, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
         title:SetWidth(newW)
         title:SetHeight(newH)
+    end
+    dragger:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" and not MR.db.profile.locked then
+            dragStartW = title:GetWidth()
+            dragStartH = title:GetHeight()
+            dragStartX, dragStartY = GetCursorPosition()
+            local scale = title:GetEffectiveScale()
+            dragStartX = dragStartX / scale
+            dragStartY = dragStartY / scale
+            dragger._dragging = true
+            dragger:SetScript("OnUpdate", ResizeDetachedFrame)
+        end
+    end)
+    dragger:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" and dragger._dragging then
+            dragger._dragging = false
+            dragger:SetScript("OnUpdate", nil)
+            local newW = math.max(180, math.min(PANEL_MAX_WIDTH, math.floor(title:GetWidth())))
+            local newH = math.max(HEADER_HEIGHT + 48, math.min(PANEL_MAX_HEIGHT, math.floor(title:GetHeight())))
+            title:SetWidth(newW)
+            title:SetHeight(newH)
+            MR:SetDetachedModuleSize(mod.key, newW, newH)
+            MR:RefreshUI()
+        end
     end)
 
     frame = title
@@ -3794,10 +3985,20 @@ function MR:EnsureDetachedFrame(mod)
     frame._dragger = dragger
     frame._widgets = {}
     frame._modKey = mod.key
+    if MR.RegisterPeekFrame then MR:RegisterPeekFrame(frame) end
     frame:SetScript("OnShow", function()
-        if MR._refreshUIDirty or frame._needsRefresh then
+        if MR._tickFrame then MR._tickFrame:Show() end
+        if MR.ActivateVisibleTrackingSurface and MR:ActivateVisibleTrackingSurface() then
+            MR:RequestUIRefresh(0.08)
+        elseif MR._refreshUIDirty or frame._needsRefresh then
             MR:RefreshUI()
         end
+    end)
+    frame:SetScript("OnHide", function()
+        if MR._tickFrame and not MR:HasVisibleMainTrackingSurface() then
+            MR._tickFrame:Hide()
+        end
+        if MR.SuspendHiddenSurfaceWork then MR:SuspendHiddenSurfaceWork() end
     end)
     self.detachedFrames[mod.key] = frame
     return frame
@@ -3917,7 +4118,29 @@ function MR:RefreshVisibleDetachedFrames()
     end
 end
 
+local function HasVisibleUISurface(self)
+    if self.frame and self.frame:IsShown() then
+        return true
+    end
+    if self.altBoardFrame and self.altBoardFrame:IsShown() then
+        return true
+    end
+    if self.detachedFrames then
+        for _, frame in pairs(self.detachedFrames) do
+            if frame and frame.IsShown and frame:IsShown() then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function MR:RefreshUI()
+    if self.NoteRefreshSource then
+        self:NoteRefreshSource("RefreshUI")
+    end
+    self._refreshUIAttemptCount = (self._refreshUIAttemptCount or 0) + 1
+
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self._refreshUIDirty = true
         return
@@ -3928,13 +4151,14 @@ function MR:RefreshUI()
         return
     end
 
-    if not self.frame or not self.content then
+    if not self:CanRefreshUIImmediately() then
         self._refreshUIDirty = true
         return
     end
 
-    if not self:CanRefreshUIImmediately() then
+    if not HasVisibleUISurface(self) then
         self._refreshUIDirty = true
+        self._mainPanelNeedsRefresh = true
         return
     end
 
@@ -3963,6 +4187,7 @@ function MR:RefreshUI()
 
     self._refreshUIInProgress = true
     self._refreshUIDirty = nil
+    self._refreshUICount = (self._refreshUICount or 0) + 1
 
     RecalcLayout()
     self._moduleStatsCache = BuildModuleStatsCache(self)
@@ -4160,11 +4385,14 @@ function MR:RefreshUI()
 
     self:RefreshVisibleDetachedFrames()
 
+    if self.UpdateTimerRowTicker then
+        self:UpdateTimerRowTicker()
+    end
+
     if self.altBoardFrame and self.altBoardFrame:IsShown() and self.RequestWarbandBoardRefresh then
         self:RequestWarbandBoardRefresh(false)
     end
 
-    self._moduleStatsCache = nil
     self._lastRefreshUIAt = GetTime and GetTime() or now
     self._refreshUIInProgress = nil
 
@@ -4309,19 +4537,8 @@ BuildModuleStatsCache = function(self)
         local height = HEADER_HEIGHT + 1 + SECTION_GAP
 
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
-        local rowsByGroup = GetVisibleRowsByGroup(mod, rows)
-        local lastGroup
         for _, row in ipairs(rows) do
-            local rowVisible = MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
-            local group = GetMainRowGroupKey(row)
-            if rowVisible and group and group ~= lastGroup and rowsByGroup[group] and ShouldRenderMainRowGroupHeader(self, mod, rowsByGroup[group], hideComplete) then
-                shownRows = shownRows + 1
-                if isOpen then
-                    height = height + ROW_HEIGHT
-                end
-            end
-            lastGroup = group
-
+            local rowVisible = IsMainRowVisible(mod, row)
             if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
                 local done = MR:GetProgress(mod.key, row.key)
                 local countsForTotals = not row.control
@@ -4332,15 +4549,12 @@ BuildModuleStatsCache = function(self)
                         doneRows = doneRows + 1
                     end
                 end
-
-                if row.control or not (hideComplete and isComplete) then
-                    shownRows = shownRows + 1
-                    if isOpen then
-                        height = height + ROW_HEIGHT
-                    end
-                end
             end
         end
+
+        local countedShownRows, extraHeight = CountMainGroupedRows(self, mod, rows, hideComplete, isOpen)
+        shownRows = countedShownRows
+        height = height + extraHeight
 
         if shownRows == 0 then
             height = 0
@@ -5177,7 +5391,7 @@ function MR:BuildRow(mod, row, done, yOff, collapsed, xOff, colW, parent, widget
         end
         UpdateTimer()
         rowFrame._timerUpdate = UpdateTimer
-        table.insert(MR._timerRows, rowFrame)
+        RegisterTimerRow(rowFrame)
     end
 
     table.insert(widgetBucket, rowFrame)

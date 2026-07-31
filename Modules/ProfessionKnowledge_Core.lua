@@ -167,15 +167,58 @@ local function UpsertPendingRow(bucket, row, payload)
     bucket[#bucket + 1] = payload or row
 end
 
+local function CountMapEntries(map)
+    local count = 0
+    if type(map) == "table" then
+        for _ in pairs(map) do
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function MR:GetProfessionKnowledgeCacheCounts()
+    for questID in pairs(pendingQuestTitleRows) do
+        if not questTitlePending[questID] and not questTitleCache[questID] then
+            pendingQuestTitleRows[questID] = nil
+        end
+    end
+
+    return {
+        itemNames = CountMapEntries(itemNameCache),
+        questTitles = CountMapEntries(questTitleCache),
+        questTitlePending = CountMapEntries(questTitlePending),
+        pendingQuestRows = CountMapEntries(pendingQuestTitleRows),
+        rewardItems = CountMapEntries(questRewardItemCache),
+        pendingLabels = CountMapEntries(pendingLabelRows),
+    }
+end
+
 local function RequestLabelRefresh()
     if labelRefreshPending then return end
     labelRefreshPending = true
     C_Timer.After(0.08, function()
         labelRefreshPending = false
-        if MR.RequestUIRefresh then
-            MR:RequestUIRefresh(0.02)
-        elseif MR.RefreshUI then
-            MR:RefreshUI()
+        local hasVisibleMain = MR.frame and MR.frame.IsShown and MR.frame:IsShown()
+        local hasVisibleDetached = false
+        if MR.detachedFrames then
+            for _, frame in pairs(MR.detachedFrames) do
+                if frame and frame.IsShown and frame:IsShown() then
+                    hasVisibleDetached = true
+                    break
+                end
+            end
+        end
+
+        if hasVisibleMain or hasVisibleDetached then
+            if MR.RequestUIRefresh then
+                MR:RequestUIRefresh(0.02)
+            elseif MR.RefreshUI then
+                MR:RefreshUI()
+            end
+        else
+            MR._refreshUIDirty = true
+            MR._mainPanelNeedsRefresh = true
         end
 
         if MR.RequestProfessionKnowledgeSurfaceRefresh then
@@ -255,6 +298,8 @@ local function GetQuestTitle(entry)
         local title = C_QuestLog.GetTitleForQuestID(questID)
         if title and title ~= "" then
             questTitleCache[questID] = title
+            questTitlePending[questID] = nil
+            pendingQuestTitleRows[questID] = nil
             return title
         end
         if C_QuestLog.RequestLoadQuestByID and not questTitlePending[questID] then
@@ -375,6 +420,7 @@ function TrackPendingQuestTitle(row, entry, fallback, preferFallback)
     local questID = entry and (entry.questID or (entry.questIDs and entry.questIDs[1]))
     if not (row and questID) then return end
     if questTitleCache[questID] then return end
+    if not questTitlePending[questID] then return end
 
     pendingQuestTitleRows[questID] = pendingQuestTitleRows[questID] or {}
     UpsertPendingRow(pendingQuestTitleRows[questID], row, {
@@ -718,7 +764,4 @@ function ns.RegisterProfessionMainMenuModule(profession, expansion)
         })
     end
 
-    if MR.RequestScan then
-        MR:RequestScan(1)
-    end
 end

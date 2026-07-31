@@ -480,8 +480,9 @@ function MR:QueueCombatDeferredUpdate(flag)
     self._combatDeferred = self._combatDeferred or {}
     self._combatDeferred[flag] = true
 
-    if self.RegisterEvent then
+    if self.RegisterEvent and not self._combatEndEventRegistered then
         self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
+        self._combatEndEventRegistered = true
     end
 end
 
@@ -496,7 +497,8 @@ end
 
 function MR:QueueDeferredProgressUpdate(moduleKey, rowKey, value, maxVal)
     self._combatDeferredProgress = self._combatDeferredProgress or {}
-    self._combatDeferredProgress[#self._combatDeferredProgress + 1] = {
+    self._combatDeferredProgress[moduleKey] = self._combatDeferredProgress[moduleKey] or {}
+    self._combatDeferredProgress[moduleKey][rowKey] = {
         moduleKey = moduleKey,
         rowKey = rowKey,
         value = value,
@@ -542,12 +544,14 @@ function MR:FlushCombatDeferredUpdates()
     end
 
     if deferredProgress then
-        for _, entry in ipairs(deferredProgress) do
-            local progressBucket = self.GetProgressBucket and self:GetProgressBucket(entry.moduleKey, entry.rowKey) or self.db.char.progress
-            if not progressBucket[entry.moduleKey] then
-                progressBucket[entry.moduleKey] = {}
+        for _, moduleEntries in pairs(deferredProgress) do
+            for _, entry in pairs(moduleEntries) do
+                local progressBucket = self.GetProgressBucket and self:GetProgressBucket(entry.moduleKey, entry.rowKey) or self.db.char.progress
+                if not progressBucket[entry.moduleKey] then
+                    progressBucket[entry.moduleKey] = {}
+                end
+                progressBucket[entry.moduleKey][entry.rowKey] = math.max(0, math.min(entry.value, entry.maxVal))
             end
-            progressBucket[entry.moduleKey][entry.rowKey] = math.max(0, math.min(entry.value, entry.maxVal))
         end
     end
 
@@ -578,6 +582,7 @@ function MR:FlushCombatDeferredUpdates()
 end
 
 function MR:OnCombatEnded()
+    self._combatEndEventRegistered = nil
     if self.UnregisterEvent then
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
     end
@@ -779,7 +784,7 @@ function MR:RegisterModule(def)
         self:BuildSpellIndex()
     end
 
-    if self.db then
+    if self.db and not def.skipRegisterScan then
         if self.Scan then
             self:Scan()
         elseif self.RefreshUI then
@@ -991,7 +996,11 @@ function MR:SetProgress(moduleKey, rowKey, value, maxVal, bypassInstanceSuspend)
         end
     end
     SetProgressValue(progressBucket, moduleKey, rowKey, math.max(0, math.min(value, maxVal)))
-    self:RefreshUI()
+    if self.RequestUIRefresh then
+        self:RequestUIRefresh(0.01)
+    else
+        self:RefreshUI()
+    end
     local mod = self.moduleByKey and self.moduleByKey[moduleKey]
     if mod and mod.profSkillLine and self.RefreshProfessionKnowledgeSurfaces then
         self:RequestProfessionKnowledgeSurfaceRefresh()
@@ -1024,9 +1033,54 @@ function MR:GetPatchSortOrder(key)
     return info.order or 999999
 end
 
+local function OrderedRowsCacheMatches(cache, sourceRows, savedOrder)
+    local savedCount = savedOrder and #savedOrder or 0
+    if not cache or #cache.sourceRows ~= #sourceRows or #cache.savedOrder ~= savedCount then
+        return false
+    end
+    for index, row in ipairs(sourceRows) do
+        if cache.sourceRows[index] ~= row then
+            return false
+        end
+    end
+    if savedOrder then
+        for index, rowKey in ipairs(savedOrder) do
+            if cache.savedOrder[index] ~= rowKey then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+local function CacheOrderedRows(mod, sourceRows, savedOrder, rows)
+    local sourceSnapshot = {}
+    local orderSnapshot = {}
+    for index, row in ipairs(sourceRows) do sourceSnapshot[index] = row end
+    if savedOrder then
+        for index, rowKey in ipairs(savedOrder) do orderSnapshot[index] = rowKey end
+    end
+    mod._orderedRowsCache = {
+        sourceRows = sourceSnapshot,
+        savedOrder = orderSnapshot,
+        rows = rows,
+    }
+    return rows
+end
+
 function MR:GetOrderedRows(mod)
     if not mod or type(mod.rows) ~= "table" then
         return {}
+    end
+
+    local storage = self.GetActiveModuleStorage and self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod)) or nil
+    local state = storage and storage[mod.key]
+    local savedOrder = state and state.rowOrder
+    if type(savedOrder) ~= "table" then
+        savedOrder = nil
+    end
+    if OrderedRowsCacheMatches(mod._orderedRowsCache, mod.rows, savedOrder) then
+        return mod._orderedRowsCache.rows
     end
 
     local ordered = {}
@@ -1048,11 +1102,8 @@ function MR:GetOrderedRows(mod)
         baseRows[#baseRows + 1] = entry.row
     end
 
-    local storage = self.GetActiveModuleStorage and self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod)) or nil
-    local state = storage and storage[mod.key]
-    local savedOrder = state and state.rowOrder
-    if type(savedOrder) ~= "table" or #savedOrder == 0 then
-        return baseRows
+    if not savedOrder or #savedOrder == 0 then
+        return CacheOrderedRows(mod, mod.rows, savedOrder, baseRows)
     end
 
     local byKey, used, reorderedRows, rows = {}, {}, {}, {}
@@ -1083,7 +1134,7 @@ function MR:GetOrderedRows(mod)
             reorderedIndex = reorderedIndex + 1
         end
     end
-    return rows
+    return CacheOrderedRows(mod, mod.rows, savedOrder, rows)
 end
 
 function MR:RegisterPatch(def)
@@ -1459,7 +1510,8 @@ end
 function MR:IsModuleEnabled(key)
     local mod = self.moduleByKey[key]
     local professionSource = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil
-    local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource) or self:GetActiveModuleStorage()
+    local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource)
+        or self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     local s = storage and storage[key]
     if mod and mod.profSkillLine and self.HasProfessionForModule and not self:HasProfessionForModule(mod.profSkillLine, professionSource) then
         return false
@@ -1486,6 +1538,22 @@ function MR:IsModuleEnabled(key)
         return false
     end
     return not (s and s.enabled == false)
+end
+
+function MR:GetStoryCampaignsEnabledPreference()
+    if not self.db then
+        return nil
+    end
+    local settings = self:IsCharacterWindowLayoutEnabled() and self.db.char or self.db.profile
+    return settings and settings.storyCampaignsEnabled
+end
+
+function MR:SetStoryCampaignsEnabledPreference(enabled)
+    if not self.db then
+        return
+    end
+    local settings = self:IsCharacterWindowLayoutEnabled() and self.db.char or self.db.profile
+    settings.storyCampaignsEnabled = enabled and true or false
 end
 
 function MR:ShouldHideProfessionModuleInMain(mod)
@@ -1590,33 +1658,134 @@ end
 function MR:SetModuleEnabled(key, enabled, skipRefresh)
     local mod = self.moduleByKey and self.moduleByKey[key]
     local professionSource = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil
-    local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource) or self:GetActiveModuleStorage()
+    local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource)
+        or self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
     if not storage[key] then storage[key] = {} end
     storage[key].enabled = enabled
     if mod and mod.profSkillLine then
         storage[key].professionManual = enabled and true or nil
         storage[key].professionDisabled = enabled and nil or true
     end
+    if enabled and mod and self.PrimeModuleData then
+        self:PrimeModuleData(mod)
+        self._moduleStatsCache = nil
+    end
     if not skipRefresh then
-        self:RefreshUI()
+        if self.RequestUIRefresh then
+            self:RequestUIRefresh(0.01)
+        else
+            self:RefreshUI()
+        end
     end
 end
 
+function MR:HasVisibleMainTrackingSurface()
+    if self.frame and self.frame.IsShown and self.frame:IsShown() then
+        return true
+    end
+    if self.altBoardFrame and self.altBoardFrame.IsShown and self.altBoardFrame:IsShown() then
+        return true
+    end
+    if self.detachedFrames then
+        for _, frame in pairs(self.detachedFrames) do
+            if frame and frame.IsShown and frame:IsShown() then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function MR:MarkBackgroundDataDirty()
+    self._backgroundDataDirty = true
+    self._refreshUIDirty = true
+    self._mainPanelNeedsRefresh = true
+end
+
+local HIDDEN_SURFACE_TIMER_FIELDS = {
+    "_refreshRequestTimer",
+    "_dataRefreshTimer",
+    "_requestedScanTimer",
+    "_scanThrottleTimer",
+    "_refreshUITimer",
+    "_delvesLiveProgressTimer",
+}
+
+function MR:SuspendHiddenSurfaceWork()
+    if self:HasVisibleMainTrackingSurface() then
+        return false
+    end
+
+    for _, field in ipairs(HIDDEN_SURFACE_TIMER_FIELDS) do
+        local timer = self[field]
+        if timer and self.CancelTimer then self:CancelTimer(timer) end
+        self[field] = nil
+    end
+    self._refreshRequestAt = nil
+    self._requestedScanAt = nil
+    self._refreshRequestPending = nil
+    self._dataRefreshPending = nil
+    self._refreshUIPending = nil
+    self._scanPending = nil
+    self:MarkBackgroundDataDirty()
+    return true
+end
+
+function MR:ActivateVisibleTrackingSurface()
+    if not self._backgroundDataDirty then
+        return false
+    end
+
+    self._backgroundDataDirty = nil
+    if self.UpdateInstanceFrameVisibility then self:UpdateInstanceFrameVisibility() end
+    if self.RefreshPlayerProfessions then self:RefreshPlayerProfessions() end
+    if self.RefreshProfessionConcentration then self:RefreshProfessionConcentration() end
+    if self.RefreshStoryCampaignRegistration then self:RefreshStoryCampaignRegistration() end
+    if self.RequestScan then self:RequestScan(0.01) end
+    return true
+end
+
 function MR:RequestUIRefresh(delay)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
+    if IsInRestrictedCombat() then
+        self:QueueCombatDeferredUpdate("refreshUI")
+        return
+    end
+
     if not self.ScheduleTimer then
+        if self.NoteRefreshSource then
+            self:NoteRefreshSource("RequestUIRefresh")
+        end
         self:RefreshUI()
         return
     end
 
     delay = tonumber(delay) or 0.05
+
+    local now = GetTime and GetTime() or 0
+    local targetAt = now + delay
+    if self._refreshRequestTimer and self._refreshRequestAt and self._refreshRequestAt <= targetAt then
+        return
+    end
+
+    if self.NoteRefreshSource then
+        self:NoteRefreshSource("RequestUIRefresh")
+    end
+
     self._refreshRequestPending = true
     if self._refreshRequestTimer and self.CancelTimer then
         self:CancelTimer(self._refreshRequestTimer)
         self._refreshRequestTimer = nil
     end
 
+    self._refreshRequestAt = targetAt
     self._refreshRequestTimer = self:ScheduleTimer(function()
         self._refreshRequestTimer = nil
+        self._refreshRequestAt = nil
         if self._refreshRequestPending then
             self._refreshRequestPending = nil
             self:RefreshUI()
@@ -1626,6 +1795,33 @@ end
 
 function MR:RequestConfigRefresh()
     self:RequestUIRefresh(0.04)
+end
+
+function MR:RequestDataRefresh(delay)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
+    if self._dataRefreshPending then
+        return
+    end
+
+    if not self.ScheduleTimer then
+        self:RefreshUI()
+        return
+    end
+
+    self._dataRefreshPending = true
+    self._dataRefreshTimer = self:ScheduleTimer(function()
+        self._dataRefreshTimer = nil
+        self._dataRefreshPending = nil
+        if self.RequestUIRefresh then
+            self:RequestUIRefresh(0.01)
+        else
+            self:RefreshUI()
+        end
+    end, tonumber(delay) or 0.05)
 end
 
 function MR:RequestConfigRepopulate(reason, delay)
@@ -1724,21 +1920,51 @@ function MR:RefreshProfessionKnowledgeSurfaces()
 end
 
 function MR:RequestProfessionKnowledgeSurfaceRefresh(delay)
+    local gatheringVisible = self.gatheringLocationsFrame
+        and self.gatheringLocationsFrame.IsShown
+        and self.gatheringLocationsFrame:IsShown()
+    local configFrame = self.GetConfigFrame and self:GetConfigFrame() or nil
+    local configVisible = configFrame and configFrame.IsShown and configFrame:IsShown()
+    if not gatheringVisible and not configVisible then
+        self._professionKnowledgeSurfaceRefreshPending = true
+        return
+    end
+
     if not self.ScheduleTimer then
         self:RefreshProfessionKnowledgeSurfaces()
         return
     end
 
     delay = tonumber(delay) or 0.04
+    local now = GetTime and GetTime() or 0
+    local targetAt = now + delay
+    if self._professionKnowledgeSurfaceRefreshTimer
+        and self._professionKnowledgeSurfaceRefreshAt
+        and self._professionKnowledgeSurfaceRefreshAt <= targetAt then
+        return
+    end
+
     self._professionKnowledgeSurfaceRefreshPending = true
     if self._professionKnowledgeSurfaceRefreshTimer and self.CancelTimer then
         self:CancelTimer(self._professionKnowledgeSurfaceRefreshTimer)
         self._professionKnowledgeSurfaceRefreshTimer = nil
     end
 
+    self._professionKnowledgeSurfaceRefreshAt = targetAt
     self._professionKnowledgeSurfaceRefreshTimer = self:ScheduleTimer(function()
         self._professionKnowledgeSurfaceRefreshTimer = nil
+        self._professionKnowledgeSurfaceRefreshAt = nil
         if self._professionKnowledgeSurfaceRefreshPending then
+            local liveGatheringVisible = self.gatheringLocationsFrame
+                and self.gatheringLocationsFrame.IsShown
+                and self.gatheringLocationsFrame:IsShown()
+            local liveConfigFrame = self.GetConfigFrame and self:GetConfigFrame() or nil
+            local liveConfigVisible = liveConfigFrame
+                and liveConfigFrame.IsShown
+                and liveConfigFrame:IsShown()
+            if not liveGatheringVisible and not liveConfigVisible then
+                return
+            end
             self._professionKnowledgeSurfaceRefreshPending = nil
             self:RefreshProfessionKnowledgeSurfaces()
         end
@@ -2084,14 +2310,6 @@ function MR:ApplyPanelHeaderAutoHide(frame, titleBar, shouldHideFunc)
             if self.UpdatePanelHeaderVisibility then
                 self:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(self))
             end
-        end)
-        frame:HookScript("OnUpdate", function(self, elapsed)
-            if not self.UpdatePanelHeaderVisibility then return end
-            self._mrHeaderHoverElapsed = (self._mrHeaderHoverElapsed or 0) + (elapsed or 0)
-            if self._mrHeaderHoverElapsed < 0.05 then return end
-            self._mrHeaderHoverElapsed = 0
-            local isHovering = MR:IsCursorWithinBounds(self)
-            self:UpdatePanelHeaderVisibility(isHovering)
         end)
         frame._mrPanelHeaderAutoHideHooked = true
     end
@@ -2502,6 +2720,29 @@ local function ValuesEqual(a, b)
     return true
 end
 
+local function RowScanSignature(row)
+    if not row then
+        return ""
+    end
+
+    local color = row.countColor
+    local colorSig
+    if type(color) == "table" then
+        colorSig = tostring(color[1]) .. "," .. tostring(color[2]) .. "," .. tostring(color[3]) .. "," .. tostring(color[4])
+    else
+        colorSig = tostring(color)
+    end
+
+    local visible = row.isVisible and row.isVisible() or nil
+    return colorSig
+        .. "\031" .. tostring(row.countText)
+        .. "\031" .. tostring(visible)
+        .. "\031" .. tostring(row.max)
+        .. "\031" .. tostring(row.note)
+        .. "\031" .. tostring(row.vaultColor)
+        .. "\031" .. tostring(row.vaultLabel)
+end
+
 local function UpdateCurrencyProgressForRow(self, progress, mod, row)
     local info = C_CurrencyInfo.GetCurrencyInfo(row.currencyId)
     if not info then
@@ -2603,7 +2844,46 @@ local function UpdateItemProgressForRow(self, progress, mod, row)
     return WriteProgress(progress, mod.key, row.key, value, self.db.char.manualOverrides)
 end
 
+function MR:PrimeModuleData(mod)
+    if not (mod and self.db and self.db.char and self.db.char.progress) then
+        return false
+    end
+
+    local progress = self.db.char.progress
+    local dirty = false
+    for _, row in ipairs(mod.rows or {}) do
+        if row.questIds and not row.turnInTracked then
+            dirty = UpdateQuestProgressForRow(self, progress, mod, row) or dirty
+        elseif row.questIds and row.turnInTracked and row.allowQuestFlagBackfill then
+            local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
+            local currentValue = progressBucket[mod.key] and progressBucket[mod.key][row.key] or 0
+            if currentValue <= 0 then
+                dirty = UpdateQuestProgressForRow(self, progress, mod, row) or dirty
+            end
+        end
+        if row.currencyId then
+            dirty = UpdateCurrencyProgressForRow(self, progress, mod, row) or dirty
+        end
+        if row.itemId and not row.noItemProgress then
+            dirty = UpdateItemProgressForRow(self, progress, mod, row) or dirty
+        end
+    end
+
+    if mod.onScan then
+        local ok, changed = pcall(mod.onScan, mod)
+        dirty = (ok and changed == true) or dirty
+    end
+
+    self._moduleStatsCache = nil
+    return dirty
+end
+
 function MR:RequestScan(delay)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
     delay = tonumber(delay) or 0
 
     if self._scanSuppressedUntil then
@@ -2616,7 +2896,7 @@ function MR:RequestScan(delay)
     if delay > 0 then
         local targetAt = GetTime() + delay
 
-        if self._requestedScanTimer and self._requestedScanAt and self._requestedScanAt >= targetAt then
+        if self._requestedScanTimer and self._requestedScanAt and self._requestedScanAt <= targetAt then
             return
         end
 
@@ -2649,71 +2929,68 @@ function MR:ScanAutoUpdateInstanceRows(changedQuestId, changedEncounterId, diffi
     end
     local progress = self.db.char.progress
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
 
-            if row.autoUpdateInstances and row.questIds and (changedQuestId == nil or (function()
-                for _, qid in ipairs(row.questIds) do
-                    if qid == changedQuestId then return true end
-                end
-            end)()) then
-                if not row.turnInTracked then
-                    UpdateQuestProgressForRow(self, progress, mod, row)
-                elseif row.allowQuestFlagBackfill then
-                    local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
-                    local cur = progressBucket[mod.key] and progressBucket[mod.key][row.key] or 0
-                    if cur <= 0 then
+                if row.autoUpdateInstances and row.questIds and (changedQuestId == nil or (function()
+                    for _, qid in ipairs(row.questIds) do
+                        if qid == changedQuestId then return true end
+                    end
+                end)()) then
+                    if not row.turnInTracked then
                         UpdateQuestProgressForRow(self, progress, mod, row)
+                    elseif row.allowQuestFlagBackfill then
+                        local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
+                        local cur = progressBucket[mod.key] and progressBucket[mod.key][row.key] or 0
+                        if cur <= 0 then
+                            UpdateQuestProgressForRow(self, progress, mod, row)
+                        end
                     end
                 end
-            end
 
+                if row.encounterIds and (changedEncounterId == nil or (function()
+                    for _, eid in ipairs(row.encounterIds) do
+                        if eid == changedEncounterId then return true end
+                    end
+                end)()) then
 
-            if row.encounterIds and (changedEncounterId == nil or (function()
-                for _, eid in ipairs(row.encounterIds) do
-                    if eid == changedEncounterId then return true end
-                end
-            end)()) then
+                    local diffOk = (not difficultyId) or (not row.encounterDifficulties) or (row.encounterDifficulties[difficultyId] == true)
+                    if diffOk then
+                        local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
+                        if not progressBucket[mod.key] then progressBucket[mod.key] = {} end
+                        local cur = progressBucket[mod.key][row.key] or 0
+                        local maxVal = row.max or 1
 
-                local diffOk = (not difficultyId) or (not row.encounterDifficulties) or (row.encounterDifficulties[difficultyId] == true)
-                if diffOk then
-                    local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
-                    if not progressBucket[mod.key] then progressBucket[mod.key] = {} end
-                    local cur = progressBucket[mod.key][row.key] or 0
-                    local maxVal = row.max or 1
-
-
-                    if difficultyId and row.taskId then
-                        if self.db then
-                            local diffProgress
-                            if row.accountWideComplete then
-                                self.db.global.customTaskDiffProgress = self.db.global.customTaskDiffProgress or {}
-                                diffProgress = self.db.global.customTaskDiffProgress
-                            elseif self.db.char then
-                                self.db.char.customTaskDiffProgress = self.db.char.customTaskDiffProgress or {}
-                                diffProgress = self.db.char.customTaskDiffProgress
-                            end
-                            local key = row.key or tostring(row.taskId)
-                            if diffProgress then
-                                diffProgress[key] = diffProgress[key] or {}
-                                local diffState = diffProgress[key]
-                                if not diffState[difficultyId] then
-                                    diffState[difficultyId] = true
-                                    if cur < maxVal then
-                                        progressBucket[mod.key][row.key] = cur + 1
-                                        self._moduleStatsCache = nil
+                        if difficultyId and row.taskId then
+                            if self.db then
+                                local diffProgress
+                                if row.accountWideComplete then
+                                    self.db.global.customTaskDiffProgress = self.db.global.customTaskDiffProgress or {}
+                                    diffProgress = self.db.global.customTaskDiffProgress
+                                elseif self.db.char then
+                                    self.db.char.customTaskDiffProgress = self.db.char.customTaskDiffProgress or {}
+                                    diffProgress = self.db.char.customTaskDiffProgress
+                                end
+                                local key = row.key or tostring(row.taskId)
+                                if diffProgress then
+                                    diffProgress[key] = diffProgress[key] or {}
+                                    local diffState = diffProgress[key]
+                                    if not diffState[difficultyId] then
+                                        diffState[difficultyId] = true
+                                        if cur < maxVal then
+                                            progressBucket[mod.key][row.key] = cur + 1
+                                            self._moduleStatsCache = nil
+                                        end
                                     end
                                 end
                             end
-                        end
-                    elseif not row.taskId then
-
-                        if cur < maxVal then
-                            progressBucket[mod.key][row.key] = maxVal
-                            self._moduleStatsCache = nil
+                        elseif not row.taskId then
+                            if cur < maxVal then
+                                progressBucket[mod.key][row.key] = maxVal
+                                self._moduleStatsCache = nil
+                            end
                         end
                     end
-
-
                 end
             end
         end
@@ -2729,10 +3006,12 @@ function MR:RefreshCurrencyProgress(currencyId, refreshUI)
     local dirty = false
 
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
-            if row.currencyId and (currencyId == nil or row.currencyId == currencyId) then
-                if UpdateCurrencyProgressForRow(self, progress, mod, row) then
-                    dirty = true
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
+                if row.currencyId and (currencyId == nil or row.currencyId == currencyId) then
+                    if UpdateCurrencyProgressForRow(self, progress, mod, row) then
+                        dirty = true
+                    end
                 end
             end
         end
@@ -2757,28 +3036,30 @@ function MR:RefreshQuestProgress(questId, refreshUI)
     local dirty = false
 
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
-            if row.questIds then
-                local shouldUpdate = questId == nil
-                if not shouldUpdate then
-                    for _, qid in ipairs(row.questIds) do
-                        if qid == questId then
-                            shouldUpdate = true
-                            break
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
+                if row.questIds then
+                    local shouldUpdate = questId == nil
+                    if not shouldUpdate then
+                        for _, qid in ipairs(row.questIds) do
+                            if qid == questId then
+                                shouldUpdate = true
+                                break
+                            end
                         end
                     end
-                end
 
-                if shouldUpdate then
-                    if row.turnInTracked and row.allowQuestFlagBackfill then
-                        local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
-                        local currentValue = progressBucket[mod.key] and progressBucket[mod.key][row.key] or 0
-                        if currentValue <= 0 and UpdateQuestProgressForRow(self, progress, mod, row) then
-                            dirty = true
-                        end
-                    elseif not row.turnInTracked then
-                        if UpdateQuestProgressForRow(self, progress, mod, row) then
-                            dirty = true
+                    if shouldUpdate then
+                        if row.turnInTracked and row.allowQuestFlagBackfill then
+                            local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(mod.key, row.key)) or progress
+                            local currentValue = progressBucket[mod.key] and progressBucket[mod.key][row.key] or 0
+                            if currentValue <= 0 and UpdateQuestProgressForRow(self, progress, mod, row) then
+                                dirty = true
+                            end
+                        elseif not row.turnInTracked then
+                            if UpdateQuestProgressForRow(self, progress, mod, row) then
+                                dirty = true
+                            end
                         end
                     end
                 end
@@ -2805,10 +3086,12 @@ function MR:RefreshItemProgress(itemId, refreshUI)
     local dirty = false
 
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
-            if row.itemId and not row.noItemProgress and (itemId == nil or row.itemId == itemId) then
-                if UpdateItemProgressForRow(self, progress, mod, row) then
-                    dirty = true
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
+                if row.itemId and not row.noItemProgress and (itemId == nil or row.itemId == itemId) then
+                    if UpdateItemProgressForRow(self, progress, mod, row) then
+                        dirty = true
+                    end
                 end
             end
         end
@@ -2828,27 +3111,28 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
     if not (self and self.db and self.db.char and self.db.char.progress and moduleKeys) then
         return false
     end
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return false
+    end
 
     local ran = false
     local dirty = false
     for _, moduleKey in ipairs(moduleKeys) do
         local mod = self.moduleByKey and self.moduleByKey[moduleKey]
-        if mod and mod.onScan then
+        if mod and mod.onScan and self:IsModuleEnabled(moduleKey) then
             if not self.db.char.progress[moduleKey] then
                 self.db.char.progress[moduleKey] = {}
             end
-            local beforeProgress = DeepCopy(self.db.char.progress[moduleKey])
-            local beforeRows = {}
-            for _, row in ipairs(mod.rows or {}) do
-                beforeRows[row.key] = {
-                    countColor = DeepCopy(row.countColor),
-                    countText = row.countText,
-                    isVisible = row.isVisible and row.isVisible() or nil,
-                    max = row.max,
-                    note = row.note,
-                    vaultColor = row.vaultColor,
-                    vaultLabel = row.vaultLabel,
-                }
+            local trustChangedResult = mod.scanReturnsChanged == true
+            local beforeProgress
+            local beforeRows
+            if not trustChangedResult then
+                beforeProgress = DeepCopy(self.db.char.progress[moduleKey])
+                beforeRows = {}
+                for _, row in ipairs(mod.rows or {}) do
+                    beforeRows[row.key] = RowScanSignature(row)
+                end
             end
 
             local changed = mod.onScan(mod) == true
@@ -2858,22 +3142,13 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
             if self.db.global and PruneProgressStore(self.db.global.customTaskProgress) then
                 changed = true
             end
-            if not changed and not ValuesEqual(beforeProgress, self.db.char.progress[moduleKey]) then
+            if not trustChangedResult and not changed and not ValuesEqual(beforeProgress, self.db.char.progress[moduleKey]) then
                 changed = true
             end
-            if not changed then
+            if not trustChangedResult and not changed then
                 for _, row in ipairs(mod.rows or {}) do
                     local beforeRow = beforeRows[row.key]
-                    local afterRow = {
-                        countColor = DeepCopy(row.countColor),
-                        countText = row.countText,
-                        isVisible = row.isVisible and row.isVisible() or nil,
-                        max = row.max,
-                        note = row.note,
-                        vaultColor = row.vaultColor,
-                        vaultLabel = row.vaultLabel,
-                    }
-                    if not ValuesEqual(beforeRow, afterRow) then
+                    if beforeRow ~= RowScanSignature(row) then
                         changed = true
                         break
                     end
@@ -2901,7 +3176,7 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
     if dirty then
         self._moduleStatsCache = nil
         if refreshUI then
-            self:RefreshUI()
+            self:RequestDataRefresh()
         end
     end
 
@@ -2910,6 +3185,11 @@ end
 
 function MR:Scan()
     if self:ShouldDeferForCombat("scan") then
+        return
+    end
+
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
         return
     end
 
@@ -2950,6 +3230,7 @@ function MR:Scan()
         return
     end
 
+    self._scanCount = (self._scanCount or 0) + 1
     self._scanInProgress = true
     self.db.char.lastSyncAt = GetServerTime()
     local concentrationChanged = self:RefreshProfessionConcentration()
@@ -2958,7 +3239,8 @@ function MR:Scan()
     local dirty    = concentrationChanged and true or false
 
     for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
             if row.questIds and not row.turnInTracked then
                 if UpdateQuestProgressForRow(self, progress, mod, row) then
                     dirty = true
@@ -2979,31 +3261,33 @@ function MR:Scan()
                     dirty = true
                 end
             end
-        end
+            end
 
-        if mod.onScan then
-            local before = progress[mod.key] and next(progress[mod.key])
-            local changed = mod.onScan(mod)
-            if changed or (progress[mod.key] and next(progress[mod.key]) ~= before) then dirty = true end
-        end
+            if mod.onScan then
+                local changed = mod.onScan(mod)
+                if changed == true or mod.scanReturnsChanged ~= true then
+                    dirty = true
+                end
+            end
 
-        local mdb = progress[mod.key]
-        if mdb then
-            for _, row in ipairs(mod.rows) do
-                if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
-                    local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
-                    local _ov = self.db.char.manualOverrides
-                    if _ov and _ov[mod.key] then
-                        local mo = _ov[mod.key][row.key]
-                        if mo and mo > capped then capped = mo end
+            local mdb = progress[mod.key]
+            if mdb then
+                for _, row in ipairs(mod.rows) do
+                    if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
+                        local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
+                        local _ov = self.db.char.manualOverrides
+                        if _ov and _ov[mod.key] then
+                            local mo = _ov[mod.key][row.key]
+                            if mo and mo > capped then capped = mo end
+                        end
+                        if SetProgressValue(progress, mod.key, row.key, capped) then dirty = true end
                     end
-                    if SetProgressValue(progress, mod.key, row.key, capped) then dirty = true end
-                end
-                if row.liveTierLabelKey then
-                    row.vaultLabel = mdb[row.liveTierLabelKey]
-                end
-                if row.liveTierColorKey then
-                    row.vaultColor = mdb[row.liveTierColorKey]
+                    if row.liveTierLabelKey then
+                        row.vaultLabel = mdb[row.liveTierLabelKey]
+                    end
+                    if row.liveTierColorKey then
+                        row.vaultColor = mdb[row.liveTierColorKey]
+                    end
                 end
             end
         end
@@ -3012,7 +3296,7 @@ function MR:Scan()
     if PruneProgressStore(progress) then dirty = true end
     if self.db.global and PruneProgressStore(self.db.global.customTaskProgress) then dirty = true end
 
-    if dirty then self:RefreshUI() end
+    if dirty then self:RequestDataRefresh() end
     if self.SyncAllRareKills then self:SyncAllRareKills() end
     if self.RefreshRares  then self:RefreshRares()  end
     if self.RefreshRenown then self:RefreshRenown() end
@@ -3044,6 +3328,152 @@ local STATIC_TURN_IN_COMPLETIONS = {
 }
 
 local TURN_IN_COMPLETIONS = {}
+
+local function CountArray(t)
+    return type(t) == "table" and #t or 0
+end
+
+local function CountMap(t)
+    local count = 0
+    if type(t) == "table" then
+        for _ in pairs(t) do
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function MR:PrintMemoryReport(details)
+    details = details or ""
+    local showSources = details == "sources" or details == "debug"
+    if not showSources then
+        self._trackRefreshSources = nil
+        self._trackRefreshSourcesUntil = nil
+        self._refreshSourceCounts = nil
+    end
+    if collectgarbage and details ~= "sources" and details ~= "debug" then
+        collectgarbage("collect")
+    end
+    if UpdateAddOnMemoryUsage then
+        UpdateAddOnMemoryUsage()
+    end
+
+    local addonMemory = GetAddOnMemoryUsage and GetAddOnMemoryUsage(addonName) or nil
+    local luaMemory = collectgarbage and collectgarbage("count") or nil
+    local modules, rows, enabledModules = 0, 0, 0
+    for _, mod in ipairs(self.modules or {}) do
+        modules = modules + 1
+        rows = rows + CountArray(mod.rows)
+        if self.IsModuleEnabled and self:IsModuleEnabled(mod.key) then
+            enabledModules = enabledModules + 1
+        end
+    end
+
+    local accountTasks = self.db and self.db.global and CountArray(self.db.global.customTasks) or 0
+    local charTasks = self.db and self.db.char and CountArray(self.db.char.customTasks) or 0
+    local detached = CountMap(self.detachedFrames)
+    local activeTimers = CountMap(self._timers)
+    local mainRows = 0
+    local pooledMainRows = CountArray(self._mainRowWidgetPool)
+    if self._mainSectionFrames then
+        for _, section in pairs(self._mainSectionFrames) do
+            mainRows = mainRows + CountMap(section._rows)
+        end
+    end
+
+    print("|cff2ae7c6MidnightRoutine memory|r")
+    local lastAddonMemory = self._lastMemoryReportAddonKB
+    local lastLuaMemory = self._lastMemoryReportLuaKB
+    if addonMemory then
+        local delta = lastAddonMemory and ((addonMemory - lastAddonMemory) / 1024) or nil
+        print(delta and ("  Addon: %.2f MB (%+.2f)"):format(addonMemory / 1024, delta)
+            or ("  Addon: %.2f MB"):format(addonMemory / 1024))
+        self._lastMemoryReportAddonKB = addonMemory
+    end
+    if luaMemory then
+        local delta = lastLuaMemory and ((luaMemory - lastLuaMemory) / 1024) or nil
+        print(delta and ("  Lua total: %.2f MB (%+.2f)"):format(luaMemory / 1024, delta)
+            or ("  Lua total: %.2f MB"):format(luaMemory / 1024))
+        self._lastMemoryReportLuaKB = luaMemory
+    end
+    print(("  Modules: %d enabled / %d loaded"):format(enabledModules, modules))
+    print(("  Loaded rows: %d"):format(rows))
+    print(("  Main row widgets: %d active / %d pooled"):format(mainRows, pooledMainRows))
+    print(("  Detached windows: %d"):format(detached))
+    print(("  Custom tasks: %d character / %d account"):format(charTasks, accountTasks))
+    print(("  Scans / UI redraws: %d / %d"):format(self._scanCount or 0, self._refreshUICount or 0))
+    print(("  UI refresh attempts: %d"):format(self._refreshUIAttemptCount or 0))
+    print(("  Active timers: %d"):format(activeTimers))
+    if self.GetProfessionKnowledgeCacheCounts then
+        local counts = self:GetProfessionKnowledgeCacheCounts()
+        print(("  PK caches: items %d, quests %d, pending %d/%d, rewards %d, labels %d"):format(
+            counts.itemNames or 0,
+            counts.questTitles or 0,
+            counts.questTitlePending or 0,
+            counts.pendingQuestRows or 0,
+            counts.rewardItems or 0,
+            counts.pendingLabels or 0
+        ))
+    end
+
+    if showSources and self._refreshSourceCounts then
+        local top = {}
+        for source, count in pairs(self._refreshSourceCounts) do
+            top[#top + 1] = { source = source, count = count }
+        end
+        table.sort(top, function(a, b) return a.count > b.count end)
+        if #top > 0 then
+            print("  Refresh sources:")
+            for i = 1, math.min(#top, 5) do
+                print(("    %d - %s"):format(top[i].count, top[i].source))
+            end
+        end
+    end
+
+    if details == "modules" then
+        print("  Loaded module rows:")
+        for _, mod in ipairs(self.modules or {}) do
+            local enabled = self.IsModuleEnabled and self:IsModuleEnabled(mod.key)
+            local marker = enabled and "*" or "-"
+            print(("    %s %s: %d"):format(marker, tostring(mod.key), CountArray(mod.rows)))
+        end
+    end
+
+    if collectgarbage and (details == "sources" or details == "debug") then
+        collectgarbage("step", 300)
+    end
+end
+
+function MR:NoteRefreshSource(kind)
+    if not self._trackRefreshSources then
+        return
+    end
+
+    local source = kind or "refresh"
+    local now = GetTime and GetTime() or 0
+    if self._trackRefreshSourcesUntil and now > self._trackRefreshSourcesUntil then
+        self._trackRefreshSources = nil
+        self._trackRefreshSourcesUntil = nil
+        return
+    end
+
+    if debugstack then
+        local ok, stack = pcall(debugstack, 3, 6, 0)
+        if ok and type(stack) == "string" then
+            for line in stack:gmatch("[^\n]+") do
+                if not line:find("NoteRefreshSource", 1, true)
+                    and not line:find("RequestUIRefresh", 1, true)
+                    and not line:find("RefreshUI", 1, true) then
+                    source = source .. " " .. line:gsub("^%s+", "")
+                    break
+                end
+            end
+        end
+    end
+
+    self._refreshSourceCounts = self._refreshSourceCounts or {}
+    self._refreshSourceCounts[source] = (self._refreshSourceCounts[source] or 0) + 1
+end
 
 function MR:RebuildTurnInCompletions()
     wipe(TURN_IN_COMPLETIONS)
@@ -3268,6 +3698,7 @@ function MR:HideManagedWindows(persistState)
     if self.HideRares then self:HideRares(false) end
     if self.HideGatheringLocations then self:HideGatheringLocations(false) end
     if self.HideConcentrationTracker then self:HideConcentrationTracker(false) end
+    if self.SuspendHiddenSurfaceWork then self:SuspendHiddenSurfaceWork() end
 end
 
 function MR:RestoreManagedWindows(state, persistState)
@@ -3372,6 +3803,11 @@ function MR:UpdateInstanceFrameVisibility()
     self:ResumeDeferredInstanceWork()
 end
 
+function MR:CheckScheduledResets()
+    self:CheckWeeklyReset()
+    self:CheckDailyReset()
+end
+
 function MR:OnEnable()
     self:RegisterBucketEvent({
         "AREA_POIS_UPDATED",
@@ -3416,8 +3852,7 @@ function MR:OnEnable()
     self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
 
-    self:ScheduleRepeatingTimer("CheckWeeklyReset", 60)
-    self:ScheduleRepeatingTimer("CheckDailyReset",  60)
+    self:ScheduleRepeatingTimer("CheckScheduledResets", 60)
 
     if not self._questTurnInFrame then
         local addon = self
@@ -3447,7 +3882,13 @@ function MR:OnEnable()
             end
             if not ch.progress[entry.mod] then ch.progress[entry.mod] = {} end
             ch.progress[entry.mod][entry.row] = 1
-            addon:RefreshUI()
+            if addon:IsModuleEnabled(entry.mod) then
+                if addon.RequestDataRefresh then
+                    addon:RequestDataRefresh()
+                else
+                    addon:RefreshUI()
+                end
+            end
         end)
         self._questTurnInFrame = f
     end
@@ -3459,8 +3900,6 @@ function MR:OnEnteringWorld()
         self.db.char.classFile = classFile
     end
     self.db.char.lastSyncAt = GetServerTime()
-    self:RefreshPlayerProfessions()
-    self:RefreshProfessionConcentration()
     self:RebuildTurnInCompletions()
     self:BuildSpellIndex()
     local temporarilyHidden = self._toggleRestoreState ~= nil
@@ -3470,10 +3909,24 @@ function MR:OnEnteringWorld()
         self:SetManagedWindowOpen("renownOpen", false)
     end
 
+    local managedBundleVisible = not self:IsManagedWindowsBundleHidden()
+    local trackingSurfaceRequested = managedBundleVisible and (
+        self.db.char.panelOpen ~= false
+        or self:GetManagedWindowOpen("gatheringLocOpen")
+        or self:GetManagedWindowOpen("concentrationTrackerOpen")
+    )
+    if trackingSurfaceRequested then
+        self:RefreshPlayerProfessions()
+        self:RefreshProfessionConcentration()
+    else
+        self:MarkBackgroundDataDirty()
+    end
+
     local shouldHideFrames = self:ShouldHideFramesInCurrentInstance()
 
     if not shouldHideFrames then
-        if not self.frame then
+        local shouldBuildMainFrame = self.db.char.panelOpen ~= false
+        if shouldBuildMainFrame and not self.frame then
             self:BuildUI()
         end
         if self.frame and self.db.char.panelOpen == false then
@@ -3490,7 +3943,7 @@ function MR:OnEnteringWorld()
     shouldHideFrames = self._instanceFramesHidden == true
 
     if shouldHideFrames then
-        self:RequestScan(0.35)
+        self:RequestScan(1.0)
         if self.RefreshGatheringLocationsFrame then
             self._deferredInstanceGatheringRefresh = true
         end
@@ -3519,7 +3972,7 @@ function MR:OnEnteringWorld()
             self:EnsureConcentrationTrackerShown()
         end
     end
-    if self.db.profile.peekOnHover and self.ApplyPeekOnHover then
+    if trackingSurfaceRequested and self.db.profile.peekOnHover and self.ApplyPeekOnHover then
         if self._enteringWorldPeekTimer then
             self:CancelTimer(self._enteringWorldPeekTimer)
         end
@@ -3535,8 +3988,12 @@ function MR:OnEnteringWorld()
         self._enteringWorldRefreshTimer = nil
         self:CheckWeeklyReset()
         self:CheckDailyReset()
-        self:RefreshPlayerProfessions()
-        self:RequestScan(0.35)
+        if self:HasVisibleMainTrackingSurface()
+            or (self.gatheringLocationsFrame and self.gatheringLocationsFrame:IsShown()) then
+            self:RefreshPlayerProfessions()
+        else
+            self:MarkBackgroundDataDirty()
+        end
         self:UpdateInstanceFrameVisibility()
         if self.RequestProfessionKnowledgeSurfaceRefresh then
             self:RequestProfessionKnowledgeSurfaceRefresh()
@@ -3544,24 +4001,22 @@ function MR:OnEnteringWorld()
             self:RefreshGatheringLocationsFrame()
         end
     end, 0.5)
-    if self._enteringWorldScanTimer then
-        self:CancelTimer(self._enteringWorldScanTimer)
-    end
-    self._enteringWorldScanTimer = self:ScheduleTimer(function()
-        self._enteringWorldScanTimer = nil
-        self:RequestScan()
-    end, 5)
-    self:RequestScan(0.35)
+    self:RequestScan(1.0)
 end
 
 function MR:OnCurrencyDisplayUpdate(_, currencyID)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
     local dirty = self:RefreshCurrencyProgress(currencyID, false)
 
     if self:RefreshModuleScans({ "s1_weekly" }, false) then
         dirty = true
     end
 
-    if currencyID == 3290 and self.RefreshDelvesLiveProgress then
+    if currencyID == 3290 and self.RefreshDelvesLiveProgress and self:HasVisibleMainTrackingSurface() then
         if self._delvesLiveProgressTimer then
             self:CancelTimer(self._delvesLiveProgressTimer)
         end
@@ -3572,7 +4027,7 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
     end
 
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3580,6 +4035,10 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
 end
 
 function MR:OnQuestDataChanged()
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self:ScanAutoUpdateInstanceRows(nil, nil)
         return
@@ -3592,7 +4051,7 @@ function MR:OnQuestDataChanged()
         dirty = true
     end
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3616,7 +4075,7 @@ function MR:OnQuestTurnedIn(_, questID)
         dirty = true
     end
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3624,6 +4083,11 @@ function MR:OnQuestTurnedIn(_, questID)
 end
 
 function MR:OnQuestAccepted(_, questID)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self:ScanAutoUpdateInstanceRows(questID, nil)
         return
@@ -3636,7 +4100,7 @@ function MR:OnQuestAccepted(_, questID)
         dirty = true
     end
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3644,6 +4108,11 @@ function MR:OnQuestAccepted(_, questID)
 end
 
 function MR:OnQuestRemoved(_, questID)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self:ScanAutoUpdateInstanceRows(questID, nil)
         return
@@ -3656,7 +4125,7 @@ function MR:OnQuestRemoved(_, questID)
         dirty = true
     end
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3664,14 +4133,18 @@ function MR:OnQuestRemoved(_, questID)
 end
 
 function MR:OnBagUpdateDelayed()
-    local dirty = self:RefreshItemProgress()
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+    local dirty = self:RefreshItemProgress(nil, false)
 
     if self:RefreshModuleScans({ "s1_weekly" }, false) then
         dirty = true
     end
 
     if dirty then
-        self:RefreshUI()
+        self:RequestDataRefresh()
         if self.RefreshProfessionKnowledgeSurfaces then
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
@@ -3679,9 +4152,14 @@ function MR:OnBagUpdateDelayed()
 end
 
 function MR:OnProfessionChange()
+    if not self:HasVisibleMainTrackingSurface()
+        and not (self.gatheringLocationsFrame and self.gatheringLocationsFrame:IsShown()) then
+        self:MarkBackgroundDataDirty()
+        return
+    end
     self:RefreshPlayerProfessions()
     self:RefreshProfessionConcentration()
-    self:RefreshUI()
+    self:RequestDataRefresh()
     if self.RequestProfessionKnowledgeSurfaceRefresh then
         self:RequestProfessionKnowledgeSurfaceRefresh()
     elseif self.RefreshGatheringLocationsFrame then
@@ -3717,10 +4195,14 @@ function MR:OnEncounterEnd(_, encounterId, encounterName, difficultyID, _, succe
         if encounterName and self.SyncCurrentWorldBossKillByName then
             self:SyncCurrentWorldBossKillByName(encounterName)
         end
-        if self.RefreshEncounterProgress then
-            self:RefreshEncounterProgress(tonumber(encounterId), true, tonumber(difficultyID))
+        local dirty = self.RefreshEncounterProgress
+            and self:RefreshEncounterProgress(tonumber(encounterId), false, tonumber(difficultyID))
+        if self:RefreshModuleScans({ "great_vault", "delves", "world_bosses", "s1_weekly" }, false) then
+            dirty = true
         end
-        self:RefreshModuleScans({ "great_vault", "delves", "world_bosses", "s1_weekly" }, true)
+        if dirty then
+            self:RequestDataRefresh()
+        end
     end
 end
 
@@ -3735,10 +4217,14 @@ function MR:OnBossKill(_, bossId, bossName)
             self:SyncCurrentWorldBossKillByName(nameForSync)
         end
     end
-    if self.RefreshEncounterProgress then
-        self:RefreshEncounterProgress(tonumber(bossId), true)
+    local dirty = self.RefreshEncounterProgress
+        and self:RefreshEncounterProgress(tonumber(bossId), false)
+    if self:RefreshModuleScans({ "world_bosses", "great_vault", "s1_weekly" }, false) then
+        dirty = true
     end
-    self:RefreshModuleScans({ "world_bosses", "great_vault", "s1_weekly" }, true)
+    if dirty then
+        self:RequestDataRefresh()
+    end
 end
 
 local function BuildFakeCharacterData(self)
@@ -4122,6 +4608,26 @@ SlashCmdList["MIDROUTE"] = function(msg)
     elseif msg == "rares" then MR:ToggleRares()
     elseif msg == "rares config" then MR:ToggleRaresConfig()
     elseif msg == "gathering" then MR:ToggleGatheringLocations()
+    elseif msg == "mem" or msg == "memory" then MR:PrintMemoryReport()
+    elseif msg == "mem modules" or msg == "memory modules" then
+        MR:PrintMemoryReport("modules")
+    elseif msg == "mem sources" or msg == "memory sources" or msg == "mem debug" then
+        MR._trackRefreshSources = true
+        MR._trackRefreshSourcesUntil = (GetTime and GetTime() or 0) + 15
+        MR:PrintMemoryReport("sources")
+    elseif msg == "mem clear" or msg == "memory clear" then
+        MR._refreshSourceCounts = nil
+        MR._trackRefreshSources = nil
+        MR._trackRefreshSourcesUntil = nil
+        MR._scanCount = 0
+        MR._refreshUICount = 0
+        MR._refreshUIAttemptCount = 0
+        MR._lastMemoryReportAddonKB = nil
+        MR._lastMemoryReportLuaKB = nil
+        if collectgarbage then
+            collectgarbage("collect")
+        end
+        print("|cff2ae7c6MidnightRoutine:|r Memory debug counters cleared.")
     elseif msg == "test" or msg == "selftest" then MR:RunSelfTest()
     else
         print(L["Chat_Commands"])

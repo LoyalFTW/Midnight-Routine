@@ -3352,11 +3352,27 @@ function MR:ToggleWarbandBoard()
         }
         frame.rightPane = rightPane
 
+        frame:SetScript("OnShow", function()
+            if MR._tickFrame then MR._tickFrame:Show() end
+            if MR.ActivateVisibleTrackingSurface and MR:ActivateVisibleTrackingSurface() then
+                MR:RequestUIRefresh(0.08)
+            end
+        end)
+        frame:SetScript("OnHide", function()
+            if MR._tickFrame and not MR:HasVisibleMainTrackingSurface() then
+                MR._tickFrame:Hide()
+            end
+            if MR.SuspendHiddenSurfaceWork then MR:SuspendHiddenSurfaceWork() end
+        end)
+
         self.altBoardFrame = frame
     end
 
     self.altBoardFrame:SetScale(self.db.profile.scale or 1)
     self.altBoardFrame:Show()
+    if self.ActivateVisibleTrackingSurface then
+        self:ActivateVisibleTrackingSurface()
+    end
     self:RefreshWarbandBoard()
 end
 

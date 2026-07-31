@@ -77,6 +77,7 @@ MR:RegisterModule({
     resetType = "weekly",
     defaultOpen = true,
     patchKey = "12.0.7",
+    scanReturnsChanged = true,
 
     onScan = function(mod)
         local db = MR.db.char.progress

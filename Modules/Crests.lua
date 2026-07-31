@@ -43,8 +43,12 @@ local function RefreshCrestItemLabels()
             end
         end
     end
-    if dirty and MR.RefreshUI then
-        MR:RefreshUI()
+    if dirty then
+        if MR.RequestUIRefresh then
+            MR:RequestUIRefresh(0.05)
+        elseif MR.RefreshUI then
+            MR:RefreshUI()
+        end
     end
 end
 
