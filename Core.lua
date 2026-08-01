@@ -246,6 +246,8 @@ local DEFAULTS = {
         mainHeaderPosition  = "top",
         showMainCharacterBar = true,
         characterWindowLayout = false,
+        autoEnableNewModules = true,
+        knownModules = {},
         selectedExpansion   = "midnight",
         altBoardSelectedExpansion = "midnight",
         altBoardHiddenCharacters = {},
@@ -1528,6 +1530,9 @@ function MR:IsModuleEnabled(key)
             return false
         end
     end
+    if not s and not self:ShouldAutoEnableNewModules() and not self:IsModuleKnown(key) then
+        return false
+    end
     if mod and mod.profSkillLine then
         if not s and mod.defaultEnabled == false then
             return false
@@ -1538,6 +1543,42 @@ function MR:IsModuleEnabled(key)
         return false
     end
     return not (s and s.enabled == false)
+end
+
+function MR:ShouldAutoEnableNewModules()
+    return not (self.db and self.db.profile and self.db.profile.autoEnableNewModules == false)
+end
+
+function MR:GetActiveKnownModuleStorage()
+    if not (self.db and self.db.profile) then return nil end
+    self.db.profile.knownModules = self.db.profile.knownModules or {}
+    return self.db.profile.knownModules
+end
+
+function MR:IsModuleKnown(key)
+    local known = self:GetActiveKnownModuleStorage()
+    return known and known[key] == true or false
+end
+
+function MR:SetAutoEnableNewModules(enabled)
+    if not (self.db and self.db.profile) then return end
+    enabled = enabled ~= false
+    local wasEnabled = self:ShouldAutoEnableNewModules()
+    if not enabled and wasEnabled then
+        local known = self:GetActiveKnownModuleStorage()
+        if known then
+            for _, mod in ipairs(self.modules or {}) do
+                known[mod.key] = true
+            end
+        end
+    end
+    self.db.profile.autoEnableNewModules = enabled
+    self._moduleStatsCache = nil
+    if self.RequestUIRefresh then
+        self:RequestUIRefresh(0.01)
+    elseif self.RefreshUI then
+        self:RefreshUI()
+    end
 end
 
 function MR:GetStoryCampaignsEnabledPreference()

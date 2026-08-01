@@ -806,6 +806,12 @@ function MR:PopulateConfigFrame(f)
 
         Gap(4); Divider()
         SectionLabel(L["OPTIONS"])
+        Checkbox(L["Config_AutoEnableNewModules"] or "Automatically Enable New Modules",
+            function() return MR:ShouldAutoEnableNewModules() end,
+            function(v)
+                MR:SetAutoEnableNewModules(v)
+                MR:PopulateConfigFrame(f)
+            end, "#2ae7c6")
         Checkbox(L["Config_HideWhenCompleted"],
             function() return MR.db.char.hideComplete end,
             function(v)

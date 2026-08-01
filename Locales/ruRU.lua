@@ -1,5 +1,13 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("MidnightRoutine", "ruRU")
 if not L then return end
+L["Config_AutoEnableNewModules"] = "Automatically Enable New Modules"
+L["Welcome_LayoutMode"] = "Layout Mode"
+L["Welcome_LayoutSharedDesc"] = "One module layout and window setup shared by every character."
+L["Welcome_LayoutCharacterDesc"] = "Each character keeps its own modules, order, and window setup."
+L["Welcome_AutoEnableNewModules"] = "Automatically Enable New Modules"
+L["Welcome_AutoEnableNewModulesDesc"] = "Turn this off to choose new modules yourself when an update or new area adds them."
+L["Welcome_AutoEnableOn"] = "New modules start enabled"
+L["Welcome_AutoEnableOff"] = "New modules require opt-in"
 -- Translator ZamestoTV
 -- Core / Chat
 L["Weekly_Reset"] = "|cff2ae7c6MidnightRoutine:|r Еженедельный сброс выполнен."

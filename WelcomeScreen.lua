@@ -13,27 +13,20 @@ local pendingEnabled = {}
 local pendingRenown      = false
 local pendingRares       = false
 local pendingGathering   = false
+local pendingCharacterLayout = false
+local pendingAutoEnableNewModules = true
 local checkboxRefs   = {}
 
 local function RefreshFonts()
-    if ns.EnsureFonts then
-        FONT_HEADERS, FONT_ROWS = ns.EnsureFonts()
-        return
-    end
-
-    FONT_ROWS = ns.FONT_ROWS or FONT_ROWS or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
-    FONT_HEADERS = ns.FONT_HEADERS or FONT_HEADERS or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+    local readableFont = GameFontNormal and select(1, GameFontNormal:GetFont())
+        or STANDARD_TEXT_FONT
+        or "Fonts\\FRIZQT__.TTF"
+    FONT_ROWS = readableFont
+    FONT_HEADERS = readableFont
 end
 
 local function GetFontFlags()
-    if ns.GetFontFlags then
-        local flags = ns.GetFontFlags()
-        if flags ~= nil then
-            return flags
-        end
-    end
-
-    return "OUTLINE"
+    return ""
 end
 
 local function IsStoryModule(mod)
@@ -52,9 +45,11 @@ local function BuildWelcomeScreen()
     pendingRenown = MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("renownOpen") or false
     pendingRares = MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("raresOpen") or false
     pendingGathering = MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("gatheringLocOpen") or false
+    pendingCharacterLayout = MR:IsCharacterWindowLayoutEnabled()
+    pendingAutoEnableNewModules = MR:ShouldAutoEnableNewModules()
 
     local f = StyledFrame(UIParent, nil, "FULLSCREEN_DIALOG", 200)
-    f:SetSize(420, 608)
+    f:SetSize(460, 680)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
     f:SetBackdropColor(0.02, 0.04, 0.10, 0.98)
     f:SetBackdropBorderColor(0.16, 0.78, 0.75, 1)
@@ -65,15 +60,9 @@ local function BuildWelcomeScreen()
     titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
     titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
 
-    local icon = titleBar:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(24, 24)
-    icon:SetPoint("LEFT", titleBar, "LEFT", 12, -1)
-    icon:SetTexture("Interface\\AddOns\\MidnightRoutine\\Media\\Icon")
-    icon:SetVertexColor(0.16, 0.78, 0.75, 1)
-
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
-    titleTxt:SetFont(FONT_HEADERS, 13, GetFontFlags())
-    titleTxt:SetPoint("LEFT", icon, "RIGHT", 8, 1)
+    titleTxt:SetFont(FONT_HEADERS, 14, GetFontFlags())
+    titleTxt:SetPoint("LEFT", titleBar, "LEFT", 14, 1)
     titleTxt:SetText(L["Welcome_Title"])
 
     local function ScrollByDelta(delta)
@@ -98,7 +87,7 @@ local function BuildWelcomeScreen()
     local headerTop = -54
 
     local heading = f:CreateFontString(nil, "OVERLAY")
-    heading:SetFont(FONT_HEADERS, 14, GetFontFlags())
+    heading:SetFont(FONT_HEADERS, 16, GetFontFlags())
     heading:SetPoint("TOPLEFT",  f, "TOPLEFT",  headerInset, headerTop)
     heading:SetPoint("TOPRIGHT", f, "TOPRIGHT", -headerInset, headerTop)
     heading:SetJustifyH("LEFT")
@@ -107,11 +96,110 @@ local function BuildWelcomeScreen()
     local hintTop = headerTop - 20
 
     local hint = f:CreateFontString(nil, "OVERLAY")
-    hint:SetFont(FONT_ROWS, 10, GetFontFlags())
+    hint:SetFont(FONT_ROWS, 11, GetFontFlags())
     hint:SetPoint("TOPLEFT",  f, "TOPLEFT",  headerInset, hintTop)
     hint:SetPoint("TOPRIGHT", f, "TOPRIGHT", -headerInset, hintTop)
     hint:SetJustifyH("LEFT")
     hint:SetText(L["Welcome_Hint"])
+
+    local setupPanel = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    setupPanel:SetPoint("TOPLEFT", f, "TOPLEFT", 14, hintTop - 28)
+    setupPanel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, hintTop - 28)
+    setupPanel:SetHeight(120)
+    setupPanel:SetBackdrop(MakeBackdrop())
+    setupPanel:SetBackdropColor(0.015, 0.045, 0.075, 0.94)
+    setupPanel:SetBackdropBorderColor(0.12, 0.38, 0.40, 0.90)
+
+    local layoutLabel = setupPanel:CreateFontString(nil, "OVERLAY")
+    layoutLabel:SetFont(FONT_HEADERS, 11, GetFontFlags())
+    layoutLabel:SetPoint("TOPLEFT", setupPanel, "TOPLEFT", 10, -9)
+    layoutLabel:SetText(L["Welcome_LayoutMode"] or "Layout Mode")
+    layoutLabel:SetTextColor(0.72, 0.92, 0.90)
+
+    local modeButtons = {}
+    local function RefreshModeButtons()
+        for _, entry in ipairs(modeButtons) do
+            local active = pendingCharacterLayout == entry.characterMode
+            entry.button:SetBackdropColor(active and 0.08 or 0.025, active and 0.23 or 0.07, active and 0.20 or 0.11, 1)
+            entry.button:SetBackdropBorderColor(active and 0.18 or 0.10, active and 0.78 or 0.25, active and 0.68 or 0.30, 1)
+            entry.title:SetTextColor(active and 0.90 or 0.63, active and 1.00 or 0.74, active and 0.94 or 0.72)
+            entry.desc:SetTextColor(active and 0.64 or 0.43, active and 0.82 or 0.50, active and 0.80 or 0.52)
+        end
+    end
+    local function CreateModeButton(label, desc, characterMode, anchorPoint, relativePoint, x)
+        local btn = CreateFrame("Button", nil, setupPanel, "BackdropTemplate")
+        btn:SetPoint(anchorPoint, setupPanel, relativePoint, x, -27)
+        btn:SetSize(206, 52)
+        btn:SetBackdrop(MakeBackdrop())
+
+        local modeTitle = btn:CreateFontString(nil, "OVERLAY")
+        modeTitle:SetFont(FONT_HEADERS, 12, GetFontFlags())
+        modeTitle:SetPoint("TOPLEFT", btn, "TOPLEFT", 8, -7)
+        modeTitle:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -8, -7)
+        modeTitle:SetJustifyH("LEFT")
+        modeTitle:SetText(label)
+
+        local modeDesc = btn:CreateFontString(nil, "OVERLAY")
+        modeDesc:SetFont(FONT_ROWS, 9, GetFontFlags())
+        modeDesc:SetPoint("TOPLEFT", modeTitle, "BOTTOMLEFT", 0, -4)
+        modeDesc:SetPoint("TOPRIGHT", modeTitle, "BOTTOMRIGHT", 0, -4)
+        modeDesc:SetJustifyH("LEFT")
+        modeDesc:SetWordWrap(true)
+        modeDesc:SetText(desc)
+
+        modeButtons[#modeButtons + 1] = {
+            button = btn,
+            title = modeTitle,
+            desc = modeDesc,
+            characterMode = characterMode,
+        }
+        btn:SetScript("OnClick", function()
+            pendingCharacterLayout = characterMode
+            RefreshModeButtons()
+        end)
+    end
+
+    CreateModeButton(
+        L["Config_LayoutShared"] or "Shared",
+        L["Welcome_LayoutSharedDesc"] or "One layout shared by every character.",
+        false, "TOPLEFT", "TOPLEFT", 8
+    )
+    CreateModeButton(
+        L["Config_LayoutCharacter"] or "Per Character",
+        L["Welcome_LayoutCharacterDesc"] or "Each character keeps its own layout.",
+        true, "TOPRIGHT", "TOPRIGHT", -8
+    )
+    RefreshModeButtons()
+
+    local autoCb = CreateFrame("CheckButton", nil, setupPanel, "UICheckButtonTemplate")
+    autoCb:SetSize(20, 20)
+    autoCb:SetPoint("BOTTOMLEFT", setupPanel, "BOTTOMLEFT", 7, 6)
+    autoCb:SetChecked(pendingAutoEnableNewModules)
+    autoCb:SetScript("OnClick", function(self)
+        pendingAutoEnableNewModules = self:GetChecked() and true or false
+    end)
+
+    local autoLabel = setupPanel:CreateFontString(nil, "OVERLAY")
+    autoLabel:SetFont(FONT_ROWS, 10, GetFontFlags())
+    autoLabel:SetPoint("LEFT", autoCb, "RIGHT", 2, 0)
+    autoLabel:SetText(L["Welcome_AutoEnableNewModules"] or "Automatically Enable New Modules")
+    autoLabel:SetTextColor(0.78, 0.90, 0.88)
+
+    local autoInfo = setupPanel:CreateFontString(nil, "OVERLAY")
+    autoInfo:SetFont(FONT_ROWS, 9, GetFontFlags())
+    autoInfo:SetPoint("LEFT", autoLabel, "RIGHT", 7, 0)
+    autoInfo:SetPoint("RIGHT", setupPanel, "RIGHT", -8, 0)
+    autoInfo:SetJustifyH("RIGHT")
+    autoInfo:SetWordWrap(false)
+    autoInfo:SetText(pendingAutoEnableNewModules
+        and (L["Welcome_AutoEnableOn"] or "New modules start enabled")
+        or (L["Welcome_AutoEnableOff"] or "New modules require opt-in"))
+    autoInfo:SetTextColor(0.45, 0.68, 0.66)
+    autoCb:HookScript("OnClick", function()
+        autoInfo:SetText(pendingAutoEnableNewModules
+            and (L["Welcome_AutoEnableOn"] or "New modules start enabled")
+            or (L["Welcome_AutoEnableOff"] or "New modules require opt-in"))
+    end)
 
     local function MakeDivider(parent, y)
         local d = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -133,15 +221,15 @@ local function BuildWelcomeScreen()
     footer:SetBackdropColor(0.03, 0.08, 0.16, 0.96)
 
     local scroll = CreateFrame("ScrollFrame", nil, f)
-    scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, hintTop - 28)
-    scroll:SetPoint("TOPRIGHT", f, "TOPRIGHT", -24, hintTop - 28)
+    scroll:SetPoint("TOPLEFT", setupPanel, "BOTTOMLEFT", 0, -12)
+    scroll:SetPoint("TOPRIGHT", setupPanel, "BOTTOMRIGHT", -10, -12)
     scroll:SetPoint("BOTTOMLEFT", footer, "TOPLEFT", 14, 12)
     scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -24, 12)
     scroll:EnableMouseWheel(true)
     f._welcomeScroll = scroll
 
     local content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(360, 1)
+    content:SetSize(400, 1)
     scroll:SetScrollChild(content)
     content:EnableMouseWheel(true)
     content:SetScript("OnMouseWheel", function(_, delta)
@@ -336,7 +424,7 @@ local function BuildWelcomeScreen()
         line:SetColorTexture(0.16, 0.78, 0.75, 0.22)
 
         local fs = section:CreateFontString(nil, "OVERLAY")
-        fs:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        fs:SetFont(FONT_HEADERS, 11, GetFontFlags())
         fs:SetPoint("LEFT", section, "LEFT", 2, 1)
         fs:SetPoint("RIGHT", section, "RIGHT", -2, 1)
         fs:SetJustifyH("LEFT")
@@ -389,7 +477,7 @@ local function BuildWelcomeScreen()
             checkboxRefs[key] = cb
 
             local lbl = row:CreateFontString(nil, "OVERLAY")
-            lbl:SetFont(FONT_ROWS, 11, GetFontFlags())
+            lbl:SetFont(FONT_ROWS, 12, GetFontFlags())
             lbl:SetPoint("LEFT",  cb,  "RIGHT",  4, 0)
             lbl:SetPoint("RIGHT", row, "RIGHT", -8, 0)
             lbl:SetJustifyH("LEFT")
@@ -433,7 +521,7 @@ local function BuildWelcomeScreen()
         end)
 
         local titleFs = panel:CreateFontString(nil, "OVERLAY")
-        titleFs:SetFont(FONT_HEADERS, 12, GetFontFlags())
+        titleFs:SetFont(FONT_HEADERS, 13, GetFontFlags())
         titleFs:SetPoint("TOPLEFT",  cb, "TOPRIGHT", 4, -1)
         titleFs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -10)
         titleFs:SetJustifyH("LEFT")
@@ -441,7 +529,7 @@ local function BuildWelcomeScreen()
         titleFs:SetText(title)
 
         local descFs = panel:CreateFontString(nil, "OVERLAY")
-        descFs:SetFont(FONT_ROWS, 10, GetFontFlags())
+        descFs:SetFont(FONT_ROWS, 11, GetFontFlags())
         descFs:SetPoint("TOPLEFT",  panel, "TOPLEFT", 14, -31)
         descFs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -31)
         descFs:SetJustifyH("LEFT")
@@ -515,7 +603,7 @@ local function BuildWelcomeScreen()
     enableAllBtn:SetBackdropBorderColor(0.18, 0.55, 0.60, 1)
 
     local eaLbl = enableAllBtn:CreateFontString(nil, "OVERLAY")
-    eaLbl:SetFont(FONT_ROWS, 10, GetFontFlags())
+    eaLbl:SetFont(FONT_ROWS, 11, GetFontFlags())
     eaLbl:SetPoint("CENTER")
     eaLbl:SetText(allOn and L["Welcome_Disable_All"] or L["Welcome_Enable_All"])
 
@@ -547,7 +635,7 @@ local function BuildWelcomeScreen()
     suppressCb:SetChecked(false)
 
     local suppressLbl = footer:CreateFontString(nil, "OVERLAY")
-    suppressLbl:SetFont(FONT_ROWS, 10, GetFontFlags())
+    suppressLbl:SetFont(FONT_ROWS, 11, GetFontFlags())
     suppressLbl:SetPoint("LEFT", suppressCb, "RIGHT", 2, 0)
     suppressLbl:SetPoint("RIGHT", footer, "RIGHT", -12, 0)
     suppressLbl:SetJustifyH("LEFT")
@@ -564,7 +652,7 @@ local function BuildWelcomeScreen()
     confirmBtn:SetBackdropBorderColor(0.15, 0.78, 0.42, 1)
 
     local confirmLbl = confirmBtn:CreateFontString(nil, "OVERLAY")
-    confirmLbl:SetFont(FONT_HEADERS, 12, GetFontFlags())
+    confirmLbl:SetFont(FONT_HEADERS, 13, GetFontFlags())
     confirmLbl:SetPoint("CENTER")
     confirmLbl:SetText(L["Welcome_Confirm"])
     local cr, cg, cb = hex("#00ff96")
@@ -572,10 +660,12 @@ local function BuildWelcomeScreen()
 
     confirmBtn:SetScript("OnClick", function()
         local anyEnabled = false
+        MR.db.profile.characterWindowLayout = pendingCharacterLayout and true or false
         for key, val in pairs(pendingEnabled) do
             MR:SetModuleEnabled(key, val, true)
             if val then anyEnabled = true end
         end
+        MR:SetAutoEnableNewModules(pendingAutoEnableNewModules)
         MR:DismissFirstTimeGlow()
         MR.db.char.welcomeSeen = true
         if suppressCb:GetChecked() then
