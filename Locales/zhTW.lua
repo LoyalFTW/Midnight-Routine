@@ -1,14 +1,14 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("MidnightRoutine", "zhTW")
 if not L then return end
 
-L["Config_AutoEnableNewModules"] = "Automatically Enable New Modules"
-L["Welcome_LayoutMode"] = "Layout Mode"
-L["Welcome_LayoutSharedDesc"] = "One module layout and window setup shared by every character."
-L["Welcome_LayoutCharacterDesc"] = "Each character keeps its own modules, order, and window setup."
-L["Welcome_AutoEnableNewModules"] = "Automatically Enable New Modules"
-L["Welcome_AutoEnableNewModulesDesc"] = "Turn this off to choose new modules yourself when an update or new area adds them."
-L["Welcome_AutoEnableOn"] = "New modules start enabled"
-L["Welcome_AutoEnableOff"] = "New modules require opt-in"
+L["Config_AutoEnableNewModules"] = "自動啟用新模組"
+L["Welcome_LayoutMode"] = "佈局模式"
+L["Welcome_LayoutSharedDesc"] = "每個角色共享一個模組佈局和視窗設定。"
+L["Welcome_LayoutCharacterDesc"] = "每個角色都有自己的模組、順序和視窗設定。"
+L["Welcome_AutoEnableNewModules"] = "自動啟用新模組"
+L["Welcome_AutoEnableNewModulesDesc"] = "關閉此功能，以便在更新或新區域加入模組時自行選擇新模組。"
+L["Welcome_AutoEnableOn"] = "新模組開始啟用"
+L["Welcome_AutoEnableOff"] = "新模組需要選擇加入"
 
 -- Core / Chat
 L["Weekly_Reset"] = "|cff2ae7c6MidnightRoutine:|r 每週重置已套用。"
