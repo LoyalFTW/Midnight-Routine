@@ -11,7 +11,13 @@ local function T(data) data.mode = data.mode or "single"; return E("treasure", d
 local function S(data) data.mode = data.mode or "single"; return E("study", data) end
 local function WQ(data) data.mode = data.mode or "any"; return E("weeklyQuest", data) end
 local function WD(data) data.mode = data.mode or "single"; return E("weeklyDrop", data) end
-local function DMF(data) data.mode = "single"; return E("darkmoon", data) end
+local function DMF(data)
+    data.mode = "single"
+    if data.requiredItems == nil and MR.GetDarkmoonRequiredItems then
+        data.requiredItems = MR:GetDarkmoonRequiredItems(data.questID)
+    end
+    return E("darkmoon", data)
+end
 local function TR(data) data.mode = "single"; return E("treatise", data) end
 local function Ref(data) data.mode = "reference"; data.reference = true; return E("reference", data) end
 

@@ -892,6 +892,10 @@ local function AddProfessionKnowledgeTooltip(tooltip, entry, sectionKey, current
         tooltip:AddLine(entry.note, 0.65, 0.85, 0.95, true)
     end
 
+    if entry.kind == "darkmoon" and MR.AddDarkmoonMaterialsToTooltip then
+        MR:AddDarkmoonMaterialsToTooltip(tooltip, entry.questID, entry.requiredItems)
+    end
+
     if entry.reference then
         tooltip:AddLine(" ")
         tooltip:AddLine(L["ProfKnowledge_ReferenceOnly"] or "One-time source, not auto-tracked.", 0.6, 0.6, 0.6, true)
