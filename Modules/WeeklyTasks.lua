@@ -14,6 +14,28 @@ local SA_ASSIGNMENTS = {
     { quest = 93438, unlock = 94743, name = L["SA_Precision"], zone = 2405, zoneLabel = L["Zone_Voidstorm"] },
 }
 
+local SEASON_2_AVAILABLE = MR:IsPatchAvailable("12.1.0")
+if SEASON_2_AVAILABLE then
+    SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
+        quest = 95918,
+        name = L["SA_WraithWrath"] or "Wraith Wrath",
+        zone = 2512,
+        zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
+    }
+    SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
+        quest = 95921,
+        name = L["SA_DemandAndSupply"] or "Demand and Supply",
+        zone = 2512,
+        zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
+    }
+    SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
+        dynamicTitle = L["SA_FaceTheSwarm"] or "Face the Swarm",
+        name = L["SA_FaceTheSwarm"] or "Face the Swarm",
+        zone = 2512,
+        zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
+    }
+end
+
 local UATV_BRANCHES = {
     { quest = 93890, name = L["Unity_Abundance"]     },
     { quest = 93767, name = L["Unity_Arcantina"]     },
@@ -32,6 +54,13 @@ local UATV_BRANCHES = {
     { quest = 93913, name = L["Unity_WorldBoss"]     },
     { quest = 93766, name = L["Unity_WorldQuests"]   },
 }
+
+if SEASON_2_AVAILABLE then
+    UATV_BRANCHES[#UATV_BRANCHES + 1] = {
+        quest = 98232,
+        name = L["Unity_VaultsAtalUtek"] or "Midnight: Vaults of Atal'Utek",
+    }
+end
 
 local UATV_META_QUEST_IDS = {
     93744,
@@ -303,23 +332,45 @@ local function UpdateRotatingWeeklyQuestState(progressBucket, row, questId)
     return isActive, isDone
 end
 
+local function ResolveDynamicAssignmentQuest(assignment)
+    if assignment.quest or not assignment.dynamicTitle then
+        return assignment.quest
+    end
+    if not (C_TaskQuest and C_TaskQuest.GetQuestsOnMap) then
+        return nil
+    end
+
+    local expected = assignment.dynamicTitle:lower()
+    for _, taskInfo in ipairs(C_TaskQuest.GetQuestsOnMap(assignment.zone) or {}) do
+        local questId = taskInfo.questId or taskInfo.questID
+        local title = questId and MR:GetQuestName(questId)
+        if title and title:lower():find(expected, 1, true) then
+            assignment.quest = questId
+            return questId
+        end
+    end
+
+    return nil
+end
+
 local function CollectSpecialAssignments()
     local completed = {}
     local active = {}
     local allowActive = IsPlayerInMidnightArea()
 
     for _, assignment in ipairs(SA_ASSIGNMENTS) do
+        local questId = ResolveDynamicAssignmentQuest(assignment)
         local entry = {
-            quest = assignment.quest,
+            quest = questId,
             unlock = assignment.unlock,
-            name = MR:GetQuestName(assignment.quest, assignment.name),
+            name = MR:GetQuestName(questId, assignment.name),
             zone = assignment.zone,
             zoneName = GetMapName(assignment.zone, assignment.zoneLabel),
         }
 
-        if C_QuestLog.IsQuestFlaggedCompleted(assignment.quest) then
+        if questId and C_QuestLog.IsQuestFlaggedCompleted(questId) then
             table.insert(completed, entry)
-        elseif allowActive and (IsQuestCurrentlyActive(assignment.quest) or IsQuestCurrentlyActive(assignment.unlock)) then
+        elseif allowActive and (IsQuestCurrentlyActive(questId) or IsQuestCurrentlyActive(assignment.unlock)) then
             table.insert(active, entry)
         end
     end
@@ -1341,6 +1392,29 @@ MR:RegisterModule({
                     tip:AddLine(L["Tooltip_Visit_Silvermoon"], 0.7, 0.7, 0.7)
                 end
             end,
+        },
+        {
+            key      = "turn_back_surge",
+            label    = L["Weekly_TurnBackSurge_Label"] or "Turn Back the Surge:",
+            max      = 1,
+            note     = L["Weekly_TurnBackSurge_Note"] or "Defeat 3 Curse Surges on the Coiled Isle.",
+            patchKey = "12.1.0",
+            questIds = { 96995 },
+        },
+        {
+            key      = "nymrissa_lair",
+            label    = L["Weekly_Nymrissa_Label"] or "Lair: Nymrissa Wavecaller:",
+            max      = 1,
+            note     = L["Weekly_Nymrissa_Note"] or "Complete the Tidebound Grotto Lair weekly reward.",
+            patchKey = "12.1.0",
+            questIds = { 97128 },
+        },
+        {
+            key      = "vaults_weekly_reward",
+            label    = L["Weekly_VaultsReward_Label"] or "Vaults Weekly Reward:",
+            max      = 1,
+            note     = L["Weekly_VaultsReward_Note"] or "Use the weekly Vaults opportunity for a chance at improved gear.",
+            patchKey = "12.1.0",
         },
     },
 })

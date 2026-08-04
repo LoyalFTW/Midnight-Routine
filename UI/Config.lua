@@ -244,6 +244,14 @@ function MR:PopulateConfigFrame(f)
 
     local yOff = f.scroll and -4 or -26
     local cfgFs = GetFontSize()
+    -- Keep the dense Modules page one step smaller than tracker text while
+    -- still following the user's Layout font-size setting.
+    local moduleHeaderFs = math.max(FONT_SIZE_MIN, cfgFs - 1)
+    local moduleRowFs = math.max(FONT_SIZE_MIN, cfgFs - 2)
+    local moduleSubFs = math.max(FONT_SIZE_MIN, cfgFs - 3)
+    local moduleHeaderH = math.max(22, moduleHeaderFs + 12)
+    local moduleRowH = math.max(18, moduleRowFs + 9)
+    local moduleCompactH = math.max(16, moduleSubFs + 8)
     local contentW = (f:GetWidth() or 344) - 16
     local activePage = MR._cfgPage or "windows"
 
@@ -1441,8 +1449,9 @@ function MR:PopulateConfigFrame(f)
 
     local function BuildPatchHeader(patchKey)
         local patchInfo = MR:GetPatchInfo(patchKey)
+        local available = MR:IsPatchAvailable(patchKey)
         local enabled = MR:IsPatchEnabled(patchKey)
-        local ROW_H = 22
+        local ROW_H = moduleHeaderH
         local patchFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         patchFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         patchFr:SetSize(contentW, ROW_H)
@@ -1454,6 +1463,8 @@ function MR:PopulateConfigFrame(f)
         cb:SetSize(20, 20)
         cb:SetPoint("LEFT", patchFr, "LEFT", 2, 0)
         cb:SetChecked(enabled)
+        cb:SetEnabled(available)
+        cb:SetAlpha(available and 1 or 0.45)
         cb:SetScript("OnClick", function(s)
             MR:SetPatchEnabled(patchKey, s:GetChecked(), true)
             if MR.RequestConfigRefresh then
@@ -1464,11 +1475,14 @@ function MR:PopulateConfigFrame(f)
         end)
 
         local lbl = patchFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        lbl:SetFont(FONT_HEADERS, moduleHeaderFs, GetFontFlags())
         lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         lbl:SetPoint("RIGHT", patchFr, "RIGHT", -8, 0)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText((patchInfo.label or patchKey) .. "  |cff667788" .. (L["Config_PatchFilter"] or "Patch filter") .. "|r")
+        lbl:SetWordWrap(false)
+        local status = available and (L["Config_PatchFilter"] or "Patch filter")
+            or (L["Config_ComingSoon"] or "Coming soon")
+        lbl:SetText((patchInfo.label or patchKey) .. "  |cff667788" .. status .. "|r")
         lbl:SetTextColor(enabled and 0.82 or 0.45, enabled and 0.98 or 0.48, enabled and 0.95 or 0.50)
 
         yOff = yOff - ROW_H
@@ -1493,8 +1507,9 @@ function MR:PopulateConfigFrame(f)
 
     local function BuildRowPatchHeader(patchKey)
         local patchInfo = MR:GetPatchInfo(patchKey)
+        local available = MR:IsPatchAvailable(patchKey)
         local enabled = MR:IsPatchEnabled(patchKey)
-        local ROW_H = 18
+        local ROW_H = moduleRowH
         local patchFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         patchFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
         patchFr:SetSize(contentW - 20, ROW_H)
@@ -1506,6 +1521,8 @@ function MR:PopulateConfigFrame(f)
         cb:SetSize(18, 18)
         cb:SetPoint("LEFT", patchFr, "LEFT", 0, 0)
         cb:SetChecked(enabled)
+        cb:SetEnabled(available)
+        cb:SetAlpha(available and 1 or 0.45)
         cb:SetScript("OnClick", function(s)
             MR:SetPatchEnabled(patchKey, s:GetChecked(), true)
             if MR.RequestConfigRefresh then
@@ -1516,11 +1533,14 @@ function MR:PopulateConfigFrame(f)
         end)
 
         local lbl = patchFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+        lbl:SetFont(FONT_HEADERS, moduleRowFs, GetFontFlags())
         lbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
         lbl:SetPoint("RIGHT", patchFr, "RIGHT", -6, 0)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText((patchInfo.label or patchKey) .. "  |cff667788" .. (L["Config_PatchFilter"] or "Patch filter") .. "|r")
+        lbl:SetWordWrap(false)
+        local status = available and (L["Config_PatchFilter"] or "Patch filter")
+            or (L["Config_ComingSoon"] or "Coming soon")
+        lbl:SetText((patchInfo.label or patchKey) .. "  |cff667788" .. status .. "|r")
         lbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
 
         yOff = yOff - ROW_H
@@ -1528,7 +1548,7 @@ function MR:PopulateConfigFrame(f)
 
     local function BuildRowGroupHeader(modKey, groupRows, label)
         local enabled = MR:IsRowGroupEnabled(modKey, groupRows)
-        local ROW_H = 18
+        local ROW_H = moduleRowH
         local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
         groupFr:SetSize(contentW - 20, ROW_H)
@@ -1550,7 +1570,7 @@ function MR:PopulateConfigFrame(f)
         end)
 
         local lbl = groupFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+        lbl:SetFont(FONT_HEADERS, moduleRowFs, GetFontFlags())
         lbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
         lbl:SetPoint("RIGHT", groupFr, "RIGHT", -6, 0)
         lbl:SetJustifyH("LEFT")
@@ -1760,7 +1780,7 @@ function MR:PopulateConfigFrame(f)
     end
 
     local function BuildProfessionGroupHeader()
-        local ROW_H = 38
+        local ROW_H = math.max(38, moduleHeaderFs + moduleSubFs + 14)
         local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         headerFr:SetSize(contentW, ROW_H)
@@ -1776,7 +1796,7 @@ function MR:PopulateConfigFrame(f)
         badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
 
         local badgeText = badge:CreateFontString(nil, "OVERLAY")
-        badgeText:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        badgeText:SetFont(FONT_HEADERS, moduleHeaderFs, GetFontFlags())
         badgeText:SetPoint("CENTER")
         badgeText:SetText("PK")
         badgeText:SetTextColor(0.60, 1.00, 0.90)
@@ -1795,7 +1815,7 @@ function MR:PopulateConfigFrame(f)
         arrowLbl:SetTextColor(0.45, 0.75, 0.70)
 
         local lbl = headerFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 11, GetFontFlags())
+        lbl:SetFont(FONT_HEADERS, moduleHeaderFs, GetFontFlags())
         lbl:SetPoint("TOPLEFT", badge, "TOPRIGHT", 8, -1)
         lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         lbl:SetJustifyH("LEFT")
@@ -1803,7 +1823,7 @@ function MR:PopulateConfigFrame(f)
         lbl:SetTextColor(0.88, 1.00, 0.94)
 
         local sub = headerFr:CreateFontString(nil, "OVERLAY")
-        sub:SetFont(FONT_ROWS, 8, GetFontFlags())
+        sub:SetFont(FONT_ROWS, moduleSubFs, GetFontFlags())
         sub:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -1)
         sub:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         sub:SetJustifyH("LEFT")
@@ -1901,7 +1921,7 @@ function MR:PopulateConfigFrame(f)
                         renderedAny = true
                     end
 
-                    local expH = 18
+                    local expH = moduleRowH
                     local expFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
                     expFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
                     expFr:SetSize(contentW - 4, expH)
@@ -1909,7 +1929,7 @@ function MR:PopulateConfigFrame(f)
                     expFr:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
                     expFr:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
                     local expLbl = expFr:CreateFontString(nil, "OVERLAY")
-                    expLbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+                    expLbl:SetFont(FONT_HEADERS, moduleRowFs, GetFontFlags())
                     expLbl:SetPoint("LEFT", expFr, "LEFT", 7, 0)
                     expLbl:SetPoint("RIGHT", expFr, "RIGHT", -7, 0)
                     expLbl:SetJustifyH("LEFT")
@@ -1918,7 +1938,7 @@ function MR:PopulateConfigFrame(f)
                     yOff = yOff - expH
 
                     for _, profession in ipairs(learned) do
-                        local rowH = 22
+                        local rowH = moduleHeaderH
                         local rowKey = "__pk:" .. expansion.key .. ":" .. profession.key
                         local isExp = MR._cfgExpanded[rowKey]
                         local professionEnabled = ProfessionEnabled(expansion.key, profession)
@@ -1960,7 +1980,7 @@ function MR:PopulateConfigFrame(f)
                         end)
 
                         local lbl = rowFr:CreateFontString(nil, "OVERLAY")
-                        lbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                        lbl:SetFont(FONT_ROWS, moduleRowFs, GetFontFlags())
                         lbl:SetPoint("LEFT", enableBtn, "RIGHT", 6, 0)
                         lbl:SetPoint("RIGHT", expandBtn, "LEFT", -6, 0)
                         lbl:SetJustifyH("LEFT")
@@ -1974,7 +1994,7 @@ function MR:PopulateConfigFrame(f)
                                     local enabled = GroupEnabled(expansion.key, profession, section)
                                     local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
                                     groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 26, yOff)
-                                    groupFr:SetSize(contentW - 22, 16)
+                                    groupFr:SetSize(contentW - 22, moduleCompactH)
                                     groupFr:SetBackdrop(MakeBackdrop())
                                     groupFr:SetBackdropColor(enabled and 0.035 or 0.055, enabled and 0.085 or 0.045, enabled and 0.095 or 0.050, 0.72)
                                     groupFr:SetBackdropBorderColor(enabled and 0.10 or 0.24, enabled and 0.32 or 0.12, enabled and 0.34 or 0.12, 0.70)
@@ -1988,13 +2008,13 @@ function MR:PopulateConfigFrame(f)
                                     end)
 
                                     local sectionLbl = groupFr:CreateFontString(nil, "OVERLAY")
-                                    sectionLbl:SetFont(FONT_ROWS, 8, GetFontFlags())
+                                    sectionLbl:SetFont(FONT_ROWS, moduleSubFs, GetFontFlags())
                                     sectionLbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
                                     sectionLbl:SetPoint("RIGHT", groupFr, "RIGHT", -5, 0)
                                     sectionLbl:SetJustifyH("LEFT")
                                     sectionLbl:SetText(CleanProfessionConfigLabel(section.label))
                                     sectionLbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
-                                    yOff = yOff - 16
+                                    yOff = yOff - moduleCompactH
                                 end
                             end
                             Gap(2)
@@ -2010,7 +2030,7 @@ function MR:PopulateConfigFrame(f)
             return
         end
 
-        local ROW_H = 22
+        local ROW_H = moduleHeaderH
         local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         headerFr:SetSize(contentW, ROW_H)
@@ -2050,7 +2070,7 @@ function MR:PopulateConfigFrame(f)
         arrowLbl:SetTextColor(0.90, 0.82, 0.42)
 
         local lbl = headerFr:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        lbl:SetFont(FONT_HEADERS, moduleHeaderFs, GetFontFlags())
         lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         lbl:SetJustifyH("LEFT")
@@ -2127,7 +2147,7 @@ function MR:PopulateConfigFrame(f)
             local professionExpansionKey = MR:GetModuleExpansionKey(mod)
             if professionExpansionKey ~= lastProfessionExpansionKey then
                 local expansionInfo = MR:GetExpansionInfo(professionExpansionKey)
-                local ROW_H = 18
+                local ROW_H = moduleRowH
                 local expFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
                 expFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
                 expFr:SetSize(contentW - 4, ROW_H)
@@ -2136,7 +2156,7 @@ function MR:PopulateConfigFrame(f)
                 expFr:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
 
                 local expLbl = expFr:CreateFontString(nil, "OVERLAY")
-                expLbl:SetFont(FONT_HEADERS, 9, GetFontFlags())
+                expLbl:SetFont(FONT_HEADERS, moduleRowFs, GetFontFlags())
                 expLbl:SetPoint("LEFT", expFr, "LEFT", 7, 0)
                 expLbl:SetPoint("RIGHT", expFr, "RIGHT", -7, 0)
                 expLbl:SetJustifyH("LEFT")
@@ -2146,7 +2166,7 @@ function MR:PopulateConfigFrame(f)
                 lastProfessionExpansionKey = professionExpansionKey
             end
 
-            local ROW_H = 24
+            local ROW_H = math.max(24, moduleHeaderFs + 14)
             local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
             headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
             headerFr:SetSize(contentW - 4, ROW_H)
@@ -2249,7 +2269,7 @@ function MR:PopulateConfigFrame(f)
                 local colorSwatch = BuildColorSwatch(headerFr, key, mod, bgSwatch)
 
                 local lbl = headerFr:CreateFontString(nil, "OVERLAY")
-                lbl:SetFont(FONT_ROWS, 10, GetFontFlags())
+                lbl:SetFont(FONT_ROWS, moduleHeaderFs, GetFontFlags())
                 lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
                 lbl:SetPoint("RIGHT", colorSwatch, "LEFT", -2, 0)
                 lbl:SetText(FormatModuleConfigLabel(mod, false))
@@ -2295,7 +2315,7 @@ function MR:PopulateConfigFrame(f)
 
                         local rowFr = CreateFrame("Frame", nil, body)
                         rowFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
-                        rowFr:SetSize(contentW - 20, 18)
+                        rowFr:SetSize(contentW - 20, moduleRowH)
                         rowFr:EnableMouse(true)
                         _cfgRowRows[key] = _cfgRowRows[key] or {}
                         _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = rkey, frame = rowFr, label = row.label }
@@ -2333,7 +2353,7 @@ function MR:PopulateConfigFrame(f)
                         rdot:SetAlpha(enabled and 0.8 or 0.25)
 
                         local rlbl = rowFr:CreateFontString(nil, "OVERLAY")
-                        rlbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                        rlbl:SetFont(FONT_ROWS, moduleRowFs, GetFontFlags())
                         rlbl:SetPoint("LEFT", rowFr, "LEFT", 10, 0)
                         rlbl:SetPoint("RIGHT", rowFr, "RIGHT", -32, 0)
                         rlbl:SetJustifyH("LEFT")
@@ -2361,7 +2381,7 @@ function MR:PopulateConfigFrame(f)
                             enabled and 0.32 or 0.12,
                             enabled and 0.38 or 0.12, 1)
                         local eyeLbl = eyeBtn:CreateFontString(nil, "OVERLAY")
-                        eyeLbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                        eyeLbl:SetFont(FONT_ROWS, moduleRowFs, GetFontFlags())
                         eyeLbl:SetPoint("CENTER", eyeBtn, "CENTER", 0, 0)
                         eyeLbl:SetText(enabled and "o" or "-")
                         eyeLbl:SetTextColor(
@@ -2432,7 +2452,7 @@ function MR:PopulateConfigFrame(f)
                         rowSwatch:SetSize(14, 14)
                         rowSwatch:SetPoint("RIGHT", eyeBtn, "LEFT", -2, 0)
 
-                        yOff = yOff - 19
+                        yOff = yOff - moduleRowH - 1
                     end
 
                     if yOff == guideTopY then
@@ -2445,7 +2465,8 @@ function MR:PopulateConfigFrame(f)
                     Gap(3)
                 end
         elseif optVisible then
-            local ROW_H = 22
+            local ROW_H = moduleHeaderH
+            local moduleAvailable = MR:IsModuleAvailable(mod)
             local headerFr = CreateFrame("Frame", nil, body)
             headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
             headerFr:SetSize(contentW, ROW_H)
@@ -2454,6 +2475,8 @@ function MR:PopulateConfigFrame(f)
             cb:SetSize(20, 20)
             cb:SetPoint("LEFT", headerFr, "LEFT", 18, 0)
             cb:SetChecked(MR:IsModuleEnabled(key))
+            cb:SetEnabled(moduleAvailable)
+            cb:SetAlpha(moduleAvailable and 1 or 0.45)
             cb:SetScript("OnClick", function(s)
                 MR:SetModuleEnabled(key, s:GetChecked(), true)
                 if isStoryConfigModule then
@@ -2544,12 +2567,17 @@ function MR:PopulateConfigFrame(f)
             end)
             table.insert(_cfgRows, { key = key, frame = headerFr, label = mod.label })
 
+            if not moduleAvailable then
+                grip:SetEnabled(false)
+                grip:SetAlpha(0.35)
+            end
+
             local hideBtn = BuildHideCompleteBtn(headerFr, key, arrowBtn)
             local bgSwatch = BuildHeaderBackgroundSwatch(headerFr, key, hideBtn)
             local colorSwatch = BuildColorSwatch(headerFr, key, mod, bgSwatch)
 
             local lbl = headerFr:CreateFontString(nil, "OVERLAY")
-            lbl:SetFont(FONT_ROWS, 10, GetFontFlags())
+            lbl:SetFont(FONT_ROWS, moduleHeaderFs, GetFontFlags())
             lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
             lbl:SetPoint("RIGHT", colorSwatch, "LEFT", -2, 0)
             lbl:SetText(FormatModuleConfigLabel(mod, false))
@@ -2559,6 +2587,10 @@ function MR:PopulateConfigFrame(f)
                 lbl:SetTextColor(hex(customColor or mod.labelColor))
             else
                 lbl:SetTextColor(0.88, 0.88, 0.88)
+            end
+            if not moduleAvailable then
+                lbl:SetTextColor(0.42, 0.46, 0.48)
+                headerFr:SetAlpha(0.70)
             end
 
             yOff = yOff - ROW_H
@@ -2573,6 +2605,7 @@ function MR:PopulateConfigFrame(f)
                 local lastRowPatchKey
                 for _, row in ipairs(GetConfigRowsForModule(mod)) do
                     local rowPatchKey = MR:GetRowPatchKey(mod, row)
+                    local rowAvailable = moduleAvailable and MR:IsPatchAvailable(rowPatchKey)
                     if rowPatchKey and rowPatchKey ~= MR:GetModulePatchKey(mod) and rowPatchKey ~= lastRowPatchKey then
                         BuildRowPatchHeader(rowPatchKey)
                         lastRowPatchKey = rowPatchKey
@@ -2582,12 +2615,13 @@ function MR:PopulateConfigFrame(f)
 
                     local rowFr = CreateFrame("Frame", nil, body)
                     rowFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
-                    rowFr:SetSize(contentW - 20, 18)
+                    rowFr:SetSize(contentW - 20, moduleRowH)
                     rowFr:EnableMouse(true)
+                    rowFr:SetAlpha(rowAvailable and 1 or 0.55)
                     _cfgRowRows[key] = _cfgRowRows[key] or {}
                     _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = rkey, frame = rowFr, label = row.label }
                     rowFr:SetScript("OnMouseDown", function(_, button)
-                        if button ~= "LeftButton" or drag.active then
+                        if not rowAvailable or button ~= "LeftButton" or drag.active then
                             return
                         end
                         drag.active = true
@@ -2620,7 +2654,7 @@ function MR:PopulateConfigFrame(f)
                     rdot:SetAlpha(enabled and 0.8 or 0.25)
 
                     local rlbl = rowFr:CreateFontString(nil, "OVERLAY")
-                    rlbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                    rlbl:SetFont(FONT_ROWS, moduleRowFs, GetFontFlags())
                     rlbl:SetPoint("LEFT", rowFr, "LEFT", 10, 0)
                     rlbl:SetPoint("RIGHT", rowFr, "RIGHT", -32, 0)
                     rlbl:SetJustifyH("LEFT")
@@ -2647,8 +2681,9 @@ function MR:PopulateConfigFrame(f)
                         enabled and 0.15 or 0.35,
                         enabled and 0.32 or 0.12,
                         enabled and 0.38 or 0.12, 1)
+                    eyeBtn:SetEnabled(rowAvailable)
                     local eyeLbl = eyeBtn:CreateFontString(nil, "OVERLAY")
-                    eyeLbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+                    eyeLbl:SetFont(FONT_ROWS, moduleRowFs, GetFontFlags())
                     eyeLbl:SetPoint("CENTER", eyeBtn, "CENTER", 0, 0)
                     eyeLbl:SetText(enabled and "o" or "-")
                     eyeLbl:SetTextColor(
@@ -2719,7 +2754,7 @@ function MR:PopulateConfigFrame(f)
                     rowSwatch:SetSize(14, 14)
                     rowSwatch:SetPoint("RIGHT", eyeBtn, "LEFT", -2, 0)
 
-                    yOff = yOff - 19
+                    yOff = yOff - moduleRowH - 1
                 end
 
                 if yOff == guideTopY then

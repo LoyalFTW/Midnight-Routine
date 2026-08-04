@@ -337,6 +337,13 @@ MR.patches = {
         shortLabel = "12.0.7",
         order = 120007,
     },
+    ["12.1.0"] = {
+        key = "12.1.0",
+        label = L["Patch_1210"] or "12.1 Curse of Ula'tek",
+        shortLabel = "12.1",
+        order = 120100,
+        minInterface = 120100,
+    },
 }
 
 local function DeepCopy(value)
@@ -1149,6 +1156,7 @@ function MR:RegisterPatch(def)
         label = def.label or existing.label or def.key,
         shortLabel = def.shortLabel or existing.shortLabel or def.label or def.key,
         order = def.order or existing.order or 999999,
+        minInterface = def.minInterface or existing.minInterface,
     }
 end
 
@@ -1511,6 +1519,9 @@ end
 
 function MR:IsModuleEnabled(key)
     local mod = self.moduleByKey[key]
+    if mod and not self:IsModuleAvailable(mod) then
+        return false
+    end
     local professionSource = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil
     local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource)
         or self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
@@ -1568,7 +1579,9 @@ function MR:SetAutoEnableNewModules(enabled)
         local known = self:GetActiveKnownModuleStorage()
         if known then
             for _, mod in ipairs(self.modules or {}) do
-                known[mod.key] = true
+                if self:IsModuleAvailable(mod) then
+                    known[mod.key] = true
+                end
             end
         end
     end
@@ -1610,13 +1623,41 @@ function MR:IsPatchEnabled(patchKey)
     if not patchKey then
         return true
     end
+    if not self:IsPatchAvailable(patchKey) then
+        return false
+    end
     local states = self.db and self.db.profile and self.db.profile.patchStates
     local state = states and states[patchKey]
     return not (state and state.enabled == false)
 end
 
+function MR:IsPatchAvailable(patchKey)
+    if not patchKey then
+        return true
+    end
+
+    local info = self:GetPatchInfo(patchKey)
+    if not info.minInterface then
+        return true
+    end
+
+    local interfaceVersion = GetBuildInfo and select(4, GetBuildInfo()) or 0
+    return (tonumber(interfaceVersion) or 0) >= info.minInterface
+end
+
+function MR:IsModuleAvailable(modOrKey)
+    local mod = modOrKey
+    if type(modOrKey) == "string" then
+        mod = self.moduleByKey and self.moduleByKey[modOrKey]
+    end
+    return not mod or self:IsPatchAvailable(mod.patchKey)
+end
+
 function MR:SetPatchEnabled(patchKey, enabled, skipRefresh)
     if not (self and self.db and self.db.profile and patchKey) then
+        return
+    end
+    if not self:IsPatchAvailable(patchKey) then
         return
     end
 
@@ -1698,6 +1739,9 @@ end
 
 function MR:SetModuleEnabled(key, enabled, skipRefresh)
     local mod = self.moduleByKey and self.moduleByKey[key]
+    if mod and not self:IsModuleAvailable(mod) then
+        return
+    end
     local professionSource = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil
     local storage = (mod and mod.profSkillLine) and self:GetActiveProfessionModuleStorage(professionSource)
         or self:GetActiveModuleStorage(self:GetModuleExpansionKey(mod or key))
@@ -3847,6 +3891,16 @@ end
 function MR:CheckScheduledResets()
     self:CheckWeeklyReset()
     self:CheckDailyReset()
+    if self.RefreshDarkmoonVisibility and self:RefreshDarkmoonVisibility() then
+        if self:HasVisibleMainTrackingSurface() then
+            self:RequestDataRefresh()
+        else
+            self:MarkBackgroundDataDirty()
+        end
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
+    end
 end
 
 function MR:OnEnable()
@@ -3876,6 +3930,10 @@ function MR:OnEnable()
     self:RegisterBucketEvent({
         "ZONE_CHANGED_NEW_AREA",
     }, 0.5, "OnZoneChanged")
+
+    self:RegisterBucketEvent({
+        "CALENDAR_UPDATE_EVENT_LIST",
+    }, 0.5, "OnCalendarEventsUpdated")
 
     self:RegisterBucketEvent({
         "CHALLENGE_MODE_COMPLETED",
@@ -4221,9 +4279,34 @@ end
 
 function MR:OnZoneChanged()
     self:UpdateInstanceFrameVisibility()
+    local darkmoonChanged = self.RefreshDarkmoonVisibility and self:RefreshDarkmoonVisibility()
     self:RefreshModuleScans({ "delves", "s1_weekly" }, true)
+    if darkmoonChanged then
+        if self:HasVisibleMainTrackingSurface() then
+            self:RequestDataRefresh()
+        else
+            self:MarkBackgroundDataDirty()
+        end
+        if self.RequestProfessionKnowledgeSurfaceRefresh then
+            self:RequestProfessionKnowledgeSurfaceRefresh()
+        end
+    end
     if self.OnRaresZoneChanged then
         self:OnRaresZoneChanged()
+    end
+end
+
+function MR:OnCalendarEventsUpdated()
+    if not (self.RefreshDarkmoonVisibility and self:RefreshDarkmoonVisibility()) then
+        return
+    end
+    if self:HasVisibleMainTrackingSurface() then
+        self:RequestDataRefresh()
+    else
+        self:MarkBackgroundDataDirty()
+    end
+    if self.RequestProfessionKnowledgeSurfaceRefresh then
+        self:RequestProfessionKnowledgeSurfaceRefresh()
     end
 end
 
