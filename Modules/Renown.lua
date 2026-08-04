@@ -33,6 +33,7 @@ local RefreshRenownFrame
 local RebuildRenownFrame
 local SaveFactionOrder
 local PopulateRenownConfig
+local renownCfgFrame
 
 local function RefreshFonts()
     if ns.EnsureFonts then
@@ -1016,8 +1017,6 @@ RefreshRenownFrame = function()
         renownFrame:SetHeight(headerH)
     end
 end
-
-local renownCfgFrame
 
 local function BuildRenownConfigFrame()
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")

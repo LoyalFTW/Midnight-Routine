@@ -517,7 +517,10 @@ function MR:GetCurrentCharacterKey()
         end
     end
 
-    local name, realm = UnitFullName and UnitFullName("player")
+    local name, realm
+    if UnitFullName then
+        name, realm = UnitFullName("player")
+    end
     if name and realm and realm ~= "" then
         return string.format("%s - %s", name, realm)
     end

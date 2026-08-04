@@ -32,19 +32,62 @@ local DARKMOON_REQUIRED_ITEMS = {
 local cachedVisible
 local cacheExpiresAt = 0
 
+local function CanReadValue(value)
+    if canaccessvalue then
+        return canaccessvalue(value)
+    end
+    if issecretvalue then
+        return not issecretvalue(value)
+    end
+    return true
+end
+
+local function CanReadTable(value)
+    if not CanReadValue(value) then
+        return false
+    end
+    if type(value) ~= "table" then
+        return true
+    end
+    return not canaccesstable or canaccesstable(value)
+end
+
+local function CanReadAll(...)
+    for index = 1, select("#", ...) do
+        if not CanReadValue(select(index, ...)) then
+            return false
+        end
+    end
+    return true
+end
+
 local function CalendarTimeToEpoch(value)
+    if not CanReadTable(value) then
+        return nil
+    end
     if type(value) == "number" then
         return value
     end
     if type(value) ~= "table" or not time then
         return nil
     end
+
+    local year = value.year
+    local month = value.month
+    local monthDay = value.monthDay
+    local day = value.day
+    local hour = value.hour
+    local minute = value.minute
+    if not CanReadAll(year, month, monthDay, day, hour, minute) then
+        return nil
+    end
+
     return time({
-        year = value.year,
-        month = value.month,
-        day = value.monthDay or value.day,
-        hour = value.hour or 0,
-        min = value.minute or 0,
+        year = year,
+        month = month,
+        day = monthDay or day,
+        hour = hour or 0,
+        min = minute or 0,
         sec = 0,
     })
 end
@@ -52,7 +95,7 @@ end
 local function IsHolidayActive(holidayId)
     if not C_DateAndTime or not C_DateAndTime.GetHolidayInfo then return false end
     local info = C_DateAndTime.GetHolidayInfo(holidayId)
-    if not info then return false end
+    if not CanReadTable(info) then return false end
     local startTime = CalendarTimeToEpoch(info.startTime)
     local endTime = CalendarTimeToEpoch(info.endTime)
     local now = GetServerTime and GetServerTime() or time()
@@ -66,7 +109,11 @@ local function GetCurrentCalendarDate()
 
     if C_Calendar and C_Calendar.GetDate then
         local dateOrWeekday, month, monthDay, year = C_Calendar.GetDate()
+        if not CanReadAll(dateOrWeekday, month, monthDay, year) then
+            return nil
+        end
         if type(dateOrWeekday) == "table" then
+            if not CanReadTable(dateOrWeekday) then return nil end
             return dateOrWeekday
         end
         return {
@@ -81,6 +128,7 @@ local function GetCurrentCalendarDate()
 end
 
 local function NormalizeTitle(value)
+    if not CanReadValue(value) then return "" end
     if type(value) ~= "string" then return "" end
     return value:lower():gsub("[%s%p]", "")
 end
@@ -97,7 +145,7 @@ local function IsDarkmoonTitle(value)
 end
 
 local function IsHolidayInfoActive(info)
-    if type(info) ~= "table" then return false end
+    if not CanReadTable(info) or type(info) ~= "table" then return false end
     local startTime = CalendarTimeToEpoch(info.startTime)
     local endTime = CalendarTimeToEpoch(info.endTime)
     if not startTime or not endTime then
@@ -110,25 +158,41 @@ end
 local function IsDarkmoonOnCalendar()
     if not C_Calendar then return false end
     local today = GetCurrentCalendarDate()
-    if not today or not today.monthDay then return false end
+    if not CanReadTable(today) then return false end
+    local monthDay = today.monthDay
+    if not CanReadValue(monthDay) or not monthDay then return false end
 
     if C_Calendar.GetNumDayEvents and C_Calendar.GetDayEvent then
-        local numEvents = C_Calendar.GetNumDayEvents(0, today.monthDay) or 0
+        local numEvents = C_Calendar.GetNumDayEvents(0, monthDay)
+        if not CanReadValue(numEvents) then return false end
+        numEvents = numEvents or 0
         for index = 1, numEvents do
-            local event = C_Calendar.GetDayEvent(0, today.monthDay, index)
-            if event and (event.eventID == HOLIDAY_DARKMOON_FAIRE or IsDarkmoonTitle(event.title))
-                and IsHolidayInfoActive(event) then
-                return true
+            local event = C_Calendar.GetDayEvent(0, monthDay, index)
+            if CanReadTable(event) then
+                local eventID = event.eventID
+                local title = event.title
+                local matchesID = CanReadValue(eventID) and eventID == HOLIDAY_DARKMOON_FAIRE
+                local matchesTitle = CanReadValue(title) and IsDarkmoonTitle(title)
+                if (matchesID or matchesTitle) and IsHolidayInfoActive(event) then
+                    return true
+                end
             end
         end
     end
 
     if C_Calendar.GetHolidayInfo then
         for index = 1, 20 do
-            local info = C_Calendar.GetHolidayInfo(0, today.monthDay, index)
+            local info = C_Calendar.GetHolidayInfo(0, monthDay, index)
+            if not CanReadValue(info) then break end
             if not info then break end
-            if (IsDarkmoonTitle(info.name) or IsDarkmoonTitle(info.description)) and IsHolidayInfoActive(info) then
-                return true
+            if CanReadTable(info) then
+                local name = info.name
+                local description = info.description
+                local matchesName = CanReadValue(name) and IsDarkmoonTitle(name)
+                local matchesDescription = CanReadValue(description) and IsDarkmoonTitle(description)
+                if (matchesName or matchesDescription) and IsHolidayInfoActive(info) then
+                    return true
+                end
             end
         end
     end
@@ -138,8 +202,12 @@ end
 
 local function IsDarkmoonWeekByDate()
     local today = GetCurrentCalendarDate()
-    local monthDay = today and tonumber(today.monthDay)
-    local weekday = today and tonumber(today.weekday)
+    if not CanReadTable(today) then return false end
+    local rawMonthDay = today.monthDay
+    local rawWeekday = today.weekday
+    if not CanReadAll(rawMonthDay, rawWeekday) then return false end
+    local monthDay = tonumber(rawMonthDay)
+    local weekday = tonumber(rawWeekday)
     if not monthDay or not weekday then return false end
 
     local firstWeekday = ((weekday - ((monthDay - 1) % 7) - 1) % 7) + 1
@@ -208,13 +276,9 @@ local function GetRequiredItemDisplay(item)
     if itemID then
         if C_Item and C_Item.GetItemNameByID then
             name = C_Item.GetItemNameByID(itemID) or name
-        elseif GetItemInfo then
-            name = GetItemInfo(itemID) or name
         end
         if C_Item and C_Item.GetItemIconByID then
             icon = C_Item.GetItemIconByID(itemID)
-        elseif GetItemIcon then
-            icon = GetItemIcon(itemID)
         end
         if C_Item and C_Item.RequestLoadItemDataByID then
             C_Item.RequestLoadItemDataByID(itemID)

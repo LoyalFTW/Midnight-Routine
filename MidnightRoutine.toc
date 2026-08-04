@@ -22,6 +22,9 @@ Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua
 Theme.lua
 Locales/Localization.xml
 Core.lua
+Core/Runtime.lua
+Core/Professions.lua
+Core/Scanner.lua
 Core/Resets.lua
 Core/Warband.lua
 
@@ -50,11 +53,11 @@ Modules/ProfessionKnowledge.lua
 UI/WarbandBoard.lua
 UI/CustomTaskDialogs.lua
 UI/EncounterJournalOverlay.lua
+UI/CurrencyIndicators.lua
+UI/IconResolver.lua
 UI.lua
 UI/Config.lua
 WelcomeScreen.lua
 MinimapButton.lua
 Core/Bootstrap.lua
-
-
 
