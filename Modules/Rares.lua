@@ -636,123 +636,27 @@ BuildRaresFrame = function()
         scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -4)
         scroll:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -8, 1)
     else
-        scroll:SetPoint("TOPLEFT",     titleBar, "BOTTOMLEFT",  0, -1)
-        scroll:SetPoint("BOTTOMRIGHT", f,        "BOTTOMRIGHT", -8, 4)
+        scroll:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 0, -1)
+        scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 4)
     end
-    scroll:EnableMouseWheel(true)
     f._scroll = scroll
 
     local content = CreateFrame("Frame", nil, scroll)
-    content:SetWidth(W - 8)
-    content:SetHeight(1)
-    scroll:SetScrollChild(content)
+    content:SetSize(W - 8, 1)
     f._content = content
 
     local track = CreateFrame("Frame", nil, f)
-    track:SetPoint("TOPLEFT",    scroll, "TOPRIGHT",    1, 0)
+    track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 1, 0)
     track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 1, 0)
     track:SetWidth(5)
-    local trackBg = track:CreateTexture(nil, "BACKGROUND")
-    trackBg:SetAllPoints()
-    trackBg:SetColorTexture(0, 0, 0, 0.22)
-    local thumb = CreateFrame("Button", nil, track)
-    thumb:SetWidth(5)
-    thumb:EnableMouse(true)
-    thumb:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
-    local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
-    thumbTex:SetAllPoints()
-    thumbTex:SetColorTexture(0.25, 0.78, 0.68, 0.62)
     f._track = track
+
+    local UpdateScrollBar, thumb = ns.AttachScrollList(scroll, content, track, {
+        hideTrack = true,
+        trackColor = { 0, 0, 0, 0.22 },
+        thumbColor = { 0.25, 0.78, 0.68, 0.62 },
+    })
     f._thumb = thumb
-
-    local function UpdateScrollBar()
-        local viewH    = scroll:GetHeight()
-        local contentH = content:GetHeight()
-        if contentH <= viewH or viewH <= 0 then
-            track:Hide()
-            thumb:Hide()
-            return
-        end
-        if not (MR.db and MR.db.profile and MR.db.profile.raresMinimized) then track:Show() end
-        thumb:Show()
-        local trackH = math.max(track:GetHeight(), 1)
-        local thumbH = math.max(trackH * (viewH / contentH), 14)
-        local pct    = scroll:GetVerticalScroll() / math.max(contentH - viewH, 1)
-        thumb:SetHeight(thumbH)
-        thumb:ClearAllPoints()
-        thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackH - thumbH) * pct))
-    end
-
-    local function SetScrollFromCursor(cursorY, grabOffset)
-        local viewH = scroll:GetHeight()
-        local contentH = content:GetHeight()
-        local maxScroll = math.max(contentH - viewH, 0)
-        if maxScroll <= 0 then
-            scroll:SetVerticalScroll(0)
-            UpdateScrollBar()
-            return
-        end
-
-        local trackTop = track:GetTop()
-        local trackBottom = track:GetBottom()
-        if not trackTop or not trackBottom then return end
-
-        local trackH = math.max(trackTop - trackBottom, 1)
-        local thumbH = thumb:GetHeight()
-        local movable = math.max(trackH - thumbH, 1)
-        local offset = grabOffset or (thumbH * 0.5)
-        local y = math.max(0, math.min((trackTop - cursorY) - offset, movable))
-        local pct = y / movable
-        scroll:SetVerticalScroll(maxScroll * pct)
-        UpdateScrollBar()
-    end
-
-    track:SetScript("OnMouseDown", function(_, button)
-        if button ~= "LeftButton" or not thumb:IsShown() then return end
-        local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
-        SetScrollFromCursor(cursorY, thumb:GetHeight() * 0.5)
-        thumb._grabOffset = thumb:GetHeight() * 0.5
-        thumb:SetScript("OnUpdate", function(self)
-            if not IsMouseButtonDown("LeftButton") then
-                self._grabOffset = nil
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-
-            local _, dragCursorY = GetCursorPosition()
-            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-            SetScrollFromCursor(dragCursorY, self._grabOffset)
-        end)
-    end)
-
-    thumb:SetScript("OnMouseDown", function(self, button)
-        if button ~= "LeftButton" or not self:IsShown() then return end
-        local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
-        local thumbTop = self:GetTop()
-        self._grabOffset = thumbTop and (thumbTop - cursorY) or (self:GetHeight() * 0.5)
-        self:SetScript("OnUpdate", function(btn)
-            if not IsMouseButtonDown("LeftButton") then
-                btn._grabOffset = nil
-                btn:SetScript("OnUpdate", nil)
-                return
-            end
-
-            local _, dragCursorY = GetCursorPosition()
-            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-            SetScrollFromCursor(dragCursorY, btn._grabOffset)
-        end)
-    end)
-
-    thumb:SetScript("OnMouseUp", function(self)
-        self._grabOffset = nil
-        self:SetScript("OnUpdate", nil)
-    end)
-
-    scroll:SetScript("OnMouseWheel",        function(_, d) scroll:SetVerticalScroll(math.max(0, math.min(scroll:GetVerticalScroll() - d * 30, math.max(content:GetHeight() - scroll:GetHeight(), 0)))); UpdateScrollBar() end)
-    scroll:SetScript("OnScrollRangeChanged", function() UpdateScrollBar() end)
-    scroll:SetScript("OnVerticalScroll",     function() UpdateScrollBar() end)
     f.UpdateScrollBar = UpdateScrollBar
 
     f.shimmerElapsed  = 0
@@ -921,24 +825,25 @@ BuildRaresFrame = function()
                                  or (flagged and "today") or nil
                 local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx)
                 SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, true)
-                GameTooltip:SetOwner(hit, "ANCHOR_RIGHT")
-                GameTooltip:ClearLines()
-                GameTooltip:AddLine(rare[1], 1, 1, 1)
-                if killStat == "today" then
-                    GameTooltip:AddLine(L["Rares_Tooltip_KilledToday"], 0.20, 0.85, 0.45)
-                elseif killStat == "week" then
-                    GameTooltip:AddLine(L["Rares_Tooltip_KilledWeek"], 0.85, 0.65, 0.10)
-                elseif achieved then
-                    GameTooltip:AddLine(L["Rares_Tooltip_EverKilled"], 0.88, 0.70, 0.12)
-                else
-                    GameTooltip:AddLine(L["Rares_Tooltip_NotKilled"], 0.50, 0.50, 0.50)
-                end
-                AddWarbandRareTooltipLines(GameTooltip, questId)
-                if rare[3] and rare[4] and rare[5] then
-                    GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
-                end
-                GameTooltip:Show()
+                ns.ShowTooltip(hit, {
+                    build = function(tooltip)
+                        tooltip:AddLine(rare[1], 1, 1, 1)
+                        if killStat == "today" then
+                            tooltip:AddLine(L["Rares_Tooltip_KilledToday"], 0.20, 0.85, 0.45)
+                        elseif killStat == "week" then
+                            tooltip:AddLine(L["Rares_Tooltip_KilledWeek"], 0.85, 0.65, 0.10)
+                        elseif achieved then
+                            tooltip:AddLine(L["Rares_Tooltip_EverKilled"], 0.88, 0.70, 0.12)
+                        else
+                            tooltip:AddLine(L["Rares_Tooltip_NotKilled"], 0.50, 0.50, 0.50)
+                        end
+                        AddWarbandRareTooltipLines(tooltip, questId)
+                        if rare[3] and rare[4] and rare[5] then
+                            tooltip:AddLine(" ")
+                            tooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                        end
+                    end,
+                })
             end)
             hit:SetScript("OnLeave", function()
                 hit._mrHover = nil
@@ -949,7 +854,7 @@ BuildRaresFrame = function()
                                  or (flagged and "today") or nil
                 local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx)
                 SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, false)
-                GameTooltip:Hide()
+                ns.HideTooltip(hit)
             end)
             hit:SetScript("OnMouseUp", function(_, button)
                 if button ~= "LeftButton" or not (rare[3] and rare[4] and rare[5]) then return end

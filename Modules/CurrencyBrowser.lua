@@ -355,12 +355,7 @@ local function ScrollFrameByDelta(frame, delta)
         return
     end
 
-    local maxScroll = math.max((frame.content:GetHeight() or 0) - (frame.scroll:GetHeight() or 0), 0)
-    local current = frame.scroll:GetVerticalScroll() or 0
-    frame.scroll:SetVerticalScroll(math.max(0, math.min(current - delta * 30, maxScroll)))
-    if frame.UpdateScrollBar then
-        frame:UpdateScrollBar()
-    end
+    ns.ScrollByDelta(frame.scroll, frame.content, delta, 30, frame.UpdateScrollBar)
 end
 
 local function EnsureRow(frame, index)
@@ -389,16 +384,17 @@ local function EnsureRow(frame, index)
         if owner and owner.warbandIcon and self._mrHasMarker then
             owner.warbandIcon:Show()
         end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self._mrTooltipText or L["CurrencyBrowser_NotWarbandTransferable"] or "Not Warband transferable", 1, 1, 1, 1, true)
-        GameTooltip:Show()
+        ns.ShowTooltip(self, {
+            text = self._mrTooltipText or L["CurrencyBrowser_NotWarbandTransferable"] or "Not Warband transferable",
+            wrap = true,
+        })
     end)
     row.warbandHitBox:SetScript("OnLeave", function(self)
         local owner = self:GetParent()
         if owner and owner.warbandIcon then
             owner.warbandIcon:Hide()
         end
-        GameTooltip:Hide()
+        ns.HideTooltip(self)
     end)
 
     row.name = row:CreateFontString(nil, "OVERLAY")
@@ -427,13 +423,15 @@ local function EnsureRow(frame, index)
         end
     end)
     row.add:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(L["CurrencyBrowser_AddTooltipTitle"] or "Add to Currencies", 1, 1, 1)
-        GameTooltip:AddLine(L["CurrencyBrowser_AddTooltipText"] or "Adds this currency to MidnightRoutine's current Currencies section.", 0.55, 0.82, 1, true)
-        GameTooltip:Show()
+        ns.ShowTooltip(self, {
+            build = function(tooltip)
+                tooltip:SetText(L["CurrencyBrowser_AddTooltipTitle"] or "Add to Currencies", 1, 1, 1)
+                tooltip:AddLine(L["CurrencyBrowser_AddTooltipText"] or "Adds this currency to MidnightRoutine's current Currencies section.", 0.55, 0.82, 1, true)
+            end,
+        })
     end)
-    row.add:SetScript("OnLeave", function()
-        GameTooltip:Hide()
+    row.add:SetScript("OnLeave", function(self)
+        ns.HideTooltip(self)
     end)
 
     row:SetScript("OnEnter", function(self)
@@ -441,17 +439,19 @@ local function EnsureRow(frame, index)
             self.warbandIcon:Show()
         end
         if self.currencyID then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetCurrencyByID(self.currencyID)
-            AddCurrencyTransferTooltipLines(GameTooltip, self.currencyID)
-            GameTooltip:Show()
+            ns.ShowTooltip(self, {
+                build = function(tooltip)
+                    tooltip:SetCurrencyByID(self.currencyID)
+                    AddCurrencyTransferTooltipLines(tooltip, self.currencyID)
+                end,
+            })
         end
     end)
-    row:SetScript("OnLeave", function()
+    row:SetScript("OnLeave", function(self)
         if row.warbandIcon then
             row.warbandIcon:Hide()
         end
-        GameTooltip:Hide()
+        ns.HideTooltip(self)
     end)
     row:SetScript("OnMouseWheel", function(self, delta)
         ScrollFrameByDelta(self._browserFrame, delta)
@@ -736,17 +736,10 @@ function MR:ShowCurrencyBrowserFrame()
         frame:SetBackdropColor(0.02, 0.03, 0.05, 0.97)
         frame:SetBackdropBorderColor(0.18, 0.22, 0.28, 1)
 
-        local titleBar = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+        local titleBar = ns.TitleBar(frame, TITLE_BAR_HEIGHT)
         frame.titleBar = titleBar
-        titleBar:SetHeight(TITLE_BAR_HEIGHT)
-        titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
-        titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
-        titleBar:SetBackdrop(MakeBackdrop())
-        HookBackdrop(titleBar)
         titleBar:SetBackdropColor(0.03, 0.06, 0.12, 0.98)
         titleBar:SetBackdropBorderColor(0.17, 0.24, 0.32, 1)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
         titleBar:SetScript("OnDragStart", function()
             frame:StartMoving()
         end)
@@ -766,35 +759,36 @@ function MR:ShowCurrencyBrowserFrame()
         frame.count:SetTextColor(0.62, 0.68, 0.76)
         frame.count:Hide()
 
-        local close = CreateFrame("Button", nil, titleBar, "BackdropTemplate")
+        local close = ns.HeaderButton(titleBar, {
+            size = 20,
+            text = "x",
+            font = GetHeaderFont(),
+            fontSize = math.max(9, GetFontSize()),
+            color = { 0.90, 0.58, 0.58, 1 },
+            background = { 0.07, 0.09, 0.12, 1 },
+            border = { 0.28, 0.34, 0.42, 1 },
+            hoverBackground = { 0.24, 0.07, 0.07, 1 },
+            hoverBorder = { 0.80, 0.24, 0.24, 1 },
+            onClick = function() frame:Hide() end,
+        })
         frame.closeButton = close
-        close:SetSize(20, 20)
-        close:SetBackdrop(MakeBackdrop())
-        HookBackdrop(close)
-        close:SetBackdropColor(0.07, 0.09, 0.12, 1)
-        close:SetBackdropBorderColor(0.28, 0.34, 0.42, 1)
-        close.text = close:CreateFontString(nil, "OVERLAY")
+        close.text = close._lbl
         frame.closeText = close.text
-        close.text:SetFont(GetHeaderFont(), math.max(9, GetFontSize()), GetFontFlags())
-        close.text:SetPoint("CENTER")
-        close.text:SetText("x")
-        close.text:SetTextColor(0.90, 0.58, 0.58)
-        close:SetScript("OnClick", function() frame:Hide() end)
 
-        local refresh = CreateFrame("Button", nil, titleBar, "BackdropTemplate")
+        local refresh = ns.HeaderButton(titleBar, {
+            width = 64,
+            height = 20,
+            text = L["CurrencyBrowser_Refresh"] or "Refresh",
+            font = GetRowFont(),
+            fontSize = math.max(8, GetFontSize() - 2),
+            color = { 0.50, 0.95, 0.80, 1 },
+            background = { 0.05, 0.10, 0.13, 1 },
+            border = { 0.18, 0.48, 0.42, 1 },
+            onClick = function() MR:RefreshCurrencyBrowserFrame() end,
+        })
         frame.refreshButton = refresh
-        refresh:SetSize(64, 20)
-        refresh:SetBackdrop(MakeBackdrop())
-        HookBackdrop(refresh)
-        refresh:SetBackdropColor(0.05, 0.10, 0.13, 1)
-        refresh:SetBackdropBorderColor(0.18, 0.48, 0.42, 1)
-        refresh.text = refresh:CreateFontString(nil, "OVERLAY")
+        refresh.text = refresh._lbl
         frame.refreshText = refresh.text
-        refresh.text:SetFont(GetRowFont(), math.max(8, GetFontSize() - 2), GetFontFlags())
-        refresh.text:SetPoint("CENTER")
-        refresh.text:SetText(L["CurrencyBrowser_Refresh"] or "Refresh")
-        refresh.text:SetTextColor(0.50, 0.95, 0.80)
-        refresh:SetScript("OnClick", function() MR:RefreshCurrencyBrowserFrame() end)
 
         local warbandFilter = CreateFrame("Button", nil, frame, "BackdropTemplate")
         frame.warbandFilterButton = warbandFilter
@@ -816,18 +810,20 @@ function MR:ShowCurrencyBrowserFrame()
             end
         end)
         warbandFilter:SetScript("OnEnter", function(selfButton)
-        GameTooltip:SetOwner(selfButton, "ANCHOR_RIGHT")
-        if selfButton:GetParent().showWarbandOnly then
-            GameTooltip:SetText(L["CurrencyBrowser_WarbandFilterActive"] or "Showing Warband currencies", 1, 1, 1, 1, true)
-            GameTooltip:AddLine(L["CurrencyBrowser_WarbandFilterDisable"] or "Click to show all currencies.", 0.55, 0.82, 1, true)
-        else
-            GameTooltip:SetText(L["CurrencyBrowser_WarbandFilterTitle"] or "Show Warband currencies only", 1, 1, 1, 1, true)
-            GameTooltip:AddLine(L["CurrencyBrowser_WarbandFilterText"] or "Filters to Warband transferable and Warband-wide currencies.", 0.55, 0.82, 1, true)
-        end
-            GameTooltip:Show()
+            ns.ShowTooltip(selfButton, {
+                build = function(tooltip)
+                    if selfButton:GetParent().showWarbandOnly then
+                        tooltip:SetText(L["CurrencyBrowser_WarbandFilterActive"] or "Showing Warband currencies", 1, 1, 1, 1, true)
+                        tooltip:AddLine(L["CurrencyBrowser_WarbandFilterDisable"] or "Click to show all currencies.", 0.55, 0.82, 1, true)
+                    else
+                        tooltip:SetText(L["CurrencyBrowser_WarbandFilterTitle"] or "Show Warband currencies only", 1, 1, 1, 1, true)
+                        tooltip:AddLine(L["CurrencyBrowser_WarbandFilterText"] or "Filters to Warband transferable and Warband-wide currencies.", 0.55, 0.82, 1, true)
+                    end
+                end,
+            })
         end)
-        warbandFilter:SetScript("OnLeave", function()
-            GameTooltip:Hide()
+        warbandFilter:SetScript("OnLeave", function(selfButton)
+            ns.HideTooltip(selfButton)
         end)
         SetWarbandFilterButtonState(frame)
 
@@ -868,10 +864,6 @@ function MR:ShowCurrencyBrowserFrame()
         end)
 
         frame.scroll = CreateFrame("ScrollFrame", nil, frame)
-        frame.scroll:EnableMouseWheel(true)
-        frame.scroll:SetScript("OnMouseWheel", function(scroll, delta)
-            ScrollFrameByDelta(frame, delta)
-        end)
         frame:EnableMouseWheel(true)
         frame:SetScript("OnMouseWheel", function(_, delta)
             ScrollFrameByDelta(frame, delta)
@@ -883,135 +875,19 @@ function MR:ShowCurrencyBrowserFrame()
         frame.content:SetScript("OnMouseWheel", function(_, delta)
             ScrollFrameByDelta(frame, delta)
         end)
-        frame.scroll:SetScrollChild(frame.content)
 
         local track = CreateFrame("Frame", nil, frame)
-        frame.scrollTrack = track
         track:SetPoint("TOPLEFT", frame.scroll, "TOPRIGHT", 3, 0)
         track:SetPoint("BOTTOMLEFT", frame.scroll, "BOTTOMRIGHT", 3, 0)
         track:SetWidth(5)
+        frame.scrollTrack = track
 
-        local trackBg = track:CreateTexture(nil, "BACKGROUND")
-        trackBg:SetAllPoints()
-        trackBg:SetColorTexture(0, 0, 0, 0.3)
-
-        local thumb = CreateFrame("Button", nil, track)
+        local UpdateScrollBar, thumb = ns.AttachScrollList(frame.scroll, frame.content, track, {
+            hideTrack = true,
+            thumbColor = { 0.25, 0.65, 0.65, 0.75 },
+        })
+        frame.UpdateScrollBar = UpdateScrollBar
         frame.scrollThumb = thumb
-        thumb:SetWidth(5)
-        thumb:EnableMouse(true)
-        thumb:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
-
-        local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
-        thumbTex:SetAllPoints()
-        thumbTex:SetColorTexture(0.25, 0.65, 0.65, 0.75)
-
-        function frame:UpdateScrollBar()
-            local viewH = self.scroll:GetHeight()
-            local contentH = self.content:GetHeight()
-            local maxScroll = math.max(contentH - viewH, 0)
-            local currentScroll = self.scroll:GetVerticalScroll() or 0
-
-            if currentScroll > maxScroll then
-                self.scroll:SetVerticalScroll(maxScroll)
-                currentScroll = maxScroll
-            elseif currentScroll < 0 then
-                self.scroll:SetVerticalScroll(0)
-                currentScroll = 0
-            end
-
-            if contentH <= viewH or viewH <= 0 then
-                self.scrollTrack:Hide()
-                self.scrollThumb:Hide()
-                return
-            end
-
-            self.scrollTrack:Show()
-            self.scrollThumb:Show()
-            local trackH = math.max(self.scrollTrack:GetHeight(), 1)
-            local thumbH = math.max(trackH * (viewH / contentH), 14)
-            local pct = currentScroll / math.max(maxScroll, 1)
-            self.scrollThumb:SetHeight(thumbH)
-            self.scrollThumb:ClearAllPoints()
-            self.scrollThumb:SetPoint("TOPLEFT", self.scrollTrack, "TOPLEFT", 0, -((trackH - thumbH) * pct))
-        end
-
-        local function SetScrollFromCursor(cursorY, grabOffset)
-            local viewH = frame.scroll:GetHeight()
-            local contentH = frame.content:GetHeight()
-            local maxScroll = math.max(contentH - viewH, 0)
-            if maxScroll <= 0 then
-                frame.scroll:SetVerticalScroll(0)
-                frame:UpdateScrollBar()
-                return
-            end
-
-            local trackTop = track:GetTop()
-            local trackBottom = track:GetBottom()
-            if not trackTop or not trackBottom then return end
-
-            local trackH = math.max(trackTop - trackBottom, 1)
-            local thumbH = thumb:GetHeight()
-            local movable = math.max(trackH - thumbH, 1)
-            local offset = grabOffset or (thumbH * 0.5)
-            local y = math.max(0, math.min((trackTop - cursorY) - offset, movable))
-            frame.scroll:SetVerticalScroll(maxScroll * (y / movable))
-            frame:UpdateScrollBar()
-        end
-
-        track:SetScript("OnMouseDown", function(_, button)
-            if button ~= "LeftButton" or not thumb:IsShown() then return end
-            local _, cursorY = GetCursorPosition()
-            cursorY = cursorY / UIParent:GetEffectiveScale()
-            SetScrollFromCursor(cursorY, thumb:GetHeight() * 0.5)
-            thumb._dragging = true
-            thumb._grabOffset = thumb:GetHeight() * 0.5
-            thumb:SetScript("OnUpdate", function(self)
-                if not IsMouseButtonDown("LeftButton") then
-                    self._dragging = nil
-                    self._grabOffset = nil
-                    self:SetScript("OnUpdate", nil)
-                    return
-                end
-
-                local _, dragCursorY = GetCursorPosition()
-                dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-                SetScrollFromCursor(dragCursorY, self._grabOffset)
-            end)
-        end)
-
-        thumb:SetScript("OnMouseDown", function(self, button)
-            if button ~= "LeftButton" or not self:IsShown() then return end
-            local _, cursorY = GetCursorPosition()
-            cursorY = cursorY / UIParent:GetEffectiveScale()
-            local thumbTop = self:GetTop()
-            self._grabOffset = thumbTop and (thumbTop - cursorY) or (self:GetHeight() * 0.5)
-            self._dragging = true
-            self:SetScript("OnUpdate", function(btn)
-                if not IsMouseButtonDown("LeftButton") then
-                    btn._dragging = nil
-                    btn._grabOffset = nil
-                    btn:SetScript("OnUpdate", nil)
-                    return
-                end
-
-                local _, dragCursorY = GetCursorPosition()
-                dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-                SetScrollFromCursor(dragCursorY, btn._grabOffset)
-            end)
-        end)
-
-        thumb:SetScript("OnMouseUp", function(self)
-            self._dragging = nil
-            self._grabOffset = nil
-            self:SetScript("OnUpdate", nil)
-        end)
-
-        frame.scroll:SetScript("OnScrollRangeChanged", function()
-            frame:UpdateScrollBar()
-        end)
-        frame.scroll:SetScript("OnVerticalScroll", function()
-            frame:UpdateScrollBar()
-        end)
 
         function frame:LayoutChrome()
             titleBar:SetHeight(TITLE_BAR_HEIGHT)

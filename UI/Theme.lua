@@ -85,12 +85,14 @@ local SCRIPT_RANGES = {
     { 0xF900, 0xFAFF, nil      },
 }
 
+local UTF8 = _G.utf8
+
 local function DetectScriptFont(text)
     if type(text) ~= "string" or text == "" then
         return nil
     end
 
-    if not utf8 or not utf8.codes then
+    if not UTF8 or not UTF8.codes then
         if text:find("[\128-\255]") then
             local loc = GetLocale and GetLocale() or ""
             return SCRIPT_FONTS[loc] or SCRIPT_FONTS.zhCN
@@ -99,7 +101,7 @@ local function DetectScriptFont(text)
     end
 
     local locale = GetLocale and GetLocale() or ""
-    for _, cp in utf8.codes(text) do
+    for _, cp in UTF8.codes(text) do
         for _, r in ipairs(SCRIPT_RANGES) do
             if cp >= r[1] and cp <= r[2] then
                 if r[3] then
@@ -559,135 +561,6 @@ function ns.LeftAccent(parent, r, g, b)
     return group
 end
 
-function ns.TitleBar(parent, height)
-    height = height or 36
-    local bar = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    bar:SetPoint("TOPLEFT")
-    bar:SetPoint("TOPRIGHT")
-    bar:SetHeight(height)
-    bar:SetBackdrop(ns.MakeBackdrop(false))
-    HookFrameBackdrop(bar)
-    bar:SetBackdropColor(COLORS.titlebar[1], COLORS.titlebar[2], COLORS.titlebar[3], 1)
-    bar:EnableMouse(true)
-    bar:RegisterForDrag("LeftButton")
-    return bar
-end
-
-function ns.CloseButton(parent, onClose)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(16, 16)
-    btn:SetPoint("RIGHT", parent, "RIGHT", -6, 0)
-    btn:SetBackdrop(ns.MakeBackdrop())
-    btn:SetBackdropColor(0.12, 0.04, 0.04, 1)
-    btn:SetBackdropBorderColor(0.45, 0.12, 0.12, 1)
-
-    local lbl = btn:CreateFontString(nil, "OVERLAY")
-    lbl:SetFont(ns.FONT_HEADERS, 11, ns.GetFontFlags())
-    lbl:SetPoint("CENTER", btn, "CENTER", 0, 1)
-    lbl:SetText("x")
-    lbl:SetTextColor(0.75, 0.28, 0.28)
-
-    btn:SetScript("OnEnter", function()
-        btn:SetBackdropColor(0.35, 0.06, 0.06, 1)
-        btn:SetBackdropBorderColor(0.90, 0.25, 0.25, 1)
-        lbl:SetTextColor(1, 1, 1)
-    end)
-    btn:SetScript("OnLeave", function()
-        btn:SetBackdropColor(0.12, 0.04, 0.04, 1)
-        btn:SetBackdropBorderColor(0.45, 0.12, 0.12, 1)
-        lbl:SetTextColor(0.75, 0.28, 0.28)
-    end)
-
-    if onClose then
-        btn:SetScript("OnClick", onClose)
-    end
-
-    return btn
-end
-
-function ns.HeaderIconButton(parent, texturePath, tintColor, hoverTintColor, tooltipText, onClick)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(16, 16)
-    btn:SetBackdrop(ns.MakeBackdrop())
-    btn:SetBackdropColor(0.06, 0.12, 0.22, 0.85)
-    btn:SetBackdropBorderColor(0.15, 0.35, 0.40, 0.9)
-
-    local tex = btn:CreateTexture(nil, "OVERLAY")
-    tex:SetSize(14, 14)
-    tex:SetPoint("CENTER")
-    tex:SetTexture(texturePath)
-    tex:SetVertexColor((tintColor and tintColor[1]) or 1, (tintColor and tintColor[2]) or 1, (tintColor and tintColor[3]) or 1)
-
-    btn:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.08, 0.22, 0.32, 1)
-        self:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
-        tex:SetVertexColor((hoverTintColor and hoverTintColor[1]) or 1, (hoverTintColor and hoverTintColor[2]) or 1, (hoverTintColor and hoverTintColor[3]) or 1)
-        if tooltipText then
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:SetText(tooltipText, 1, 1, 1)
-            GameTooltip:Show()
-        end
-    end)
-    btn:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(0.06, 0.12, 0.22, 0.85)
-        self:SetBackdropBorderColor(0.15, 0.35, 0.40, 0.9)
-        tex:SetVertexColor((tintColor and tintColor[1]) or 1, (tintColor and tintColor[2]) or 1, (tintColor and tintColor[3]) or 1)
-        GameTooltip:Hide()
-    end)
-
-    if onClick then
-        btn:SetScript("OnClick", onClick)
-    end
-
-    btn._iconTex = tex
-    return btn
-end
-
-function ns.HeaderToggleButton(parent, getLabel, tooltipText, onClick)
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(16, 16)
-    btn:SetBackdrop(ns.MakeBackdrop())
-    btn:SetBackdropColor(0.06, 0.12, 0.22, 0.85)
-    btn:SetBackdropBorderColor(0.15, 0.35, 0.40, 0.9)
-
-    local lbl = btn:CreateFontString(nil, "OVERLAY")
-    lbl:SetFont(ns.FONT_HEADERS, 12, ns.GetFontFlags())
-    lbl:SetPoint("CENTER", btn, "CENTER", 0, 1)
-    lbl:SetTextColor(0.25, 0.80, 0.68)
-
-    local function RefreshLabel()
-        lbl:SetText(type(getLabel) == "function" and getLabel() or tostring(getLabel or "-"))
-    end
-
-    btn:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.08, 0.22, 0.32, 1)
-        self:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
-        lbl:SetTextColor(1, 1, 1)
-        if tooltipText then
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:SetText(tooltipText, 1, 1, 1)
-            GameTooltip:Show()
-        end
-    end)
-    btn:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(0.06, 0.12, 0.22, 0.85)
-        self:SetBackdropBorderColor(0.15, 0.35, 0.40, 0.9)
-        lbl:SetTextColor(0.25, 0.80, 0.68)
-        GameTooltip:Hide()
-    end)
-    btn:SetScript("OnClick", function(...)
-        if onClick then
-            onClick(...)
-        end
-        RefreshLabel()
-    end)
-
-    RefreshLabel()
-    btn._label = lbl
-    btn.RefreshLabel = RefreshLabel
-    return btn
-end
-
 function ns.SaveFramePos(frame, key)
     local addon = ns.MR
     if not addon or not addon.db then
@@ -1081,17 +954,19 @@ function ns.OptionsColorSwatch(parent, r, g, b, onPick, onReset, tooltip)
     end)
     swatch:SetScript("OnEnter", function()
         swatch:SetBackdropBorderColor(0.9, 0.9, 0.9, 1)
-        GameTooltip:SetOwner(swatch, "ANCHOR_RIGHT")
-        GameTooltip:SetText(tooltip or "Color", 1, 1, 1)
-        GameTooltip:AddLine("Left-click: Pick color", 0.5, 0.5, 0.5)
-        if onReset then
-            GameTooltip:AddLine("Right-click: Reset", 0.5, 0.5, 0.5)
-        end
-        GameTooltip:Show()
+        ns.ShowTooltip(swatch, {
+            build = function(activeTooltip)
+                activeTooltip:SetText(tooltip or "Color", 1, 1, 1)
+                activeTooltip:AddLine("Left-click: Pick color", 0.5, 0.5, 0.5)
+                if onReset then
+                    activeTooltip:AddLine("Right-click: Reset", 0.5, 0.5, 0.5)
+                end
+            end,
+        })
     end)
     swatch:SetScript("OnLeave", function()
         swatch:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-        GameTooltip:Hide()
+        ns.HideTooltip(swatch)
     end)
     return swatch
 end

@@ -208,16 +208,18 @@ local function ShowRenownTooltip(owner, faction)
     local cr, cg, cb = GetFactionColor(faction)
     local capped = C_MajorFactions.HasMaximumRenown(faction.factionId)
 
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    GameTooltip:SetText(string.format("|cff%s%s|r", faction.hex, faction.label), 1, 1, 1)
-    GameTooltip:AddLine(string.format(L["Renown_Level"], renown, maxRenown), cr, cg, cb)
-    if capped then
-        GameTooltip:AddLine(L["Renown_MaxReached"], 0.2, 1, 0.5)
-    else
-        GameTooltip:AddLine(string.format(L["Renown_Progress"], rep, needed), 0.7, 0.7, 0.7)
-        GameTooltip:AddLine(string.format(L["Renown_RepToNext"], needed - rep), 0.5, 0.5, 0.5)
-    end
-    GameTooltip:Show()
+    ns.ShowTooltip(owner, {
+        build = function(tooltip)
+            tooltip:SetText(string.format("|cff%s%s|r", faction.hex, faction.label), 1, 1, 1)
+            tooltip:AddLine(string.format(L["Renown_Level"], renown, maxRenown), cr, cg, cb)
+            if capped then
+                tooltip:AddLine(L["Renown_MaxReached"], 0.2, 1, 0.5)
+            else
+                tooltip:AddLine(string.format(L["Renown_Progress"], rep, needed), 0.7, 0.7, 0.7)
+                tooltip:AddLine(string.format(L["Renown_RepToNext"], needed - rep), 0.5, 0.5, 0.5)
+            end
+        end,
+    })
 end
 
 local function ApplyFactionEmblem(texture, fallbackLabel, faction, r, g, b)
@@ -563,7 +565,7 @@ local function BuildRenownFrame()
         emblem:SetScript("OnLeave", function()
             local v = (renownFrame and renownFrame.bgAlpha) or 1.0
             SetEmblemChrome(emblem, plate, glow, cr, cg, cb, v, false)
-            GameTooltip:Hide()
+            ns.HideTooltip(emblem)
         end)
         emblem:SetScript("OnClick", function(_, button)
             if button == "LeftButton" then
@@ -693,25 +695,14 @@ local function BuildRenownFrame()
             rowFrame:SetBackdropColor(0.025 + cr * 0.055, 0.030 + cg * 0.055, 0.040 + cb * 0.055, 0.98 * v)
             rowFrame:SetBackdropBorderColor(cr * 0.75, cg * 0.75, cb * 0.75, v)
             rowGlow:SetColorTexture(cr, cg, cb, db.renownCompact and 0.16 or 0.10)
-            local renown, maxRenown, rep, needed = GetRenownData(faction)
-            local capped = C_MajorFactions.HasMaximumRenown(faction.factionId)
-            GameTooltip:SetOwner(rowFrame, "ANCHOR_RIGHT")
-            GameTooltip:SetText(string.format("|cff%s%s|r", faction.hex, faction.label), 1, 1, 1)
-            GameTooltip:AddLine(string.format(L["Renown_Level"], renown, maxRenown), cr, cg, cb)
-            if capped then
-                GameTooltip:AddLine(L["Renown_MaxReached"], 0.2, 1, 0.5)
-            else
-                GameTooltip:AddLine(string.format(L["Renown_Progress"], rep, needed), 0.7, 0.7, 0.7)
-                GameTooltip:AddLine(string.format(L["Renown_RepToNext"], needed - rep), 0.5, 0.5, 0.5)
-            end
-            GameTooltip:Show()
+            ShowRenownTooltip(rowFrame, faction)
         end)
         rowFrame:SetScript("OnLeave", function()
             local v = db.renownCompact and 1.0 or ((renownFrame and renownFrame.bgAlpha) or 1.0)
             rowFrame:SetBackdropColor(0.018 + cr * 0.035, 0.022 + cg * 0.035, 0.032 + cb * 0.035, 0.92 * v)
             rowFrame:SetBackdropBorderColor(cr * 0.28, cg * 0.28, cb * 0.28, 0.65 * v)
             rowGlow:SetColorTexture(cr, cg, cb, db.renownCompact and 0.09 or 0.055)
-            GameTooltip:Hide()
+            ns.HideTooltip(rowFrame)
         end)
         rowFrame:SetScript("OnClick", function(_, button)
             if button == "LeftButton" then

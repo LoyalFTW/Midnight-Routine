@@ -24,16 +24,45 @@ local function CleanAccountLabel(text)
     return text:gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
 end
 
+local professionLabelCache = {}
+
 local function GetProfessionLabelBySkillLine(skillLineID)
-    if MR and MR.modules then
-        for _, mod in ipairs(MR.modules) do
-            if mod.profSkillLine == skillLineID and mod.label then
-                return CleanAccountLabel(mod.label)
+    local cached = professionLabelCache[skillLineID]
+    if cached then
+        return cached
+    end
+
+    for _, expansion in ipairs(ns.AllExpansions or {}) do
+        for _, profession in ipairs(expansion.professions or {}) do
+            if profession.skillLine == skillLineID and profession.label then
+                local label = CleanAccountLabel(profession.label)
+                professionLabelCache[skillLineID] = label
+                return label
             end
         end
     end
 
-    return tostring(skillLineID or "")
+    if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
+        local info = C_TradeSkillUI.GetProfessionInfoBySkillLineID(skillLineID)
+        local label = info and (info.parentProfessionName or info.professionName)
+        if type(label) == "string" and label ~= "" then
+            label = CleanAccountLabel(label)
+            professionLabelCache[skillLineID] = label
+            return label
+        end
+    end
+
+    if MR and MR.modules then
+        for _, mod in ipairs(MR.modules) do
+            if mod.profSkillLine == skillLineID and mod.label then
+                local label = CleanAccountLabel(mod.label)
+                professionLabelCache[skillLineID] = label
+                return label
+            end
+        end
+    end
+
+    return nil
 end
 
 local function EstimateCurrencyQuantity(currencyInfo)
@@ -215,20 +244,19 @@ function MR:MoveAltBoardCharacter(charKey, direction)
     table.insert(order, target, moved)
     self:SetAltBoardCharacterOrder(order)
 
-    if self.RefreshWarbandBoard then
-        self:RefreshWarbandBoard()
-    end
-    if self.RefreshMainAltPicker then
-        self:RefreshMainAltPicker()
-    end
-    if self.RefreshConcentrationTracker then
-        self:RefreshConcentrationTracker()
+    if self.RefreshWarbandCharacterSurfaces then
+        self:RefreshWarbandCharacterSurfaces()
     end
     return true
 end
 
 function MR:SetAltBoardCharacterPosition(charKey, targetCharKey, afterTarget)
     if type(charKey) ~= "string" or charKey == "" or type(targetCharKey) ~= "string" or targetCharKey == "" or charKey == targetCharKey then
+        return false
+    end
+
+    local currentKey = self:GetCurrentCharacterKey()
+    if charKey == currentKey or targetCharKey == currentKey then
         return false
     end
 
@@ -312,14 +340,8 @@ function MR:SetAltBoardCharacterPosition(charKey, targetCharKey, afterTarget)
     table.insert(order, insertIndex, moved)
     self:SetAltBoardCharacterOrder(order)
 
-    if self.RefreshWarbandBoard then
-        self:RefreshWarbandBoard()
-    end
-    if self.RefreshMainAltPicker then
-        self:RefreshMainAltPicker()
-    end
-    if self.RefreshConcentrationTracker then
-        self:RefreshConcentrationTracker()
+    if self.RefreshWarbandCharacterSurfaces then
+        self:RefreshWarbandCharacterSurfaces()
     end
     return true
 end
@@ -415,11 +437,8 @@ function MR:MoveAltBoardConcentrationProfession(skillLineID, direction)
     table.insert(order, target, moved)
     self:SetAltBoardConcentrationOrder(order)
 
-    if self.RefreshWarbandBoard then
-        self:RefreshWarbandBoard()
-    end
-    if self.RefreshConcentrationTracker then
-        self:RefreshConcentrationTracker()
+    if self.RefreshWarbandDataSurfaces then
+        self:RefreshWarbandDataSurfaces()
     end
     return true
 end
@@ -499,11 +518,8 @@ function MR:SetAltBoardConcentrationProfessionPosition(skillLineID, targetSkillL
 
     self:SetAltBoardConcentrationOrder(order)
 
-    if self.RefreshWarbandBoard then
-        self:RefreshWarbandBoard()
-    end
-    if self.RefreshConcentrationTracker then
-        self:RefreshConcentrationTracker()
+    if self.RefreshWarbandDataSurfaces then
+        self:RefreshWarbandDataSurfaces()
     end
     return true
 end
@@ -547,18 +563,23 @@ end
 
 function MR:SetMainAltViewCharacter(charKey)
     local currentKey = self:GetCurrentCharacterKey()
+    local nextKey
     if not charKey or charKey == currentKey then
-        self.mainAltViewCharKey = nil
+        nextKey = nil
     elseif self.db and self.db.sv and self.db.sv.char and self.db.sv.char[charKey] then
-        self.mainAltViewCharKey = charKey
+        nextKey = charKey
+    else
+        return false
     end
 
+    if self.mainAltViewCharKey == nextKey then
+        return false
+    end
+
+    self.mainAltViewCharKey = nextKey
     self._moduleStatsCache = nil
     if self.RefreshUI then
         self:RefreshUI()
-    end
-    if self.RefreshMainAltPicker then
-        self:RefreshMainAltPicker()
     end
     if self.RequestConfigRepopulate then
         self:RequestConfigRepopulate(nil, 0.04)
@@ -569,6 +590,11 @@ function MR:SetMainAltViewCharacter(charKey)
     if self.RepopulateGatheringConfig then
         self:RepopulateGatheringConfig()
     end
+    return true
+end
+
+function MR:ParseCharacterKey(charKey)
+    return ParseCharacterKey(charKey)
 end
 
 function MR:GetMainAltViewCharacterInfo()
@@ -621,12 +647,27 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
             local note = self:GetAltBoardCharacterNote(charKey)
             local savedProfessions = type(charData.professions) == "table" and charData.professions or nil
             local savedConcentration = type(charData.professionConcentration) == "table" and charData.professionConcentration or nil
+            local professionLabels = {}
+            local seenProfessionLabels = {}
+            if savedProfessions then
+                for skillLineID, learned in pairs(savedProfessions) do
+                    if learned then
+                        local label = GetProfessionLabelBySkillLine(skillLineID)
+                        if label and not seenProfessionLabels[label] then
+                            professionLabels[#professionLabels + 1] = label
+                            seenProfessionLabels[label] = true
+                        end
+                    end
+                end
+                table.sort(professionLabels)
+            end
             local snapshot = {
                 key = charKey,
                 name = name,
                 realm = realm,
                 classFile = charData.classFile,
                 note = note,
+                professionLabels = professionLabels,
                 isCurrent = (charKey == currentKey),
                 stale = stale,
                 hidden = hidden,
@@ -791,7 +832,8 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
             end
 
             local hasConcentration = type(snapshot.concentration) == "table" and #snapshot.concentration > 0
-            if (snapshot.totalRows > 0 or hasConcentration) and ((showHidden and hidden) or ((not showHidden) and (not hidden))) then
+            local matchesHiddenFilter = snapshot.isCurrent or (showHidden and hidden) or ((not showHidden) and (not hidden))
+            if (snapshot.isCurrent or snapshot.totalRows > 0 or hasConcentration) and matchesHiddenFilter then
                 table.insert(results, snapshot)
             end
         end
@@ -799,13 +841,13 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
 
     local characterOrderIndex = GetCharacterOrderIndex(self:GetAltBoardCharacterOrder())
     table.sort(results, function(a, b)
+        if a.isCurrent ~= b.isCurrent then
+            return a.isCurrent
+        end
         local aOrder = characterOrderIndex[a.key] or math.huge
         local bOrder = characterOrderIndex[b.key] or math.huge
         if aOrder ~= bOrder then
             return aOrder < bOrder
-        end
-        if a.isCurrent ~= b.isCurrent then
-            return a.isCurrent
         end
         if a.stale ~= b.stale then
             return not a.stale

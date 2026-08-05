@@ -59,19 +59,45 @@ local function IsRaidVaultMaxed()
     return (vd["vault_r_slots"] or 0) >= 3 and (vd["vault_r_diff_id"] or 0) == 16
 end
 
+local VAULT_SCAN_KEYS = {
+    "vault_d_progress",
+    "vault_d_max_level",
+    "vault_d_slots",
+    "vault_d_tier_label",
+    "vault_d_tier_color",
+    "vault_r_progress",
+    "vault_r_diff_id",
+    "vault_r_diff_label",
+    "vault_r_diff_color",
+    "vault_r_slots",
+    "vault_w_progress",
+    "vault_w_slots",
+    "vault_combined_slots",
+}
+
+local function GetVaultScanSignature(vaultData)
+    local values = {}
+    for index, key in ipairs(VAULT_SCAN_KEYS) do
+        values[index] = tostring(vaultData[key])
+    end
+    return table.concat(values, "\031")
+end
+
 MR:RegisterModule({
     key         = "great_vault",
     label       = L["GreatVault_Title"],
     labelColor  = "#ff8000",
     resetType   = "weekly",
     defaultOpen = true,
+    scanReturnsChanged = true,
 
     onScan = function(mod)
         local db = MR.db.char.progress
         if not db[mod.key] then db[mod.key] = {} end
         local vd = db[mod.key]
         local buckets = MR.GetWeeklyRewardActivityBuckets and MR:GetWeeklyRewardActivityBuckets() or nil
-        if not buckets then return end
+        if not buckets then return false end
+        local before = GetVaultScanSignature(vd)
 
         vd["vault_d_progress"]  = 0
         vd["vault_d_max_level"] = 0
@@ -134,6 +160,7 @@ MR:RegisterModule({
         vd["vault_w_slots"] = (w >= 8 and 3) or (w >= 4 and 2) or (w >= 2 and 1) or 0
 
         vd["vault_combined_slots"] = (vd["vault_r_slots"] or 0) + (vd["vault_d_slots"] or 0) + (vd["vault_w_slots"] or 0)
+        return before ~= GetVaultScanSignature(vd)
     end,
 
     rows = {

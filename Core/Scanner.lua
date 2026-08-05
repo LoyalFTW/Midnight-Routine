@@ -6,25 +6,6 @@ local DeepCopy = CoreData.DeepCopy
 local SetProgressValue = CoreData.SetProgressValue
 local PruneProgressStore = CoreData.PruneProgressStore
 
-MR.spellIndex = MR.spellIndex or {}
-local spellIndex = MR.spellIndex
-
-function MR:BuildSpellIndex()
-    wipe(spellIndex)
-    for _, mod in ipairs(self.modules) do
-        for _, row in ipairs(mod.rows) do
-            if row.spellId then
-                spellIndex[row.spellId] = {
-                    modKey = mod.key,
-                    rowKey = row.key,
-                    amount = row.spellAmount or 1,
-                    max    = row.max or 1,
-                }
-            end
-        end
-    end
-end
-
 local function WriteProgress(progress, modKey, rowKey, val, overrides)
     if overrides and overrides[modKey] then
         local mo = overrides[modKey][rowKey]
@@ -457,44 +438,28 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
         return false
     end
 
-    local ran = false
+    self._moduleScanPassCount = (self._moduleScanPassCount or 0) + 1
     local dirty = false
+    local scannedModules = {}
     for _, moduleKey in ipairs(moduleKeys) do
         local mod = self.moduleByKey and self.moduleByKey[moduleKey]
         if mod and mod.onScan and self:IsModuleEnabled(moduleKey) then
+            self._moduleScanModuleCount = (self._moduleScanModuleCount or 0) + 1
             if not self.db.char.progress[moduleKey] then
                 self.db.char.progress[moduleKey] = {}
             end
-            local trustChangedResult = mod.scanReturnsChanged == true
-            local beforeProgress
-            local beforeRows
-            if not trustChangedResult then
-                beforeProgress = DeepCopy(self.db.char.progress[moduleKey])
-                beforeRows = {}
-                for _, row in ipairs(mod.rows or {}) do
-                    beforeRows[row.key] = RowScanSignature(row)
-                end
+            local scanState = {
+                key = moduleKey,
+                mod = mod,
+                beforeProgress = DeepCopy(self.db.char.progress[moduleKey]),
+                beforeRows = {},
+            }
+            for _, row in ipairs(mod.rows or {}) do
+                scanState.beforeRows[row.key] = RowScanSignature(row)
             end
+            scannedModules[#scannedModules + 1] = scanState
 
-            local changed = mod.onScan(mod) == true
-            if PruneProgressStore(self.db.char.progress) then
-                changed = true
-            end
-            if self.db.global and PruneProgressStore(self.db.global.customTaskProgress) then
-                changed = true
-            end
-            if not trustChangedResult and not changed and not ValuesEqual(beforeProgress, self.db.char.progress[moduleKey]) then
-                changed = true
-            end
-            if not trustChangedResult and not changed then
-                for _, row in ipairs(mod.rows or {}) do
-                    local beforeRow = beforeRows[row.key]
-                    if beforeRow ~= RowScanSignature(row) then
-                        changed = true
-                        break
-                    end
-                end
-            end
+            mod.onScan(mod)
 
             self.db.char.rowVisibility = self.db.char.rowVisibility or {}
             self.db.char.rowVisibility[moduleKey] = self.db.char.rowVisibility[moduleKey] or {}
@@ -502,16 +467,35 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
             for _, row in ipairs(mod.rows or {}) do
                 local currentVisible = row.isVisible and row.isVisible() == true or nil
                 if visibilityBucket[row.key] ~= currentVisible then
-                    changed = true
+                    scanState.visibilityChanged = true
                 end
                 visibilityBucket[row.key] = currentVisible
             end
-
-            if changed then
-                dirty = true
-            end
-            ran = true
         end
+    end
+
+    PruneProgressStore(self.db.char.progress)
+    if self.db.global then
+        PruneProgressStore(self.db.global.customTaskProgress)
+    end
+
+    local emptyProgress = {}
+    for _, scanState in ipairs(scannedModules) do
+        local moduleChanged = scanState.visibilityChanged == true
+        local afterProgress = self.db.char.progress[scanState.key] or emptyProgress
+        if not ValuesEqual(scanState.beforeProgress, afterProgress) then
+            moduleChanged = true
+        end
+        for _, row in ipairs(scanState.mod.rows or {}) do
+            if scanState.beforeRows[row.key] ~= RowScanSignature(row) then
+                moduleChanged = true
+                break
+            end
+        end
+        if moduleChanged and self.NoteRefreshSource then
+            self:NoteRefreshSource("ModuleScanChanged:" .. scanState.key)
+        end
+        dirty = dirty or moduleChanged
     end
 
     if dirty then
@@ -574,41 +558,42 @@ function MR:Scan()
     self._scanCount = (self._scanCount or 0) + 1
     self._scanInProgress = true
     self.db.char.lastSyncAt = GetServerTime()
+    local beforeProgress = DeepCopy(self.db.char.progress)
+    local beforeRows = {}
+    for _, mod in ipairs(self.modules) do
+        if self:IsModuleEnabled(mod.key) then
+            local rows = {}
+            beforeRows[mod.key] = rows
+            for _, row in ipairs(mod.rows or {}) do
+                rows[row.key] = RowScanSignature(row)
+            end
+        end
+    end
     local concentrationChanged = self:RefreshProfessionConcentration()
 
     local progress = self.db.char.progress
-    local dirty    = concentrationChanged and true or false
 
     for _, mod in ipairs(self.modules) do
         if self:IsModuleEnabled(mod.key) then
             for _, row in ipairs(mod.rows) do
             if row.questIds and not row.turnInTracked then
-                if UpdateQuestProgressForRow(self, progress, mod, row) then
-                    dirty = true
-                end
+                UpdateQuestProgressForRow(self, progress, mod, row)
             elseif row.questIds and row.turnInTracked and row.allowQuestFlagBackfill then
                 local currentValue = progress[mod.key] and progress[mod.key][row.key] or 0
-                if currentValue <= 0 and UpdateQuestProgressForRow(self, progress, mod, row) then
-                    dirty = true
+                if currentValue <= 0 then
+                    UpdateQuestProgressForRow(self, progress, mod, row)
                 end
             end
             if row.currencyId then
-                if UpdateCurrencyProgressForRow(self, progress, mod, row) then
-                    dirty = true
-                end
+                UpdateCurrencyProgressForRow(self, progress, mod, row)
             end
             if row.itemId and not row.noItemProgress then
-                if UpdateItemProgressForRow(self, progress, mod, row) then
-                    dirty = true
-                end
+                UpdateItemProgressForRow(self, progress, mod, row)
             end
             end
 
             if mod.onScan then
-                local changed = mod.onScan(mod)
-                if changed == true or mod.scanReturnsChanged ~= true then
-                    dirty = true
-                end
+                mod.onScan(mod)
             end
 
             local mdb = progress[mod.key]
@@ -621,7 +606,7 @@ function MR:Scan()
                             local mo = _ov[mod.key][row.key]
                             if mo and mo > capped then capped = mo end
                         end
-                        if SetProgressValue(progress, mod.key, row.key, capped) then dirty = true end
+                        SetProgressValue(progress, mod.key, row.key, capped)
                     end
                     if row.liveTierLabelKey then
                         row.vaultLabel = mdb[row.liveTierLabelKey]
@@ -634,8 +619,26 @@ function MR:Scan()
         end
     end
 
-    if PruneProgressStore(progress) then dirty = true end
-    if self.db.global and PruneProgressStore(self.db.global.customTaskProgress) then dirty = true end
+    PruneProgressStore(progress)
+    if self.db.global then
+        PruneProgressStore(self.db.global.customTaskProgress)
+    end
+
+    local dirty = concentrationChanged == true or not ValuesEqual(beforeProgress, progress)
+    if not dirty then
+        for _, mod in ipairs(self.modules) do
+            local moduleRows = beforeRows[mod.key]
+            if moduleRows then
+                for _, row in ipairs(mod.rows or {}) do
+                    if moduleRows[row.key] ~= RowScanSignature(row) then
+                        dirty = true
+                        break
+                    end
+                end
+            end
+            if dirty then break end
+        end
+    end
 
     if dirty then self:RequestDataRefresh() end
     if self.SyncAllRareKills then self:SyncAllRareKills() end

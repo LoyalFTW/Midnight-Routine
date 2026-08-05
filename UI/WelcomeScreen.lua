@@ -66,21 +66,10 @@ local function BuildWelcomeScreen()
     titleTxt:SetText(L["Welcome_Title"])
 
     local function ScrollByDelta(delta)
-        if not f._welcomeScroll then
+        if not f._welcomeScroll or not f._welcomeContent then
             return
         end
-
-        local current = f._welcomeScroll:GetVerticalScroll()
-        local maxScroll = f._welcomeScroll:GetVerticalScrollRange() or 0
-        local step = 40
-        if delta > 0 then
-            f._welcomeScroll:SetVerticalScroll(math.max(current - step, 0))
-        else
-            f._welcomeScroll:SetVerticalScroll(math.min(current + step, maxScroll))
-        end
-        if f.UpdateWelcomeScrollBar then
-            f.UpdateWelcomeScrollBar()
-        end
+        ns.ScrollByDelta(f._welcomeScroll, f._welcomeContent, delta, 40, f.UpdateWelcomeScrollBar)
     end
 
     local headerInset = 18
@@ -225,45 +214,35 @@ local function BuildWelcomeScreen()
     scroll:SetPoint("TOPRIGHT", setupPanel, "BOTTOMRIGHT", -10, -12)
     scroll:SetPoint("BOTTOMLEFT", footer, "TOPLEFT", 14, 12)
     scroll:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT", -24, 12)
-    scroll:EnableMouseWheel(true)
     f._welcomeScroll = scroll
 
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(400, 1)
-    scroll:SetScrollChild(content)
-    content:EnableMouseWheel(true)
-    content:SetScript("OnMouseWheel", function(_, delta)
-        ScrollByDelta(delta)
-    end)
-
-    scroll:SetScript("OnMouseWheel", function(self, delta)
-        ScrollByDelta(delta)
-    end)
-    f:EnableMouseWheel(true)
-    f:SetScript("OnMouseWheel", function(_, delta)
-        ScrollByDelta(delta)
-    end)
+    f._welcomeContent = content
 
     local track = CreateFrame("Frame", nil, f)
     track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 4, 0)
     track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 4, 0)
     track:SetWidth(6)
 
-    local trackBg = track:CreateTexture(nil, "BACKGROUND")
-    trackBg:SetAllPoints()
-    trackBg:SetColorTexture(0.00, 0.00, 0.00, 0.32)
-
-    local thumb = CreateFrame("Button", nil, track)
-    thumb:SetWidth(6)
-    thumb:EnableMouse(true)
-    thumb:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
-
-    local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
-    thumbTex:SetAllPoints()
-    thumbTex:SetColorTexture(0.24, 0.72, 0.72, 0.82)
-
+    local UpdateScrollBar, thumb, _, thumbTex = ns.AttachScrollList(scroll, content, track, {
+        minThumbHeight = 18,
+        wheelStep = 40,
+        trackColor = { 0.00, 0.00, 0.00, 0.32 },
+        thumbColor = { 0.24, 0.72, 0.72, 0.82 },
+    })
     f._welcomeTrack = track
     f._welcomeThumb = thumb
+    f.UpdateWelcomeScrollBar = UpdateScrollBar
+
+    content:EnableMouseWheel(true)
+    content:SetScript("OnMouseWheel", function(_, delta)
+        ScrollByDelta(delta)
+    end)
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta)
+        ScrollByDelta(delta)
+    end)
 
     local scrollBg = CreateFrame("Frame", nil, f, "BackdropTemplate")
     scrollBg:SetPoint("TOPLEFT", scroll, "TOPLEFT", -4, 4)
@@ -273,124 +252,12 @@ local function BuildWelcomeScreen()
     scrollBg:SetBackdropColor(0.01, 0.025, 0.055, 0.72)
     scrollBg:SetBackdropBorderColor(0.10, 0.30, 0.34, 0.72)
 
-    local function UpdateScrollBar()
-        local viewH = scroll:GetHeight()
-        local contentH = content:GetHeight()
-        local maxScroll = math.max(contentH - viewH, 0)
-        local currentScroll = scroll:GetVerticalScroll()
-
-        if currentScroll > maxScroll then
-            scroll:SetVerticalScroll(maxScroll)
-            currentScroll = maxScroll
-        elseif currentScroll < 0 then
-            scroll:SetVerticalScroll(0)
-            currentScroll = 0
-        end
-
-        if contentH <= viewH or viewH <= 0 then
-            if currentScroll ~= 0 then
-                scroll:SetVerticalScroll(0)
-            end
-            thumb:Hide()
-            return
-        end
-
-        thumb:Show()
-        local trackH = math.max(track:GetHeight(), 1)
-        local thumbH = math.max(trackH * (viewH / contentH), 18)
-        local pct = currentScroll / math.max(maxScroll, 1)
-        thumb:SetHeight(thumbH)
-        thumb:ClearAllPoints()
-        thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackH - thumbH) * pct))
-    end
-
-    local function SetScrollFromCursor(cursorY, grabOffset)
-        local viewH = scroll:GetHeight()
-        local contentH = content:GetHeight()
-        local maxScroll = math.max(contentH - viewH, 0)
-        if maxScroll <= 0 then
-            scroll:SetVerticalScroll(0)
-            UpdateScrollBar()
-            return
-        end
-
-        local trackTop = track:GetTop()
-        local trackBottom = track:GetBottom()
-        if not trackTop or not trackBottom then
-            return
-        end
-
-        local trackH = math.max(trackTop - trackBottom, 1)
-        local thumbH = thumb:GetHeight()
-        local movable = math.max(trackH - thumbH, 1)
-        local offset = grabOffset or (thumbH * 0.5)
-        local y = math.max(0, math.min((trackTop - cursorY) - offset, movable))
-        local pct = y / movable
-        scroll:SetVerticalScroll(maxScroll * pct)
-        UpdateScrollBar()
-    end
-
-    track:SetScript("OnMouseDown", function(_, button)
-        if button ~= "LeftButton" or not thumb:IsShown() then
-            return
-        end
-
-        local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
-        SetScrollFromCursor(cursorY, thumb:GetHeight() * 0.5)
-        thumb._grabOffset = thumb:GetHeight() * 0.5
-        thumb:SetScript("OnUpdate", function(self)
-            if not IsMouseButtonDown("LeftButton") then
-                self._grabOffset = nil
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-
-            local _, dragCursorY = GetCursorPosition()
-            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-            SetScrollFromCursor(dragCursorY, self._grabOffset)
-        end)
-    end)
-
-    thumb:SetScript("OnMouseDown", function(self, button)
-        if button ~= "LeftButton" or not self:IsShown() then
-            return
-        end
-
-        local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
-        local thumbTop = self:GetTop()
-        self._grabOffset = thumbTop and (thumbTop - cursorY) or (self:GetHeight() * 0.5)
-        self:SetScript("OnUpdate", function(btn)
-            if not IsMouseButtonDown("LeftButton") then
-                btn._grabOffset = nil
-                btn:SetScript("OnUpdate", nil)
-                return
-            end
-
-            local _, dragCursorY = GetCursorPosition()
-            dragCursorY = dragCursorY / UIParent:GetEffectiveScale()
-            SetScrollFromCursor(dragCursorY, btn._grabOffset)
-        end)
-    end)
-
-    thumb:SetScript("OnMouseUp", function(self)
-        self._grabOffset = nil
-        self:SetScript("OnUpdate", nil)
-    end)
     thumb:SetScript("OnEnter", function()
         thumbTex:SetColorTexture(0.36, 0.86, 0.82, 0.95)
     end)
     thumb:SetScript("OnLeave", function()
         thumbTex:SetColorTexture(0.24, 0.72, 0.72, 0.82)
     end)
-    scroll:SetScript("OnScrollRangeChanged", function()
-        UpdateScrollBar()
-    end)
-    scroll:SetScript("OnVerticalScroll", function()
-        UpdateScrollBar()
-    end)
-    f.UpdateWelcomeScrollBar = UpdateScrollBar
 
     local yOff = -4
 

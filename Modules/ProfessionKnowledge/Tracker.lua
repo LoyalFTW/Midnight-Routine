@@ -915,54 +915,51 @@ end
 
 function MR:ShowProfessionKnowledgeTooltip(owner, entry, sectionKey, current, required)
     entry = ResolveProfessionKnowledgeTooltipEntry(entry)
-    if not (owner and GameTooltip and entry) then
+    if not (owner and entry) then
         return false
     end
 
     sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
-    AddProfessionKnowledgeTooltip(GameTooltip, entry, sectionKey, current, required)
-    GameTooltip:Show()
+    ns.ShowTooltip(owner, {
+        build = function(tooltip)
+            AddProfessionKnowledgeTooltip(tooltip, entry, sectionKey, current, required)
+        end,
+    })
     return true
 end
 
 function MR:ShowProfessionKnowledgeSourceTooltip(owner, entry, sectionKey)
     entry = ResolveProfessionKnowledgeTooltipEntry(entry)
-    if not (owner and GameTooltip and entry) then
+    if not (owner and entry) then
         return false
     end
 
     sectionKey = sectionKey or entry.profKnowledgeSectionKey or entry.group
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
-    AddProfessionKnowledgeTooltip(GameTooltip, entry, sectionKey, nil, nil, { sourceOnly = true })
-    GameTooltip:Show()
+    ns.ShowTooltip(owner, {
+        build = function(tooltip)
+            AddProfessionKnowledgeTooltip(tooltip, entry, sectionKey, nil, nil, { sourceOnly = true })
+        end,
+    })
     return true
 end
 
 function MR:ShowProfessionKnowledgeCatchupTooltip(owner, entry)
-    if not (owner and GameTooltip and entry) then
+    if not (owner and entry) then
         return false
     end
 
-    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    if GameTooltip.ClearLines then
-        GameTooltip:ClearLines()
-    end
-    GameTooltip:SetText(StripInlineColor(L["Prof_Catchup"] or "Catch-Up Knowledge"), 1, 1, 1)
-    if entry.profKnowledgeProfessionLabel then
-        GameTooltip:AddLine(entry.profKnowledgeProfessionLabel, 0.85, 0.85, 0.85)
-    end
-    if entry.note and entry.note ~= "" then
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(entry.note, 0.70, 0.82, 0.92, true)
-    end
-    GameTooltip:Show()
+    ns.ShowTooltip(owner, {
+        build = function(tooltip)
+            tooltip:SetText(StripInlineColor(L["Prof_Catchup"] or "Catch-Up Knowledge"), 1, 1, 1)
+            if entry.profKnowledgeProfessionLabel then
+                tooltip:AddLine(entry.profKnowledgeProfessionLabel, 0.85, 0.85, 0.85)
+            end
+            if entry.note and entry.note ~= "" then
+                tooltip:AddLine(" ")
+                tooltip:AddLine(entry.note, 0.70, 0.82, 0.92, true)
+            end
+        end,
+    })
     return true
 end
 
@@ -1180,9 +1177,9 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         hover:SetColorTexture(cr, cg, cb, 0.12 * accentAlpha)
         MR:ShowProfessionKnowledgeSourceTooltip(row, entry, sectionKey)
     end)
-    row:SetScript("OnLeave", function()
+    row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        GameTooltip:Hide()
+        ns.HideTooltip(selfRow)
     end)
     row:SetScript("OnClick", function()
         MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
@@ -1243,9 +1240,9 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
         hover:SetColorTexture(cr, cg, cb, 0.12 * chromeAlpha)
         MR:ShowProfessionKnowledgeSourceTooltip(row, entry, sectionKey)
     end)
-    row:SetScript("OnLeave", function()
+    row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        GameTooltip:Hide()
+        ns.HideTooltip(selfRow)
     end)
     row:SetScript("OnClick", function()
         MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
@@ -1352,9 +1349,9 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
         hover:SetColorTexture(cr, cg, cb, 0.10 * accentAlpha)
         MR:ShowProfessionKnowledgeCatchupTooltip(row, catchupTooltip)
     end)
-    row:SetScript("OnLeave", function()
+    row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        GameTooltip:Hide()
+        ns.HideTooltip(selfRow)
     end)
 
     return cardY + rowHeight + 10
@@ -1524,27 +1521,29 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             elseif row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
                 MR:ShowProfessionKnowledgeSourceTooltip(taskFrame, row, row.profKnowledgeSectionKey)
             else
-                GameTooltip:SetOwner(taskFrame, "ANCHOR_RIGHT")
-                GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
-                if row.note and row.note ~= "" then
-                    GameTooltip:AddLine(row.note, 0.70, 0.82, 0.92, true)
-                end
-                local target, targetCount = GetWaypointTarget(row, row.key)
-                if target then
-                    GameTooltip:AddLine(" ")
-                    if target.label then
-                        GameTooltip:AddLine(target.label, 0.75, 0.90, 1)
-                    end
-                    GameTooltip:AddLine(GetGatheringZoneName(target.zone), 0.85, 0.85, 0.85)
-                    GameTooltip:AddLine(string.format(L["Gathering_Coords"], target.x, target.y), 0.7, 1, 0.9)
-                    GameTooltip:AddLine(targetCount > 1 and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
-                end
-                GameTooltip:Show()
+                ns.ShowTooltip(taskFrame, {
+                    build = function(tooltip)
+                        tooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
+                        if row.note and row.note ~= "" then
+                            tooltip:AddLine(row.note, 0.70, 0.82, 0.92, true)
+                        end
+                        local target, targetCount = GetWaypointTarget(row, row.key)
+                        if target then
+                            tooltip:AddLine(" ")
+                            if target.label then
+                                tooltip:AddLine(target.label, 0.75, 0.90, 1)
+                            end
+                            tooltip:AddLine(GetGatheringZoneName(target.zone), 0.85, 0.85, 0.85)
+                            tooltip:AddLine(string.format(L["Gathering_Coords"], target.x, target.y), 0.7, 1, 0.9)
+                            tooltip:AddLine(targetCount > 1 and L["Gathering_ClickCycleHint"] or L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                        end
+                    end,
+                })
             end
         end)
         taskFrame:SetScript("OnLeave", function()
             hover:SetColorTexture(rr, rg, rb, 0)
-            GameTooltip:Hide()
+            ns.HideTooltip(taskFrame)
         end)
         taskFrame:SetScript("OnClick", function()
             if row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
@@ -1584,19 +1583,21 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
                 return
             end
 
-            GameTooltip:SetOwner(statusBtn, "ANCHOR_RIGHT")
-            GameTooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
-            GameTooltip:AddLine(" ")
-            if forcedComplete then
-                GameTooltip:AddLine(L["Tooltip_ManualDot_Active"] or "Manually marked complete. Click to clear.", 1, 0.85, 0.1, true)
-            else
-                GameTooltip:AddLine(L["Tooltip_ManualDot_Hint"] or "Click to manually mark complete.", 0.7, 0.7, 0.7, true)
-            end
-            GameTooltip:Show()
+            ns.ShowTooltip(statusBtn, {
+                build = function(tooltip)
+                    tooltip:SetText(StripInlineColor(row.label or mod.label or row.key), 1, 1, 1)
+                    tooltip:AddLine(" ")
+                    if forcedComplete then
+                        tooltip:AddLine(L["Tooltip_ManualDot_Active"] or "Manually marked complete. Click to clear.", 1, 0.85, 0.1, true)
+                    else
+                        tooltip:AddLine(L["Tooltip_ManualDot_Hint"] or "Click to manually mark complete.", 0.7, 0.7, 0.7, true)
+                    end
+                end,
+            })
         end)
         statusBtn:SetScript("OnLeave", function()
             hover:SetColorTexture(rr, rg, rb, 0)
-            GameTooltip:Hide()
+            ns.HideTooltip(statusBtn)
         end)
 
         cardY = cardY + rowHeight + 3
@@ -1988,233 +1989,15 @@ end
 
 local function BuildKnowledgeExpansionDropdown(parent, opts)
     opts = opts or {}
-
-    local function ResolveDropdownFontSize()
-        if type(opts.fontSize) == "function" then
-            return opts.fontSize() or 8
-        end
-
-        if type(opts.fontSize) == "number" then
-            return opts.fontSize
-        end
-
-        local db = MR.db and MR.db.profile or {}
-        return math.max(8, db.gatheringFontSize or db.fontSize or 9)
-    end
-
-    local function ResolveDropdownAlpha()
-        if type(opts.alpha) == "function" then
-            local value = opts.alpha()
-            if type(value) == "number" then
-                return math.max(0, math.min(value, 1))
-            end
-        elseif type(opts.alpha) == "number" then
-            return math.max(0, math.min(opts.alpha, 1))
-        end
-
-        return 1
-    end
-
-    local function EstimateDropdownTextWidth(text, fontSize)
-        text = tostring(text or "")
-        return (#text * math.max(fontSize or 8, 8) * 0.58) + 34
-    end
-
-    local function ResolveOptionListWidth(optionList, fontSize)
-        local width = opts.width or 78
-        for _, option in ipairs(optionList or {}) do
-            width = math.max(width, EstimateDropdownTextWidth(option.label, fontSize))
-        end
-        return math.min(opts.maxWidth or 220, math.ceil(width))
-    end
-
-    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    btn:SetSize(opts.width or 78, opts.height or 18)
-    btn:SetBackdrop(MakeBackdrop())
-    btn:SetBackdropColor(0.05, 0.12, 0.20, 0.95)
-    btn:SetBackdropBorderColor(0.40, 0.32, 0.18, 1)
-
-    local label = btn:CreateFontString(nil, "OVERLAY")
-    label:SetFont(FONT_ROWS, ResolveDropdownFontSize(), GetFontFlags())
-    label:SetPoint("LEFT", btn, "LEFT", 6, 0)
-    label:SetPoint("RIGHT", btn, "RIGHT", -14, 0)
-    label:SetJustifyH("LEFT")
-    label:SetTextColor(0.90, 0.80, 0.55)
-    btn._label = label
-
-    local caret = btn:CreateFontString(nil, "OVERLAY")
-    caret:SetFont(FONT_HEADERS, math.max(9, ResolveDropdownFontSize() + 1), GetFontFlags())
-    caret:SetPoint("RIGHT", btn, "RIGHT", -5, 0)
-    caret:SetText("v")
-    caret:SetTextColor(0.85, 0.75, 0.55)
-    btn._caret = caret
-
-    local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    popup:SetFrameStrata("DIALOG")
-    popup:SetFrameLevel(50)
-    popup:SetBackdrop(MakeBackdrop())
-    popup:SetBackdropColor(0.04, 0.09, 0.15, 0.98)
-    popup:SetBackdropBorderColor(0.40, 0.32, 0.18, 1)
-    popup:Hide()
-    popup.buttons = {}
-
-    function btn:ApplyFonts()
-        local labelSize = ResolveDropdownFontSize()
-        local caretSize = math.max(9, labelSize + 1)
-        local rowHeight = math.max(18, labelSize + 10)
-        local minWidth = opts.width or 78
-        local maxWidth = opts.maxWidth or 220
-        local minHeight = opts.height or 18
-        local maxHeight = opts.maxHeight or minHeight
-        local alpha = ResolveDropdownAlpha()
-
-        self:SetHeight(math.min(maxHeight, math.max(minHeight, labelSize + 6)))
-        self:SetBackdropColor(0.05, 0.12, 0.20, 0.95 * alpha)
-        self:SetBackdropBorderColor(0.40, 0.32, 0.18, alpha)
-        if self._label then
-            self._label:SetFont(FONT_ROWS, labelSize, GetFontFlags())
-            local textWidth = math.max((self._label:GetStringWidth() or 0) + 30, EstimateDropdownTextWidth(self._label:GetText(), labelSize))
-            self:SetWidth(math.max(minWidth, math.min(maxWidth, math.ceil(textWidth))))
-        end
-        if self._caret then
-            self._caret:SetFont(FONT_HEADERS, caretSize, GetFontFlags())
-        end
-
-        for _, row in ipairs(popup.buttons) do
-            if row._label then
-                row._label:SetFont(FONT_ROWS, labelSize, GetFontFlags())
-            end
-            if row._check then
-                row._check:SetFont(FONT_HEADERS, caretSize, GetFontFlags())
-            end
-            row:SetHeight(rowHeight)
-        end
-    end
-
-    local dismiss = CreateFrame("Frame", nil, UIParent)
-    dismiss:SetAllPoints(UIParent)
-    dismiss:SetFrameStrata("DIALOG")
-    dismiss:SetFrameLevel(49)
-    dismiss:EnableMouse(true)
-    dismiss:Hide()
-    dismiss:SetScript("OnMouseDown", function()
-        popup:Hide()
-        dismiss:Hide()
-    end)
-
-    btn:SetScript("OnEnter", function(selfBtn)
-        local alpha = ResolveDropdownAlpha()
-        selfBtn:SetBackdropColor(0.08, 0.18, 0.28, 0.98 * alpha)
-        selfBtn:SetBackdropBorderColor(0.85, 0.70, 0.35, alpha)
-    end)
-    btn:SetScript("OnLeave", function(selfBtn)
-        local alpha = ResolveDropdownAlpha()
-        selfBtn:SetBackdropColor(0.05, 0.12, 0.20, 0.95 * alpha)
-        selfBtn:SetBackdropBorderColor(0.40, 0.32, 0.18, alpha)
-    end)
-
-    function btn:Update()
-        local optionList = opts.getOptions()
-        local selectedKey = opts.getSelected()
-        for _, option in ipairs(optionList) do
-            if option.key == selectedKey then
-                self._label:SetText(option.label)
-                break
-            end
-        end
-        self:ApplyFonts()
-    end
-
-    local function EnsurePopupButton(index)
-        local row = popup.buttons[index]
-        if row then
-            return row
-        end
-
-        row = CreateFrame("Button", nil, popup, "BackdropTemplate")
-        row:SetHeight(18)
-        row:SetBackdrop(MakeBackdrop())
-        row:SetBackdropColor(0.05, 0.12, 0.20, 0.94)
-        row:SetBackdropBorderColor(0.12, 0.26, 0.32, 0.95)
-
-        row._label = row:CreateFontString(nil, "OVERLAY")
-        row._label:SetFont(FONT_ROWS, ResolveDropdownFontSize(), GetFontFlags())
-        row._label:SetPoint("LEFT", row, "LEFT", 8, 1)
-        row._label:SetPoint("RIGHT", row, "RIGHT", -22, 1)
-        row._label:SetJustifyH("LEFT")
-
-        row._check = row:CreateFontString(nil, "OVERLAY")
-        row._check:SetFont(FONT_HEADERS, math.max(9, ResolveDropdownFontSize() + 1), GetFontFlags())
-        row._check:SetPoint("RIGHT", row, "RIGHT", -7, 1)
-
-        row:SetScript("OnEnter", function(selfRow)
-            local alpha = ResolveDropdownAlpha()
-            selfRow:SetBackdropColor(0.08, 0.18, 0.28, 0.98 * alpha)
-            selfRow:SetBackdropBorderColor(0.85, 0.70, 0.35, alpha)
-        end)
-        row:SetScript("OnLeave", function(selfRow)
-            local active = selfRow._checked == true
-            local alpha = ResolveDropdownAlpha()
-            selfRow:SetBackdropColor(active and 0.10 or 0.05, active and 0.22 or 0.12, active and 0.30 or 0.20, (active and 0.98 or 0.94) * alpha)
-            selfRow:SetBackdropBorderColor(active and 0.55 or 0.12, active and 0.46 or 0.26, active and 0.20 or 0.32, (active and 1 or 0.95) * alpha)
-        end)
-
-        popup.buttons[index] = row
-        return row
-    end
-
-    btn:SetScript("OnClick", function(selfBtn)
-        local optionList = opts.getOptions()
-        if #optionList <= 1 then
-            return
-        end
-
-        local selectedKey = opts.getSelected()
-        local labelSize = ResolveDropdownFontSize()
-        local rowHeight = math.max(18, labelSize + 10)
-        selfBtn:ApplyFonts()
-        local rowWidth = math.max(selfBtn:GetWidth(), ResolveOptionListWidth(optionList, labelSize), 130)
-        popup:ClearAllPoints()
-        popup:SetPoint("TOPLEFT", selfBtn, "BOTTOMLEFT", 0, -4)
-        popup:SetSize(rowWidth, (#optionList * (rowHeight + 2)) + 6)
-        local menuAlpha = ResolveDropdownAlpha()
-        popup:SetBackdropColor(0.04, 0.09, 0.15, 0.98 * menuAlpha)
-        popup:SetBackdropBorderColor(0.40, 0.32, 0.18, menuAlpha)
-
-        for index, option in ipairs(optionList) do
-            local row = EnsurePopupButton(index)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3 - ((index - 1) * (rowHeight + 2)))
-            row:SetSize(rowWidth - 6, rowHeight)
-            row._checked = option.key == selectedKey
-            row._label:SetText(option.label)
-            row._label:SetTextColor(row._checked and 0.96 or 0.85, row._checked and 0.90 or 0.80, row._checked and 0.65 or 0.75)
-            row._check:SetText(row._checked and "x" or "")
-            row._check:SetTextColor(0.90, 0.80, 0.55)
-            row:SetBackdropColor(row._checked and 0.10 or 0.05, row._checked and 0.22 or 0.12, row._checked and 0.30 or 0.20, (row._checked and 0.98 or 0.94) * menuAlpha)
-            row:SetBackdropBorderColor(row._checked and 0.55 or 0.12, row._checked and 0.46 or 0.26, row._checked and 0.20 or 0.32, (row._checked and 1 or 0.95) * menuAlpha)
-            row:SetScript("OnClick", function()
-                opts.onSelect(option.key)
-                popup:Hide()
-                dismiss:Hide()
-            end)
-            row:Show()
-        end
-
-        for index = #optionList + 1, #popup.buttons do
-            popup.buttons[index]:Hide()
-        end
-
-        if popup:IsShown() then
-            popup:Hide()
-            dismiss:Hide()
-        else
-            dismiss:Show()
-            popup:Show()
-        end
-    end)
-
-    return btn
+    opts.style = "gold"
+    opts.dynamicWidth = true
+    opts.dynamicMenuWidth = true
+    opts.labelInset = 6
+    opts.labelRightInset = -14
+    opts.caretInset = -5
+    opts.textYOffset = 0
+    opts.heightPadding = 6
+    return ns.CreateDropdown(parent, opts)
 end
 
 local function CreateKnowledgeExpansionDropdown(titleBar, gearBtn)
@@ -2903,13 +2686,11 @@ PopulateGatheringConfig = function(frame)
                 eyeBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
                 eyeBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
                 eyeLbl:SetTextColor(1, 1, 1)
-                GameTooltip:SetOwner(eyeBtn, "ANCHOR_RIGHT")
-                GameTooltip:SetText(enabled and L["Config_HideRow"] or L["Config_ShowRow"], 1, 1, 1)
-                GameTooltip:Show()
+                ns.ShowTooltip(eyeBtn, { text = enabled and L["Config_HideRow"] or L["Config_ShowRow"] })
             end)
             eyeBtn:SetScript("OnLeave", function()
                 ApplyState(enabled)
-                GameTooltip:Hide()
+                ns.HideTooltip(eyeBtn)
             end)
 
             local rsr, rsg, rsb = hex(MR:GetRowColor(modKey, rowKey) or (rowData.colorKey and MR:GetRowColor(modKey, rowData.colorKey)) or MR:GetHeaderColor(modKey))
@@ -2994,11 +2775,11 @@ PopulateGatheringConfig = function(frame)
                             SetProfessionEnabled(expansion, profession, toggleBtn:GetChecked() and true or false)
                         end)
                         toggleBtn:SetScript("OnEnter", function()
-                            GameTooltip:SetOwner(toggleBtn, "ANCHOR_RIGHT")
-                            GameTooltip:SetText(toggleBtn:GetChecked() and "Hide this profession in the Profession Knowledge window" or "Show this profession in the Profession Knowledge window", 1, 1, 1)
-                            GameTooltip:Show()
+                            ns.ShowTooltip(toggleBtn, {
+                                text = toggleBtn:GetChecked() and "Hide this profession in the Profession Knowledge window" or "Show this profession in the Profession Knowledge window",
+                            })
                         end)
-                        toggleBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                        toggleBtn:SetScript("OnLeave", function() ns.HideTooltip(toggleBtn) end)
 
                         local expandBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
                         expandBtn:SetSize(18, 18)
@@ -3019,15 +2800,13 @@ PopulateGatheringConfig = function(frame)
                             expandBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
                             expandBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
                             expandLbl:SetTextColor(1, 1, 1)
-                            GameTooltip:SetOwner(expandBtn, "ANCHOR_RIGHT")
-                            GameTooltip:SetText(L["Config_ExpandCollapseRows"] or "Expand to show/hide individual sources", 1, 1, 1)
-                            GameTooltip:Show()
+                            ns.ShowTooltip(expandBtn, { text = L["Config_ExpandCollapseRows"] or "Expand to show/hide individual sources" })
                         end)
                         expandBtn:SetScript("OnLeave", function()
                             expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                             expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
                             expandLbl:SetTextColor(0.45, 0.75, 0.70)
-                            GameTooltip:Hide()
+                            ns.HideTooltip(expandBtn)
                         end)
 
                         local swatch = OptionsColorSwatch(row, cr, cg, cb, function(r, g, b)

@@ -100,16 +100,21 @@ GetRowIconInfo = function(mod, row)
     if not row then
         return nil
     end
+    if row._mrResolvedIconInfo then
+        return row._mrResolvedIconInfo
+    end
 
     local explicit = NormalizeIconInfo(row.icon)
     if explicit then
+        row._mrResolvedIconInfo = explicit
         return explicit
     end
 
     if row.currencyId and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
         local info = C_CurrencyInfo.GetCurrencyInfo(row.currencyId)
         if info and info.iconFileID then
-            return { texture = info.iconFileID }
+            row._mrResolvedIconInfo = { texture = info.iconFileID }
+            return row._mrResolvedIconInfo
         end
     end
 
@@ -117,39 +122,51 @@ GetRowIconInfo = function(mod, row)
     if itemId and C_Item and C_Item.GetItemIconByID then
         local icon = C_Item.GetItemIconByID(itemId)
         if icon then
-            return { texture = icon }
+            row._mrResolvedIconInfo = { texture = icon }
+            return row._mrResolvedIconInfo
         end
     end
 
     if row.spellId then
         local icon = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(row.spellId)
         if icon then
-            return { texture = icon }
+            row._mrResolvedIconInfo = { texture = icon }
+            return row._mrResolvedIconInfo
         end
     end
 
     local fallback = ROW_ICON_FALLBACKS[row.key]
     if fallback then
+        row._mrResolvedIconInfo = fallback
         return fallback
     end
 
-    return GetModuleFallbackIconInfo(mod and mod.key or "")
+    local moduleFallback = GetModuleFallbackIconInfo(mod and mod.key or "")
+    if moduleFallback then
+        row._mrResolvedIconInfo = moduleFallback
+    end
+    return moduleFallback
 end
 
 GetModuleIconInfo = function(mod)
     if not mod then
         return nil
     end
+    if mod._mrResolvedIconInfo then
+        return mod._mrResolvedIconInfo
+    end
 
     if mod.key == "great_vault" then
         local keyIcon = GetRowIconInfo(nil, { currencyId = 3028 })
         if keyIcon then
+            mod._mrResolvedIconInfo = keyIcon
             return keyIcon
         end
     end
 
     local explicit = NormalizeIconInfo(mod.icon)
     if explicit then
+        mod._mrResolvedIconInfo = explicit
         return explicit
     end
 
@@ -158,12 +175,17 @@ GetModuleIconInfo = function(mod)
         for _, row in ipairs(rows) do
             local rowIcon = GetRowIconInfo(mod, row)
             if rowIcon then
+                mod._mrResolvedIconInfo = rowIcon
                 return rowIcon
             end
         end
     end
 
-    return GetModuleFallbackIconInfo(mod.key)
+    local fallback = GetModuleFallbackIconInfo(mod.key)
+    if fallback then
+        mod._mrResolvedIconInfo = fallback
+    end
+    return fallback
 end
 
 ApplyIconToTexture = function(texture, info, fallbackTexCoord)
@@ -178,18 +200,34 @@ ApplyIconToTexture = function(texture, info, fallbackTexCoord)
     end
 
     texture:Show()
-    if info.atlas and texture.SetAtlas then
-        texture:SetAtlas(info.atlas, true)
-        texture:SetTexCoord(0, 1, 0, 1)
+    local left, right, top, bottom
+    if info.texCoord then
+        left, right, top, bottom = unpack(info.texCoord)
+    elseif fallbackTexCoord then
+        left, right, top, bottom = unpack(fallbackTexCoord)
     else
-        texture:SetTexture(info.texture)
-        if info.texCoord then
-            texture:SetTexCoord(unpack(info.texCoord))
-        elseif fallbackTexCoord then
-            texture:SetTexCoord(unpack(fallbackTexCoord))
-        else
-            texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        left, right, top, bottom = 0.08, 0.92, 0.08, 0.92
+    end
+
+    if info.atlas and texture.SetAtlas then
+        if texture._mrIconAtlas ~= info.atlas then
+            texture:SetAtlas(info.atlas, true)
+            texture._mrIconAtlas = info.atlas
+            texture._mrIconTexture = nil
         end
+        left, right, top, bottom = 0, 1, 0, 1
+    else
+        if texture._mrIconTexture ~= info.texture or texture._mrIconAtlas ~= nil then
+            texture:SetTexture(info.texture)
+            texture._mrIconTexture = info.texture
+            texture._mrIconAtlas = nil
+        end
+    end
+    if texture._mrIconLeft ~= left or texture._mrIconRight ~= right
+        or texture._mrIconTop ~= top or texture._mrIconBottom ~= bottom then
+        texture:SetTexCoord(left, right, top, bottom)
+        texture._mrIconLeft, texture._mrIconRight = left, right
+        texture._mrIconTop, texture._mrIconBottom = top, bottom
     end
 
     if info.tint then

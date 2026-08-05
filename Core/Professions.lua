@@ -218,7 +218,9 @@ function MR:RefreshPlayerProfessions()
     if self.db and self.db.char then
         self.db.char.knownProfessionLines = nil
         if scanned then
-            self.db.char.professions = CopyProfessionMap(self.playerProfessions)
+            if not ProfessionMapsEqual(self.db.char.professions, self.playerProfessions) then
+                self.db.char.professions = CopyProfessionMap(self.playerProfessions)
+            end
             self.db.char.professionsScanned = true
             if not found then
                 self.db.char.professionConcentration = {}
@@ -285,11 +287,10 @@ function MR:RefreshProfessionConcentration()
                     end
 
                     if quantity == previousQuantity
-                        and previousMax > 0
-                        and previousQuantity < previousMax
+                        and maxQuantity == previousMax
                         and previousUpdated > 0
-                        and previousCycleMS > 0
-                        and previousAmountPerCycle > 0 then
+                        and cycleMS == previousCycleMS
+                        and amountPerCycle == previousAmountPerCycle then
                         lastUpdated = previousUpdated
                     end
                 end
@@ -312,4 +313,3 @@ function MR:RefreshProfessionConcentration()
     self.db.char.professionConcentration = concentration
     return not ConcentrationDataEqual(previous, concentration)
 end
-

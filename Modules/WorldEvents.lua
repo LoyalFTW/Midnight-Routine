@@ -21,6 +21,9 @@ local WORLD_BOSS_ROTATION = {
 
 local WEEK_SECONDS = 7 * 24 * 60 * 60
 local MIDNIGHT_SEASON_START_RESET = 1773727200
+local DONE_COLOR = { 0.30, 0.90, 0.55 }
+local ACTIVE_COLOR = { 1.00, 0.82, 0.30 }
+local NEXT_COLOR = { 0.75, 0.78, 0.86 }
 local function NormalizeText(text)
     if type(text) ~= "string" then
         return ""
@@ -53,10 +56,16 @@ local function SyncWorldBossKillRecord(bossKey)
     local weekKey = MR:GetCurrentWeekKey()
     if not weekKey or weekKey == 0 then return end
 
+    local existing = char.worldBossKills[bossKey]
+    if existing and existing.w == weekKey then
+        return false
+    end
+
     char.worldBossKills[bossKey] = {
         w = weekKey,
         t = GetServerTime(),
     }
+    return true
 end
 
 local function GetWorldBossKillStatus(bossKey)
@@ -190,12 +199,22 @@ function MR:SyncCurrentWorldBossKillByName(name)
     return false
 end
 
+local function GetWorldBossRowSignature(database, boss, row)
+    local color = row.countColor
+    return tostring(database[boss.key])
+        .. "\031" .. tostring(row.countText)
+        .. "\031" .. tostring(color and color[1])
+        .. "\031" .. tostring(color and color[2])
+        .. "\031" .. tostring(color and color[3])
+end
+
 MR:RegisterModule({
     key         = "world_bosses",
     label       = L["WB_Title"],
     labelColor  = "#ff4444",
     resetType   = "weekly",
     defaultOpen = true,
+    scanReturnsChanged = true,
 
     onScan = function(mod)
         local db = MR.db.char.progress
@@ -203,6 +222,12 @@ MR:RegisterModule({
 
         local now = GetServerTime()
         local _, activeIndex, currentReset, nextReset = GetActiveWorldBossState(now)
+        local before = {}
+        for index, boss in ipairs(WORLD_BOSS_ROTATION) do
+            before[index] = GetWorldBossRowSignature(db[mod.key], boss, mod.rows[index])
+        end
+
+        local changed = false
 
         for index, boss in ipairs(WORLD_BOSS_ROTATION) do
             local row = mod.rows[index]
@@ -220,18 +245,24 @@ MR:RegisterModule({
                 local remaining = nextReset - now
                 if isDone then
                     row.countText = string.format("%s - %s", L["Done"] or "Done", FormatRemaining(remaining))
-                    row.countColor = { 0.30, 0.90, 0.55 }
+                    row.countColor = DONE_COLOR
                 else
                     row.countText = string.format(L["WB_Timer_Active"] or "Active - %s", FormatRemaining(remaining))
-                    row.countColor = { 1.00, 0.82, 0.30 }
+                    row.countColor = ACTIVE_COLOR
                 end
             else
                 local weekOffset = (index - activeIndex + #WORLD_BOSS_ROTATION) % #WORLD_BOSS_ROTATION
                 local startAt = currentReset + (weekOffset * WEEK_SECONDS)
                 row.countText = string.format(L["WB_Timer_Next"] or "Next - %s", FormatRemaining(startAt - now))
-                row.countColor = { 0.75, 0.78, 0.86 }
+                row.countColor = NEXT_COLOR
+            end
+
+            local after = GetWorldBossRowSignature(db[mod.key], boss, row)
+            if after ~= before[index] then
+                changed = true
             end
         end
+        return changed
     end,
 
     rows = {

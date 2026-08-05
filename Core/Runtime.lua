@@ -11,6 +11,13 @@ local function ResolveCallback(owner, callback)
     return nil
 end
 
+local function CallbackLabel(callback)
+    if type(callback) == "string" then
+        return callback
+    end
+    return "anonymous"
+end
+
 function MR:RegisterEvent(event, callback)
     local fn, bindSelf = ResolveCallback(self, callback or event)
     if not fn then
@@ -22,6 +29,9 @@ function MR:RegisterEvent(event, callback)
     end
 
     self._eventController:Register(event, function(firedEvent, ...)
+        if self._trackIdleWork and self.NoteIdleWork then
+            self:NoteIdleWork("event:" .. tostring(firedEvent))
+        end
         if bindSelf then
             fn(self, firedEvent, ...)
         else
@@ -48,6 +58,9 @@ function MR:RegisterBucketEvent(events, interval, callback)
         events = events,
         interval = interval,
         handler = function()
+            if self._trackIdleWork and self.NoteIdleWork then
+                self:NoteIdleWork("bucket:" .. CallbackLabel(callback))
+            end
             if bindSelf then
                 fn(self)
             else
@@ -101,6 +114,9 @@ function MR:ScheduleTimer(callback, delay, ...)
     local timer
     timer = C_Timer.NewTimer(delay, function()
         self._timers[timer] = nil
+        if self._trackIdleWork and self.NoteIdleWork then
+            self:NoteIdleWork("timer:" .. CallbackLabel(callback))
+        end
         invoke()
     end)
     self._timers[timer] = true
@@ -113,7 +129,12 @@ function MR:ScheduleRepeatingTimer(callback, delay, ...)
         error("MidnightRoutine:ScheduleRepeatingTimer missing callback", 2)
     end
 
-    local timer = C_Timer.NewTicker(delay, invoke)
+    local timer = C_Timer.NewTicker(delay, function()
+        if self._trackIdleWork and self.NoteIdleWork then
+            self:NoteIdleWork("ticker:" .. CallbackLabel(callback))
+        end
+        invoke()
+    end)
     self._timers[timer] = true
     return timer
 end
