@@ -114,6 +114,7 @@ local DEFAULTS = {
         peekOnHover         = false,
         animatedMinimize    = false,
         mainHeaderPosition  = "top",
+        tooltipPosition     = "right",
         showMainCharacterBar = true,
         characterWindowLayout = false,
         autoEnableNewModules = true,

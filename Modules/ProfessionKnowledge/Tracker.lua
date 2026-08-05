@@ -2268,7 +2268,7 @@ local function BuildGatheringLocationsFrame(isRetry)
         frame:SetHeight(math.max(MIN_H, math.min(MAX_H, dragStartH + (dragStartY - cy))))
     end)
 
-    ApplyMinimized = function(isMin)
+    ApplyMinimized = function(isMin, animate)
         gatheringMinimized = isMin and true or false
         minimized = gatheringMinimized
         if MR.db then MR.db.profile.gatheringMinimized = gatheringMinimized end
@@ -2294,13 +2294,18 @@ local function BuildGatheringLocationsFrame(isRetry)
             end
             local savedH = db.gatheringHeight or DEFAULT_H
             local naturalH = TITLE_H + 1 + yOff + 6
-            ApplyFrameHeight(frame, math.min(savedH, naturalH))
+            local targetHeight = math.min(savedH, naturalH)
+            if animate == false then
+                frame:SetHeight(targetHeight)
+            else
+                ApplyFrameHeight(frame, targetHeight)
+            end
             if frame.UpdateScrollBar then frame.UpdateScrollBar() end
         end
     end
     frame.ApplyMinimized = ApplyMinimized
 
-    ApplyMinimized(minimized)
+    ApplyMinimized(minimized, false)
 
     frame:SetMovable(not db.gatheringLocked)
     frame:SetScale(db.gatheringScale or 1.0)
@@ -2317,13 +2322,7 @@ RebuildGatheringLocationsFrame = function(resetScroll)
     end
 
     local wasShown = gatheringLocationsFrame and gatheringLocationsFrame:IsShown()
-    -- Preserving scroll position only makes sense when the rebuild is for
-    -- the SAME content (e.g. a label finished resolving in the background).
-    -- Switching expansions swaps in a whole different profession list, so
-    -- reapplying an old offset (possibly scrolled near the bottom of a
-    -- taller list) onto shorter content clamps to a spot that skips right
-    -- past the new list's own header/top cards — resetScroll opts out of
-    -- that for callers where the content is genuinely changing.
+
     local savedScroll = not resetScroll and gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
     if gatheringLocationsFrame and MR.ReleaseFrameTree then
         MR:ReleaseFrameTree(gatheringLocationsFrame)
@@ -2334,11 +2333,6 @@ RebuildGatheringLocationsFrame = function(resetScroll)
     gatheringLocationsFrame = BuildGatheringLocationsFrame()
     if not wasShown then gatheringLocationsFrame:Hide() end
 
-    -- BuildGatheringLocationsFrame always resets scroll to 0 as part of its
-    -- own layout pass, so this has to happen synchronously right after it
-    -- returns — a deferred (C_Timer.After) restore would let that reset
-    -- render for one visible frame first, showing up as a flash-to-top on
-    -- every single rebuild.
     if savedScroll and savedScroll > 0 and gatheringLocationsFrame._scroll then
         gatheringLocationsFrame._scroll:SetVerticalScroll(savedScroll)
         if gatheringLocationsFrame.UpdateScrollBar then

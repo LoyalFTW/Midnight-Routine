@@ -65,6 +65,10 @@ local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     end,
 
     OnTooltipShow = function(tt)
+        local owner = tt.GetOwner and tt:GetOwner() or nil
+        if ns.ApplyTooltipPosition and owner then
+            ns.ApplyTooltipPosition(tt, owner)
+        end
         tt:AddLine(L["Title"], 1, 1, 1)
         tt:AddLine(L["Minimap_LeftClick"],  0.8, 0.8, 0.8)
         tt:AddLine(L["Minimap_RightClick"],     0.8, 0.8, 0.8)

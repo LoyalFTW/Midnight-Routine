@@ -295,3 +295,7 @@ local DRAGONFLIGHT_EXPANSION = {
 }
 
 ns.RegisterProfessionExpansion(DRAGONFLIGHT_EXPANSION)
+
+for _, profession in ipairs(DRAGONFLIGHT_EXPANSION.professions) do
+    ns.RegisterProfessionMainMenuModule(profession, DRAGONFLIGHT_EXPANSION)
+end

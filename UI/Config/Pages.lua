@@ -47,8 +47,7 @@ function MR:PopulateConfigFrame(f)
 
     local yOff = f.scroll and -4 or -26
     local cfgFs = GetFontSize()
-    -- Keep the dense Modules page one step smaller than tracker text while
-    -- still following the user's Layout font-size setting.
+
     local moduleHeaderFs = math.max(FONT_SIZE_MIN, cfgFs - 1)
     local moduleRowFs = math.max(FONT_SIZE_MIN, cfgFs - 2)
     local moduleSubFs = math.max(FONT_SIZE_MIN, cfgFs - 3)
@@ -711,6 +710,62 @@ function MR:PopulateConfigFrame(f)
                 ScheduleSettingsGarbageCollect()
             end,
             0.40, 0.40, 0.40, 8, nil, cfgFs)
+
+        Gap(4); Divider()
+        SectionLabel(L["Config_TooltipPosition"] or "Tooltip Position")
+
+        local tooltipChoices = {
+            { label = L["Config_TooltipLeft"] or "Left", value = "left" },
+            { label = L["Config_TooltipRight"] or "Right", value = "right" },
+            { label = L["Config_TooltipMiddle"] or "Middle", value = "middle" },
+            { label = L["Config_TooltipBottom"] or "Bottom", value = "bottom" },
+            { label = L["Config_TooltipCursor"] or "Cursor", value = "cursor" },
+        }
+        local tooltipY = yOff - 4
+        local tooltipBtnW = math.floor((contentW - ((#tooltipChoices - 1) * 2)) / #tooltipChoices)
+        local function CreateTooltipPositionButton(choice, index)
+            local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+            btn:SetSize(tooltipBtnW, 18)
+            btn:SetPoint("TOPLEFT", body, "TOPLEFT", 8 + (index - 1) * (tooltipBtnW + 2), tooltipY)
+            btn:SetBackdrop(MakeBackdrop())
+            local current = MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition") or MR.db.profile.tooltipPosition
+            local active = (current or "right") == choice.value
+            btn:SetBackdropColor(active and 0.12 or 0.05, active and 0.30 or 0.09, active and 0.24 or 0.16, 1)
+            btn:SetBackdropBorderColor(active and 0.24 or 0.16, active and 0.82 or 0.28, active and 0.70 or 0.36, 1)
+
+            local lbl = btn:CreateFontString(nil, "OVERLAY")
+            lbl:SetFont(FONT_ROWS, math.min(cfgFs, 10), GetFontFlags())
+            lbl:SetPoint("LEFT", btn, "LEFT", 2, 0)
+            lbl:SetPoint("RIGHT", btn, "RIGHT", -2, 0)
+            lbl:SetJustifyH("CENTER")
+            lbl:SetWordWrap(false)
+            lbl:SetText(choice.label)
+            lbl:SetTextColor(active and 0.92 or 0.70, active and 1.0 or 0.78, active and 0.94 or 0.74)
+
+            btn:SetScript("OnClick", function()
+                SetWindowLayoutValue("tooltipPosition", choice.value)
+                MR:PopulateConfigFrame(f)
+            end)
+            btn:SetScript("OnEnter", function()
+                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "right") == choice.value
+                if not selected then
+                    btn:SetBackdropColor(0.08, 0.20, 0.25, 1)
+                    btn:SetBackdropBorderColor(0.24, 0.74, 0.68, 1)
+                    lbl:SetTextColor(0.92, 0.98, 0.96)
+                end
+            end)
+            btn:SetScript("OnLeave", function()
+                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "right") == choice.value
+                btn:SetBackdropColor(selected and 0.12 or 0.05, selected and 0.30 or 0.09, selected and 0.24 or 0.16, 1)
+                btn:SetBackdropBorderColor(selected and 0.24 or 0.16, selected and 0.82 or 0.28, selected and 0.70 or 0.36, 1)
+                lbl:SetTextColor(selected and 0.92 or 0.70, selected and 1.0 or 0.78, selected and 0.94 or 0.74)
+            end)
+        end
+
+        for index, choice in ipairs(tooltipChoices) do
+            CreateTooltipPositionButton(choice, index)
+        end
+        yOff = yOff - 30
     end
 
     if activePage == "modules" then

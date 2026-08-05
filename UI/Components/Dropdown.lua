@@ -285,10 +285,12 @@ function ns.CreateDropdown(parent, opts)
             SetBackdropColor(row, row._checked and SELECTED_BG or ROW_BG, alpha)
             SetBackdropBorderColor(row, row._checked and style.selectedBorder or ROW_BORDER, alpha)
             row:SetScript("OnClick", function()
-                if opts.onSelect then opts.onSelect(OptionKey(option), option) end
-                self:Update()
                 popup:Hide()
                 dismiss:Hide()
+                if opts.onSelect then opts.onSelect(OptionKey(option), option) end
+                if self:GetParent() then
+                    self:Update()
+                end
             end)
             row:Show()
         end

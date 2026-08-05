@@ -647,9 +647,6 @@ MR:RegisterModule({
         end
 
         if activeLegendVariant then
-            -- Turning in the parent quest can mark this row complete before the
-            -- chosen relic quest begins. An active relic is the remaining work,
-            -- so it must reopen the row until that specific quest is turned in.
             db[mod.key]["lost_legends"] = 0
             db[mod.key]["legends_completed_name"] = nil
         else

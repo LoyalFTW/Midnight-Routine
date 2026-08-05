@@ -245,9 +245,6 @@ ns.ConfigInternal = {
 }
 
 function MR:RequestConfigRepopulate(frame, delay)
-    -- Core callers historically pass a reason string here, while config controls
-    -- pass the frame directly. Treat anything that is not a frame as the
-    -- default config frame so either call form remains safe.
     if type(frame) ~= "table" or type(frame.IsShown) ~= "function" then
         frame = cfgFrame
     end

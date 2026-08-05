@@ -349,9 +349,6 @@ local function GetCachedQuestMoneyReward(questId)
         return money, false
     end
 
-    -- Do not preload complete quest payloads just to decorate a custom row.
-    -- Blizzard retains that data and can charge several MB to this addon. If
-    -- the client already knows the reward, it is cached above and still shown.
     return 0, false
 end
 

@@ -278,3 +278,7 @@ local TWW_EXPANSION = {
 }
 
 ns.RegisterProfessionExpansion(TWW_EXPANSION)
+
+for _, profession in ipairs(TWW_EXPANSION.professions) do
+    ns.RegisterProfessionMainMenuModule(profession, TWW_EXPANSION)
+end
