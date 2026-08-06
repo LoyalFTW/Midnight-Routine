@@ -113,10 +113,17 @@ local function RefreshFonts()
     local loc = GetLocaleFont()
     if not FONT_ROWS    or FONT_ROWS    == "" then FONT_ROWS    = loc end
     if not FONT_HEADERS or FONT_HEADERS == "" then FONT_HEADERS = loc end
+
+    local UI = ns.UIInternal
+    if UI then
+        UI.FONT_ROWS = FONT_ROWS
+        UI.FONT_HEADERS = FONT_HEADERS
+    end
 end
 
 local function SetFontIfChanged(fontString, fontPath, size, flags)
     if not fontString then return end
+    fontPath = ns.FONT_ROWS or ns.FONT_HEADERS or fontPath
     flags = flags or ""
     if fontString._mrFontPath == fontPath
         and fontString._mrFontSize == size
@@ -132,11 +139,11 @@ end
 
 local function SetFontForText(fontString, text, size, flags)
     if not fontString then return end
-    local fontPath = FONT_ROWS
+    local fontPath = ns.FONT_ROWS or FONT_ROWS
     if ns.ResolveFontForText then
-        fontPath = ns.ResolveFontForText(text, FONT_ROWS)
+        fontPath = ns.ResolveFontForText(text, fontPath)
     elseif ns.ScriptFontForText then
-        fontPath = ns.ScriptFontForText(text) or FONT_ROWS
+        fontPath = ns.ScriptFontForText(text) or fontPath
     end
     SetFontIfChanged(fontString, fontPath, size, flags)
 end

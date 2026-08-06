@@ -48,7 +48,7 @@ do
         local label = btn[OVERLAY_KEY]
         if not label then
             label = btn:CreateFontString(nil, "OVERLAY")
-            label:SetFont(FONT_ROWS or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+            label:SetFont(ns.FONT_ROWS or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
             label:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -8, 5)
             label:SetTextColor(0.40, 0.85, 1.00, 1)
             btn[OVERLAY_KEY] = label

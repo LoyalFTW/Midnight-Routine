@@ -1293,7 +1293,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     statusFill:SetColorTexture(done and 0.20 or 0.09, done and 0.72 or 0.10, done and 0.42 or 0.14, (done and 0.85 or 0.70) * contentAlpha)
 
     local statusCheck = RenderFontString(statusBox, "OVERLAY")
-    statusCheck:SetFont(FONT_HEADERS, 9, GetFontFlags())
+    statusCheck:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
     statusCheck:SetPoint("CENTER", statusBox, "CENTER", 0, 1)
     statusCheck:SetText("x")
     statusCheck:SetTextColor(0.03, 0.08, 0.04, 1)
@@ -1306,7 +1306,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     local statusText = RenderFontString(row, "OVERLAY")
-    statusText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    statusText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     statusText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     statusText:SetWidth(46)
     statusText:SetJustifyH("RIGHT")
@@ -1319,7 +1319,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     end
 
     local nameText = RenderFontString(row, "OVERLAY")
-    nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    nameText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
     nameText:SetPoint("RIGHT", statusText, "LEFT", -8, 0)
     nameText:SetJustifyH("LEFT")
@@ -1374,7 +1374,7 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
     local kpText = RenderFontString(row, "OVERLAY")
-    kpText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    kpText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     kpText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     kpText:SetWidth(46)
     kpText:SetJustifyH("RIGHT")
@@ -1382,7 +1382,7 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     kpText:SetTextColor(cr, cg, cb, 0.95)
 
     local nameText = RenderFontString(row, "OVERLAY")
-    nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    nameText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
     nameText:SetPoint("RIGHT", kpText, "LEFT", -8, 0)
     nameText:SetJustifyH("LEFT")
@@ -1420,7 +1420,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     sectionChip:SetBackdropBorderColor(0, 0, 0, 0)
 
     local sectionHeader = RenderFontString(sectionChip, "OVERLAY")
-    sectionHeader:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    sectionHeader:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     sectionHeader:SetPoint("LEFT", sectionChip, "LEFT", 6, 0)
     sectionHeader:SetPoint("RIGHT", sectionChip, "RIGHT", -8, 0)
     sectionHeader:SetJustifyH("LEFT")
@@ -1467,7 +1467,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     local statusText
     if done and max then
         statusText = RenderFontString(row, "OVERLAY")
-        statusText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+        statusText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
         statusText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
         statusText:SetWidth(56)
         statusText:SetJustifyH("RIGHT")
@@ -1480,7 +1480,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     end
 
     local nameText = RenderFontString(row, "OVERLAY")
-    nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+    nameText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     if statusText then
         nameText:SetPoint("RIGHT", statusText, "LEFT", -8, 0)
@@ -1536,7 +1536,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         headerFrame:SetBackdropBorderColor(0, 0, 0, 0)
 
         local headerText = RenderFontString(headerFrame, "OVERLAY")
-        headerText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+        headerText:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
         headerText:SetPoint("LEFT", headerFrame, "LEFT", 6, 0)
         headerText:SetPoint("RIGHT", headerFrame, "RIGHT", -8, 0)
         headerText:SetJustifyH("LEFT")
@@ -1591,7 +1591,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         statusFill:SetPoint("BOTTOMRIGHT", statusBtn, "BOTTOMRIGHT", -2, 2)
 
         local statusCheck = RenderFontString(statusBtn, "OVERLAY")
-        statusCheck:SetFont(FONT_HEADERS, 9, GetFontFlags())
+        statusCheck:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
         statusCheck:SetPoint("CENTER", statusBtn, "CENTER", 0, 1)
         statusCheck:SetText("x")
 
@@ -1634,7 +1634,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
         local valueText = RenderFontString(taskFrame, "OVERLAY")
-        valueText:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+        valueText:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         valueText:SetPoint("RIGHT", taskFrame, "RIGHT", -8, 0)
         valueText:SetWidth(row.key == "prof_catchup" and 56 or 44)
         valueText:SetJustifyH("RIGHT")
@@ -1660,7 +1660,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         end
 
         local nameText = RenderFontString(taskFrame, "OVERLAY")
-        nameText:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+        nameText:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
         nameText:SetPoint("RIGHT", valueText, "LEFT", -8, 0)
         nameText:SetJustifyH("LEFT")
@@ -1812,7 +1812,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     cardGlow:SetColorTexture(1, 1, 1, isCollapsed and 0 or (0.025 * contentAlpha))
 
     local header = RenderFontString(card, "OVERLAY")
-    header:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
+    header:SetFont(ns.FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
     if isCollapsed then
         iconPlate:ClearAllPoints()
         iconPlate:SetPoint("LEFT", card, "LEFT", 7, 0)
@@ -1834,7 +1834,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     header:SetText(L["Skin_Lures_Title"] or "Skinning Lures")
 
     local headerMeta = RenderFontString(card, "OVERLAY")
-    headerMeta:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
+    headerMeta:SetFont(ns.FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
     if isCollapsed then
         headerMeta:SetPoint("RIGHT", card, "RIGHT", -10, 0)
         headerMeta:SetWidth(106)
@@ -1853,7 +1853,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     collapseBtn:RegisterForClicks("LeftButtonUp")
 
     local collapseLbl = RenderFontString(collapseBtn, "OVERLAY")
-    collapseLbl:SetFont(FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
+    collapseLbl:SetFont(ns.FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
     collapseLbl:SetPoint("CENTER")
     collapseLbl:SetText(isCollapsed and "+" or "-")
     collapseLbl:SetTextColor(0.84, 0.90, 0.95, 0.95)
@@ -1948,7 +1948,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 cardGlow:SetColorTexture(1, 1, 1, isCollapsed and 0 or (0.025 * contentAlpha))
 
                 local header = RenderFontString(card, "OVERLAY")
-                header:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
+                header:SetFont(ns.FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
                 if isCollapsed then
                     iconPlate:ClearAllPoints()
                     iconPlate:SetPoint("LEFT", card, "LEFT", 7, 0)
@@ -1970,7 +1970,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 header:SetText(profession.label)
 
                 local headerSub = RenderFontString(card, "OVERLAY")
-                headerSub:SetFont(FONT_ROWS, math.max(8, fontSize - 2), GetFontFlags())
+                headerSub:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 2), GetFontFlags())
                 headerSub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -3)
                 headerSub:SetPoint("RIGHT", card, "RIGHT", -12, 0)
                 headerSub:SetJustifyH("LEFT")
@@ -1978,7 +1978,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 headerSub:SetWordWrap(false)
 
                 local headerMeta = RenderFontString(card, "OVERLAY")
-                headerMeta:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
+                headerMeta:SetFont(ns.FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
                 if isCollapsed then
                     headerMeta:SetPoint("RIGHT", card, "RIGHT", -10, 0)
                     headerMeta:SetWidth(useTaskHeader and 106 or 48)
@@ -1997,7 +1997,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 collapseBtn:RegisterForClicks("LeftButtonUp")
 
                 local collapseLbl = RenderFontString(collapseBtn, "OVERLAY")
-                collapseLbl:SetFont(FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
+                collapseLbl:SetFont(ns.FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
                 collapseLbl:SetPoint("CENTER")
                 collapseLbl:SetText(isCollapsed and "+" or "-")
                 collapseLbl:SetTextColor(0.84, 0.90, 0.95, 0.95)
@@ -2088,7 +2088,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                             sectionChip:SetBackdropBorderColor(0, 0, 0, 0)
 
                             local sectionHeader = RenderFontString(sectionChip, "OVERLAY")
-                            sectionHeader:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+                            sectionHeader:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
                             sectionHeader:SetPoint("LEFT", sectionChip, "LEFT", 6, 0)
                             sectionHeader:SetPoint("RIGHT", sectionChip, "RIGHT", -8, 0)
                             sectionHeader:SetJustifyH("LEFT")
@@ -2129,7 +2129,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
         if #visibleProfessions > 0 and expansion.sharedCatchupItemID then
             local shardCount = GetItemCountRemaining(expansion.sharedCatchupItemID)
             local shardRow = RenderFontString(content, "OVERLAY")
-            shardRow:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
+            shardRow:SetFont(ns.FONT_ROWS, fontSize - 1, GetFontFlags())
             shardRow:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -yOff)
             shardRow:SetTextColor(0.70, 0.85, 1.00, 0.90)
             shardRow:SetText(string.format(L["ProfKnowledge_LegacyDragonShard"] or "Dragon Shards of Knowledge: %d", shardCount))
@@ -2288,7 +2288,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     expansionDropdown:SetPoint("LEFT", titleBar, "LEFT", 8, -1)
 
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
-    titleTxt:SetFont(FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
+    titleTxt:SetFont(ns.FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
     titleTxt:SetPoint("LEFT", titleBar, "LEFT", 9, 0)
     titleTxt:SetPoint("RIGHT", expansionDropdown, "LEFT", -6, 0)
     titleTxt:SetJustifyH("LEFT")
@@ -2488,7 +2488,7 @@ local function BuildGatheringLocationsFrame(isRetry)
             dragger:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
         end
 
-        titleTxt:SetFont(FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
+        titleTxt:SetFont(ns.FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
         expansionDropdown:Update()
         trackBg:SetColorTexture(0, 0, 0, 0.3 * chromeAlpha)
         thumbTex:SetColorTexture(0.80, 0.53, 0.20, 0.6 * chromeAlpha)
@@ -2500,7 +2500,7 @@ local function BuildGatheringLocationsFrame(isRetry)
         frame._professionKnowledgeEmptyState = yOff == 0
         if yOff == 0 then
             local emptyText = RenderFontString(content, "OVERLAY")
-            emptyText:SetFont(FONT_ROWS, db.gatheringFontSize or 9, GetFontFlags())
+            emptyText:SetFont(ns.FONT_ROWS, db.gatheringFontSize or 9, GetFontFlags())
             emptyText:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -10)
             emptyText:SetPoint("TOPRIGHT", content, "TOPRIGHT", -10, -10)
             emptyText:SetJustifyH("LEFT")
@@ -2603,7 +2603,7 @@ local function BuildGatheringConfigFrame()
     tbar:SetScript("OnDragStart", function() frame:StartMoving() end)
     tbar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     local ttitle = tbar:CreateFontString(nil, "OVERLAY")
-    ttitle:SetFont(FONT_HEADERS, 10, GetFontFlags())
+    ttitle:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
     ttitle:SetText(L["ProfKnowledge_Config_Title"])
     ttitle:SetPoint("LEFT", tbar, "LEFT", 8, 0)
     CloseButton(tbar, function() frame:Hide() end)
@@ -2695,7 +2695,7 @@ PopulateGatheringConfig = function(frame)
             btn:SetBackdropBorderColor(isActive and 0.22 or 0.16, isActive and 0.82 or 0.28, isActive and 0.70 or 0.36, 1)
 
             local lbl = btn:CreateFontString(nil, "OVERLAY")
-            lbl:SetFont(FONT_ROWS, cfgFs, GetFontFlags())
+            lbl:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             lbl:SetPoint("CENTER")
             lbl:SetText(tab.label)
             lbl:SetTextColor(isActive and 0.85 or 0.62, isActive and 1.0 or 0.75, isActive and 0.92 or 0.70)
@@ -2800,7 +2800,7 @@ PopulateGatheringConfig = function(frame)
             end
 
             local lbl = btn:CreateFontString(nil, "OVERLAY")
-            lbl:SetFont(FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
+            lbl:SetFont(ns.FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
             lbl:SetPoint("LEFT", cb or btn, cb and "RIGHT" or "LEFT", cb and 1 or 0, 0)
             lbl:SetPoint("RIGHT", btn, "RIGHT", -5, 0)
             lbl:SetJustifyH("LEFT")
@@ -2848,7 +2848,7 @@ PopulateGatheringConfig = function(frame)
             bullet:SetColorTexture(er, eg, eb)
 
             local rlbl = rowFr:CreateFontString(nil, "OVERLAY")
-            rlbl:SetFont(FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
+            rlbl:SetFont(ns.FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
             rlbl:SetPoint("LEFT", rowFr, "LEFT", 10, 0)
             rlbl:SetPoint("RIGHT", rowFr, "RIGHT", -32, 0)
             rlbl:SetJustifyH("LEFT")
@@ -2860,7 +2860,7 @@ PopulateGatheringConfig = function(frame)
             eyeBtn:SetPoint("RIGHT", rowFr, "RIGHT", 0, 0)
             eyeBtn:SetBackdrop(MakeBackdrop())
             local eyeLbl = eyeBtn:CreateFontString(nil, "OVERLAY")
-            eyeLbl:SetFont(FONT_ROWS, 9, GetFontFlags())
+            eyeLbl:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
             eyeLbl:SetPoint("CENTER", eyeBtn, "CENTER", 0, 0)
 
             local function ApplyState(isEnabled)
@@ -2933,7 +2933,7 @@ PopulateGatheringConfig = function(frame)
             header:SetBackdropBorderColor(0.22, 0.68, 0.64, 0.92)
 
             local lbl = header:CreateFontString(nil, "OVERLAY")
-            lbl:SetFont(FONT_HEADERS, math.max(10, cfgFs), GetFontFlags())
+            lbl:SetFont(ns.FONT_HEADERS, math.max(10, cfgFs), GetFontFlags())
             lbl:SetPoint("LEFT", header, "LEFT", 9, 0)
             lbl:SetPoint("RIGHT", header, "RIGHT", -8, 0)
             lbl:SetJustifyH("LEFT")
@@ -2995,7 +2995,7 @@ PopulateGatheringConfig = function(frame)
                         expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                         expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
                         local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")
-                        expandLbl:SetFont(FONT_HEADERS, cfgFs, GetFontFlags())
+                        expandLbl:SetFont(ns.FONT_HEADERS, cfgFs, GetFontFlags())
                         expandLbl:SetPoint("CENTER", expandBtn, "CENTER", 0, 1)
                         expandLbl:SetText(isExpanded and "v" or ">")
                         expandLbl:SetTextColor(0.45, 0.75, 0.70)
@@ -3027,7 +3027,7 @@ PopulateGatheringConfig = function(frame)
                         end, profession.label .. L["Color_Reset_Hint"])
                         swatch:SetPoint("RIGHT", expandBtn, "LEFT", -4, 0)
                         nameLbl = row:CreateFontString(nil, "OVERLAY")
-                        nameLbl:SetFont(FONT_ROWS, 10, GetFontFlags())
+                        nameLbl:SetFont(ns.FONT_ROWS, 10, GetFontFlags())
                         nameLbl:SetPoint("LEFT", toggleBtn, "RIGHT", 6, 0)
                         nameLbl:SetPoint("RIGHT", swatch, "LEFT", -4, 0)
                         nameLbl:SetJustifyH("LEFT")

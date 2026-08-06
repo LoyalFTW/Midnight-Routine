@@ -53,7 +53,7 @@ local function ApplyCustomTaskDialogTheme(frame)
 
     frame:SetSize(400, 512)
 
-    local function sf(fs, size) if fs then fs:SetFont(FONT_ROWS, size, GetFontFlags()) end end
+    local function sf(fs, size) if fs then fs:SetFont(ns.FONT_ROWS, size, GetFontFlags()) end end
     sf(frame.title,           math.max(10, fontSize + 1))
     sf(frame.nameLabel,       rowFont)
     sf(frame.questLabel,      rowFont)
@@ -65,15 +65,15 @@ local function ApplyCustomTaskDialogTheme(frame)
     sf(frame.targetHint,      hintFont)
     sf(frame.resetLabel,      rowFont)
 
-    if frame.title then frame.title:SetFont(FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
+    if frame.title then frame.title:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
 
     local checks = { frame.weeklyCheck, frame.dailyCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
     for _, cb in ipairs(checks) do
-        if cb and cb._text then cb._text:SetFont(FONT_ROWS, rowFont, GetFontFlags()) end
+        if cb and cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
     end
     if frame.difficultyChecks then
         for _, cb in ipairs(frame.difficultyChecks) do
-            if cb._text then cb._text:SetFont(FONT_ROWS, rowFont, GetFontFlags()) end
+            if cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
         end
     end
 
@@ -82,9 +82,9 @@ local function ApplyCustomTaskDialogTheme(frame)
     if frame.encounterInput then ApplyDialogEditBoxFont(frame.encounterInput, editFont) end
     if frame.targetInput    then ApplyDialogEditBoxFont(frame.targetInput,    editFont) end
 
-    if frame.saveBtn   and frame.saveBtn._label   then frame.saveBtn._label:SetFont(FONT_HEADERS,   10, GetFontFlags()) end
-    if frame.cancelBtn and frame.cancelBtn._label then frame.cancelBtn._label:SetFont(FONT_HEADERS, 10, GetFontFlags()) end
-    if frame.deleteBtn and frame.deleteBtn._label then frame.deleteBtn._label:SetFont(FONT_HEADERS, 10, GetFontFlags()) end
+    if frame.saveBtn   and frame.saveBtn._label   then frame.saveBtn._label:SetFont(ns.FONT_HEADERS,   10, GetFontFlags()) end
+    if frame.cancelBtn and frame.cancelBtn._label then frame.cancelBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags()) end
+    if frame.deleteBtn and frame.deleteBtn._label then frame.deleteBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags()) end
 end
 
 local function ApplyCustomTasksTitleDialogTheme(frame)
@@ -105,11 +105,11 @@ local function ApplyCustomTasksTitleDialogTheme(frame)
     frame:SetSize(frameWidth, frameHeight)
 
     if frame.titleText then
-        frame.titleText:SetFont(FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags())
+        frame.titleText:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags())
         frame.titleText:SetWidth(frameWidth - 24)
     end
     if frame.subtitle then
-        frame.subtitle:SetFont(FONT_ROWS, rowFont, GetFontFlags())
+        frame.subtitle:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags())
         frame.subtitle:SetWidth(frameWidth - 24)
     end
     if frame.inputBg then
@@ -119,16 +119,16 @@ local function ApplyCustomTasksTitleDialogTheme(frame)
         ApplyDialogEditBoxFont(frame.input, editFont)
     end
     if frame.hint then
-        frame.hint:SetFont(FONT_ROWS, hintFont, GetFontFlags())
+        frame.hint:SetFont(ns.FONT_ROWS, hintFont, GetFontFlags())
         frame.hint:ClearAllPoints()
         frame.hint:SetPoint("TOPLEFT", frame.inputBg, "BOTTOMLEFT", 0, -hintGap)
         frame.hint:SetPoint("TOPRIGHT", frame.inputBg, "BOTTOMRIGHT", 0, -hintGap)
     end
     if frame.saveBtn and frame.saveBtn._label then
-        frame.saveBtn._label:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        frame.saveBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
     end
     if frame.cancelBtn and frame.cancelBtn._label then
-        frame.cancelBtn._label:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        frame.cancelBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
     end
 end
 
@@ -167,7 +167,7 @@ local function EnsureCustomTaskDialog()
 
 
     local title = frame:CreateFontString(nil, "OVERLAY")
-    title:SetFont(FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
+    title:SetFont(ns.FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
     title:SetPoint("TOPLEFT",  frame, "TOPLEFT",  PAD, -PAD)
     title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -PAD)
     title:SetJustifyH("LEFT")
@@ -185,7 +185,7 @@ local function EnsureCustomTaskDialog()
 
     local function MakeLabel(anchorFrame, anchorPoint, xOff, yOff, text)
         local lbl = frame:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+        lbl:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
         lbl:SetPoint("TOPLEFT", anchorFrame, anchorPoint, xOff, yOff)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(text)
@@ -257,7 +257,7 @@ local function EnsureCustomTaskDialog()
 
 
     local idHint = frame:CreateFontString(nil, "OVERLAY")
-    idHint:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    idHint:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     idHint:SetPoint("TOPLEFT",  questBg, "BOTTOMLEFT",  0, -4)
     idHint:SetPoint("TOPRIGHT", frame,   "TOPRIGHT",   -PAD, 0)
     idHint:SetJustifyH("LEFT")
@@ -288,7 +288,7 @@ local function EnsureCustomTaskDialog()
         end
         cb:SetChecked(true)
         local cbText = frame:CreateFontString(nil, "OVERLAY")
-        cbText:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        cbText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
         cbText:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         cbText:SetText(opt.label)
         cbText:SetTextColor(0.84, 0.90, 0.96)
@@ -299,7 +299,7 @@ local function EnsureCustomTaskDialog()
     end
 
     local diffHint = frame:CreateFontString(nil, "OVERLAY")
-    diffHint:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    diffHint:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     diffHint:SetPoint("TOPLEFT", difficultyLabel, "BOTTOMLEFT", 0, -24)
     diffHint:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, 0)
     diffHint:SetJustifyH("LEFT")
@@ -320,7 +320,7 @@ local function EnsureCustomTaskDialog()
         ApplyDialogEditBoxFont(selfEdit, GetFontSize())
     end)
     local targetHint = frame:CreateFontString(nil, "OVERLAY")
-    targetHint:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    targetHint:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     targetHint:SetPoint("LEFT",  targetBg, "RIGHT", 8, 0)
     targetHint:SetPoint("RIGHT", frame,    "RIGHT", -PAD, 0)
     targetHint:SetJustifyH("LEFT")
@@ -341,7 +341,7 @@ local function EnsureCustomTaskDialog()
         cb:SetSize(20, 20)
         cb:SetPoint("TOPLEFT", anchorTo, anchorPt, xOff, yOff)
         local text = frame:CreateFontString(nil, "OVERLAY")
-        text:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        text:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
         text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         text:SetText(labelText)
         text:SetTextColor(0.84, 0.90, 0.96)
@@ -368,7 +368,7 @@ local function EnsureCustomTaskDialog()
     manualQuestCheck:SetSize(20, 20)
     manualQuestCheck:SetPoint("TOPLEFT", weeklyCheck, "BOTTOMLEFT", 0, -GAP)
     local manualQuestText = frame:CreateFontString(nil, "OVERLAY")
-    manualQuestText:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    manualQuestText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     manualQuestText:SetPoint("LEFT", manualQuestCheck, "RIGHT", 2, 0)
     manualQuestText:SetText(L["CustomTasks_ManualQuestClicks"] or "Allow manual clicks")
     manualQuestText:SetTextColor(0.84, 0.90, 0.96)
@@ -384,7 +384,7 @@ local function EnsureCustomTaskDialog()
     autoUpdateCheck:SetSize(20, 20)
     autoUpdateCheck:SetPoint("TOPLEFT", manualQuestCheck, "BOTTOMLEFT", 0, -4)
     local autoUpdateText = frame:CreateFontString(nil, "OVERLAY")
-    autoUpdateText:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    autoUpdateText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     autoUpdateText:SetPoint("LEFT", autoUpdateCheck, "RIGHT", 2, 0)
     autoUpdateText:SetText(L["CustomTasks_AutoUpdateInstances"] or "Auto-update in instances")
     autoUpdateText:SetTextColor(0.84, 0.90, 0.96)
@@ -399,7 +399,7 @@ local function EnsureCustomTaskDialog()
     sharedTaskCheck:SetSize(20, 20)
     sharedTaskCheck:SetPoint("TOPLEFT", autoUpdateCheck, "BOTTOMLEFT", 0, -4)
     local sharedTaskText = frame:CreateFontString(nil, "OVERLAY")
-    sharedTaskText:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    sharedTaskText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     sharedTaskText:SetPoint("LEFT", sharedTaskCheck, "RIGHT", 2, 0)
     sharedTaskText:SetText(Text("CustomTasks_SharedTask", "Show on all alts"))
     sharedTaskText:SetTextColor(0.84, 0.90, 0.96)
@@ -430,7 +430,7 @@ local function EnsureCustomTaskDialog()
     accountCompleteCheck:SetSize(20, 20)
     accountCompleteCheck:SetPoint("TOPLEFT", sharedTaskCheck, "BOTTOMLEFT", 0, -4)
     local accountCompleteText = frame:CreateFontString(nil, "OVERLAY")
-    accountCompleteText:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    accountCompleteText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     accountCompleteText:SetPoint("LEFT", accountCompleteCheck, "RIGHT", 2, 0)
     accountCompleteText:SetText(Text("CustomTasks_AccountComplete", "Complete on all alts"))
     accountCompleteText:SetTextColor(0.84, 0.90, 0.96)
@@ -448,7 +448,7 @@ local function EnsureCustomTaskDialog()
         btn:SetBackdropColor(color[1], color[2], color[3], 0.95)
         btn:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], 1)
         local text = btn:CreateFontString(nil, "OVERLAY")
-        text:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        text:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
         text:SetPoint("CENTER", btn, "CENTER", 0, 1)
         text:SetText(label)
         text:SetTextColor(0.92, 0.96, 1)
@@ -681,7 +681,7 @@ local function EnsureCustomTasksTitleDialog()
     end)
 
     local title = frame:CreateFontString(nil, "OVERLAY")
-    title:SetFont(FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
+    title:SetFont(ns.FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
     title:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -12)
     title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -12)
     title:SetJustifyH("LEFT")
@@ -689,7 +689,7 @@ local function EnsureCustomTasksTitleDialog()
     title:SetTextColor(0.92, 0.97, 1)
 
     local subtitle = frame:CreateFontString(nil, "OVERLAY")
-    subtitle:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    subtitle:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
     subtitle:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -6)
     subtitle:SetJustifyH("LEFT")
@@ -720,7 +720,7 @@ local function EnsureCustomTasksTitleDialog()
     frame.input = input
 
     local hint = frame:CreateFontString(nil, "OVERLAY")
-    hint:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
+    hint:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
     hint:SetPoint("TOPLEFT", inputBg, "BOTTOMLEFT", 0, -8)
     hint:SetPoint("TOPRIGHT", inputBg, "BOTTOMRIGHT", 0, -8)
     hint:SetJustifyH("LEFT")
@@ -736,7 +736,7 @@ local function EnsureCustomTasksTitleDialog()
         btn:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], 1)
 
         local text = btn:CreateFontString(nil, "OVERLAY")
-        text:SetFont(FONT_HEADERS, 10, GetFontFlags())
+        text:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
         text:SetPoint("CENTER", btn, "CENTER", 0, 1)
         text:SetText(label)
         text:SetTextColor(0.92, 0.96, 1)

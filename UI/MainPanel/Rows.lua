@@ -652,7 +652,7 @@ local function UpdateMainExpansionHeaderWidget(self, expansionKey, yOff, xOff, c
     frame:SetFrameLevel((self.content:GetFrameLevel() or 0) + 8)
     frame:SetBackdropColor(0.035, 0.055, 0.070, 0.86 * frameAlpha)
     frame:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.80 * frameAlpha)
-    frame._label:SetFont(FONT_HEADERS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    frame._label:SetFont(ns.FONT_HEADERS, math.max(8, GetFontSize() - 1), GetFontFlags())
     frame._label:SetPoint("LEFT", frame, "LEFT", 7, 0)
     frame._label:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
     frame._label:SetText(label)
@@ -699,7 +699,7 @@ local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     card._hdrFrame._currencyBrowserButton:SetScript("OnLeave", CurrencyBrowserButtonOnLeave)
     card._hdrFrame._currencyBrowserText = card._hdrFrame._currencyBrowserButton:CreateFontString(nil, "OVERLAY")
     card._hdrFrame._currencyBrowserButton._label = card._hdrFrame._currencyBrowserText
-    card._hdrFrame._currencyBrowserText:SetFont(FONT_ROWS, 12, GetFontFlags())
+    card._hdrFrame._currencyBrowserText:SetFont(ns.FONT_ROWS, 12, GetFontFlags())
     card._hdrFrame._currencyBrowserText:SetPoint("CENTER", card._hdrFrame._currencyBrowserButton, "CENTER", 0, 0)
     card._hdrFrame._currencyBrowserText:SetText(L["CurrencyBrowser_All"] or "ALL")
     card._hdrFrame._arrow = CreateFrame("Frame", nil, card._hdrFrame)
@@ -838,7 +838,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     local hasHeaderIcon = ApplyIconToTexture(card._hdrFrame._icon, iconInfo, { 0.14, 0.86, 0.14, 0.86 })
     card._hdrFrame._iconPlate:SetShown(hasHeaderIcon and (showIcons or showSectionHeaders))
 
-    card._hdrFrame._label:SetFont(FONT_HEADERS, math.max(9, GetFontSize()), GetFontFlags())
+    card._hdrFrame._label:SetFont(ns.FONT_HEADERS, math.max(9, GetFontSize()), GetFontFlags())
     card._hdrFrame._label:ClearAllPoints()
     if hasHeaderIcon then
         card._hdrFrame._label:SetPoint("LEFT", card._hdrFrame._iconPlate, "RIGHT", 6, 0)
@@ -851,7 +851,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     end
     card._hdrFrame._label:SetText((allDone and not explicitColor) and WC("00ff96", mod.label) or WC(headerColor:gsub("#", ""), mod.label))
 
-    card._hdrFrame._count:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    card._hdrFrame._count:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     card._hdrFrame._count:ClearAllPoints()
     local currencyBrowserButton = card._hdrFrame._currencyBrowserButton
     local showCurrencyBrowserButton = mod.key == "currencies" and MR.ToggleCurrencyBrowserFrame
@@ -965,7 +965,7 @@ EnsureMainRowWidget = function(section, rowKey, widgetKind)
     rowFrame._statusFill:SetPoint("TOPLEFT", rowFrame._statusBtn, "TOPLEFT", 2, -2)
     rowFrame._statusFill:SetPoint("BOTTOMRIGHT", rowFrame._statusBtn, "BOTTOMRIGHT", -2, 2)
     rowFrame._statusCheck = rowFrame._statusBtn:CreateFontString(nil, "OVERLAY")
-    rowFrame._statusCheck:SetFont(FONT_HEADERS, 9, GetFontFlags())
+    rowFrame._statusCheck:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
     rowFrame._statusCheck:SetPoint("CENTER", rowFrame._statusBtn, "CENTER", 0, 1)
     rowFrame._statusCheck:SetText("x")
 
@@ -980,7 +980,7 @@ EnsureMainRowWidget = function(section, rowKey, widgetKind)
         rowFrame._label:SetShadowOffset(0, 0)
     end
     rowFrame._count = rowFrame:CreateFontString(nil, "OVERLAY")
-    rowFrame._count:SetFont(FONT_ROWS, GetFontSize(), GetFontFlags())
+    rowFrame._count:SetFont(ns.FONT_ROWS, GetFontSize(), GetFontFlags())
     section._rows[rowKey] = rowFrame
     return rowFrame
 end
@@ -998,9 +998,9 @@ local function EnsureMainRowHeaderParts(rowFrame)
     rowFrame._headerActionButton:SetScript("OnEnter", MainHeaderActionOnEnter)
     rowFrame._headerActionButton:SetScript("OnLeave", MainHeaderActionOnLeave)
     rowFrame._headerActionText = rowFrame._headerActionButton:CreateFontString(nil, "OVERLAY")
-    rowFrame._headerActionText:SetFont(FONT_ROWS, 9, GetFontFlags())
+    rowFrame._headerActionText:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
     rowFrame._headerCount = rowFrame:CreateFontString(nil, "OVERLAY")
-    rowFrame._headerCount:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
+    rowFrame._headerCount:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
     MR._mainRowOptionalPartCreatedCount = (MR._mainRowOptionalPartCreatedCount or 0) + 5
 end
 
@@ -1069,7 +1069,7 @@ local function EnsureMainDifficultyBadges(rowFrame)
             edgeSize = 1,
         })
         local lbl = btn:CreateFontString(nil, "OVERLAY")
-        lbl:SetFont(FONT_ROWS, math.max(6, GetFontSize() - 3), GetFontFlags())
+        lbl:SetFont(ns.FONT_ROWS, math.max(6, GetFontSize() - 3), GetFontFlags())
         lbl:SetPoint("CENTER", btn, "CENTER", 0, 0)
         lbl:SetText(def.label)
         btn._lbl = lbl
@@ -1078,7 +1078,7 @@ local function EnsureMainDifficultyBadges(rowFrame)
         rowFrame._diffBadges[i] = btn
     end
     rowFrame._diffCount = rowFrame:CreateFontString(nil, "OVERLAY")
-    rowFrame._diffCount:SetFont(FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    rowFrame._diffCount:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     MR._mainRowOptionalPartCreatedCount = (MR._mainRowOptionalPartCreatedCount or 0) + (#DIFF_BADGE_DEFS * 2) + 1
 end
 

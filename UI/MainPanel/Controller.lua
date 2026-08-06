@@ -563,7 +563,7 @@ function MR:BuildUI()
     titleAccent:SetColorTexture(0.92, 0.72, 0.20, 1)
 
     local title = titleBar:CreateFontString(nil, "OVERLAY")
-    title:SetFont(FONT_HEADERS, math.max(8, GetFontSize() - 2), GetFontFlags())
+    title:SetFont(ns.FONT_HEADERS, math.max(8, GetFontSize() - 2), GetFontFlags())
     title:SetPoint("LEFT", titleBar, "LEFT", 12, 0)
     title:SetPoint("RIGHT", titleBar, "RIGHT", -110, 0)
     title:SetJustifyH("LEFT")
@@ -571,7 +571,7 @@ function MR:BuildUI()
     self.titleText = title
 
     local titleCount = titleBar:CreateFontString(nil, "OVERLAY")
-    titleCount:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    titleCount:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     titleCount:SetTextColor(0.84, 0.88, 0.90)
     self.titleCount = titleCount
 
@@ -735,7 +735,7 @@ function MR:BuildUI()
     warbandGlow:SetTexture("Interface\\Buttons\\WHITE8X8")
     warbandGlow:SetColorTexture(0.15, 0.42, 0.45, 0.14)
     local warbandText = warbandBtn:CreateFontString(nil, "OVERLAY")
-    warbandText:SetFont(FONT_HEADERS, 9, GetFontFlags())
+    warbandText:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
     warbandText:SetPoint("CENTER", warbandBtn, "CENTER", 0, 1)
     warbandText:SetText(L["AltBoard_ButtonLabel"] or "ALTS")
     warbandText:SetTextColor(0.84, 0.92, 0.96)
@@ -791,13 +791,13 @@ function MR:BuildUI()
     characterIcon:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
 
     local characterName = characterBar:CreateFontString(nil, "OVERLAY")
-    characterName:SetFont(FONT_HEADERS, math.max(9, GetFontSize() - 2), GetFontFlags())
+    characterName:SetFont(ns.FONT_HEADERS, math.max(9, GetFontSize() - 2), GetFontFlags())
     characterName:SetPoint("LEFT", characterIconPlate, "RIGHT", 6, 0)
     characterName:SetJustifyH("LEFT")
     characterName:SetWordWrap(false)
 
     local characterRealm = characterBar:CreateFontString(nil, "OVERLAY")
-    characterRealm:SetFont(FONT_ROWS, math.max(8, GetFontSize() - 3), GetFontFlags())
+    characterRealm:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 3), GetFontFlags())
     characterRealm:SetPoint("LEFT", characterName, "RIGHT", 5, 0)
     characterRealm:SetPoint("RIGHT", characterBar, "RIGHT", -28, 0)
     characterRealm:SetJustifyH("LEFT")
@@ -805,7 +805,7 @@ function MR:BuildUI()
     characterRealm:SetTextColor(0.42, 0.60, 0.64)
 
     local characterCaret = characterBar:CreateFontString(nil, "OVERLAY")
-    characterCaret:SetFont(FONT_HEADERS, 9, GetFontFlags())
+    characterCaret:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
     characterCaret:SetPoint("RIGHT", characterBar, "RIGHT", -9, 1)
     characterCaret:SetText("v")
     characterCaret:SetTextColor(0.48, 0.72, 0.74)
@@ -875,20 +875,20 @@ function MR:BuildUI()
         warbandBtn:SetSize(metrics.warbandWidth, metrics.buttonSize)
         characterBar:SetHeight(math.max(1, GetMainCharacterBarHeight()))
         characterIconPlate:SetSize(math.max(14, metrics.fontSize + 5), math.max(14, metrics.fontSize + 5))
-        characterName:SetFont(FONT_HEADERS, math.max(9, metrics.fontSize - 2), GetFontFlags())
-        characterRealm:SetFont(FONT_ROWS, math.max(8, metrics.fontSize - 3), GetFontFlags())
+        characterName:SetFont(ns.FONT_HEADERS, math.max(9, metrics.fontSize - 2), GetFontFlags())
+        characterRealm:SetFont(ns.FONT_ROWS, math.max(8, metrics.fontSize - 3), GetFontFlags())
         if cfgBtn._iconTex then
             cfgBtn._iconTex:SetSize(metrics.buttonSize - 5, metrics.buttonSize - 5)
         end
         if closeBtn._lbl then
-            closeBtn._lbl:SetFont(FONT_HEADERS, math.max(8, metrics.fontSize - 1), GetFontFlags())
+            closeBtn._lbl:SetFont(ns.FONT_HEADERS, math.max(8, metrics.fontSize - 1), GetFontFlags())
         end
         if minBtn._lbl then
-            minBtn._lbl:SetFont(FONT_HEADERS, math.max(8, metrics.fontSize - 1), GetFontFlags())
+            minBtn._lbl:SetFont(ns.FONT_HEADERS, math.max(8, metrics.fontSize - 1), GetFontFlags())
         end
-        title:SetFont(FONT_HEADERS, math.max(8, metrics.fontSize - 2), GetFontFlags())
-        titleCount:SetFont(FONT_ROWS, math.max(8, metrics.fontSize - 2), GetFontFlags())
-        warbandText:SetFont(FONT_HEADERS, math.max(8, metrics.fontSize - 2), GetFontFlags())
+        title:SetFont(ns.FONT_HEADERS, math.max(8, metrics.fontSize - 2), GetFontFlags())
+        titleCount:SetFont(ns.FONT_ROWS, math.max(8, metrics.fontSize - 2), GetFontFlags())
+        warbandText:SetFont(ns.FONT_HEADERS, math.max(8, metrics.fontSize - 2), GetFontFlags())
         UpdateCharacterBar()
         ApplyMainFrameLayout(f)
     end
@@ -1333,13 +1333,13 @@ function MR:ApplySharedMediaSettings()
     end
     local fontSize = GetFontSize()
     if self.titleText then
-        self.titleText:SetFont(FONT_HEADERS, math.max(8, fontSize - 2), GetFontFlags())
+        self.titleText:SetFont(ns.FONT_HEADERS, math.max(8, fontSize - 2), GetFontFlags())
     end
     if self.titleCount then
-        self.titleCount:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+        self.titleCount:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
     end
     if self.warbandBtnText then
-        self.warbandBtnText:SetFont(FONT_HEADERS, 9, GetFontFlags())
+        self.warbandBtnText:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
     end
     if self.RefreshCustomTaskDialogThemes then
         self:RefreshCustomTaskDialogThemes()
@@ -1350,31 +1350,31 @@ function MR:ApplySharedMediaSettings()
     if self.altBoardFrame then
         local frame = self.altBoardFrame
         if frame.titleText then
-            frame.titleText:SetFont(FONT_HEADERS, math.max(8, fontSize - 2), GetFontFlags())
+            frame.titleText:SetFont(ns.FONT_HEADERS, math.max(8, fontSize - 2), GetFontFlags())
         end
         if frame.summaryValue then
-            frame.summaryValue:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+            frame.summaryValue:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         end
         if frame.summarySub then
-            frame.summarySub:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+            frame.summarySub:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         end
         if frame.leftLabel then
-            frame.leftLabel:SetFont(FONT_ROWS, math.max(9, fontSize), GetFontFlags())
+            frame.leftLabel:SetFont(ns.FONT_ROWS, math.max(9, fontSize), GetFontFlags())
         end
         if frame.showHiddenLabel then
-            frame.showHiddenLabel:SetFont(FONT_ROWS, 9, GetFontFlags())
+            frame.showHiddenLabel:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
         end
         if frame.hideCompletedLabel then
-            frame.hideCompletedLabel:SetFont(FONT_ROWS, 9, GetFontFlags())
+            frame.hideCompletedLabel:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
         end
         if frame.heroName then
-            frame.heroName:SetFont(FONT_HEADERS, math.max(13, fontSize + 3), GetFontFlags())
+            frame.heroName:SetFont(ns.FONT_HEADERS, math.max(13, fontSize + 3), GetFontFlags())
         end
         if frame.heroMeta then
-            frame.heroMeta:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
+            frame.heroMeta:SetFont(ns.FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         end
         if frame.heroStatus then
-            frame.heroStatus:SetFont(FONT_ROWS, math.max(10, fontSize), GetFontFlags())
+            frame.heroStatus:SetFont(ns.FONT_ROWS, math.max(10, fontSize), GetFontFlags())
         end
         if frame.expansionDropdown and frame.expansionDropdown.ApplyFonts then
             frame.expansionDropdown:ApplyFonts()

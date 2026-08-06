@@ -193,7 +193,7 @@ function MR:BuildConfigFrame()
     tbar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
 
     local ttitle = tbar:CreateFontString(nil, "OVERLAY")
-    ttitle:SetFont(FONT_HEADERS, 11, GetFontFlags())
+    ttitle:SetFont(ns.FONT_HEADERS, 11, GetFontFlags())
     ttitle:SetText(L["Config_Title"])
     ttitle:SetPoint("LEFT", tbar, "LEFT", 8, 0)
     f.titleText = ttitle
