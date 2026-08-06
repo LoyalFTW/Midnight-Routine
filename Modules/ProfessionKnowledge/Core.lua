@@ -330,6 +330,8 @@ function EnsureQuestTitleWatchFrame()
     questTitleWatchFrame:RegisterEvent("QUEST_DATA_LOAD_RESULT")
     questTitleWatchFrame:SetScript("OnEvent", function(_, _, loadedQuestID, success)
         if not loadedQuestID then return end
+        local registrations = pendingQuestTitleRows[loadedQuestID]
+        if not questTitlePending[loadedQuestID] and not registrations then return end
 
         questTitlePending[loadedQuestID] = nil
         if success then
@@ -343,7 +345,6 @@ function EnsureQuestTitleWatchFrame()
             end
         end
 
-        local registrations = pendingQuestTitleRows[loadedQuestID]
         if registrations then
             pendingQuestTitleRows[loadedQuestID] = nil
             for _, registration in ipairs(registrations) do

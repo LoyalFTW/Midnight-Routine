@@ -184,6 +184,32 @@ function MR:PrintMemoryReport(details)
             counts.pendingLabels or 0
         ))
     end
+    print(("  PK window since clear: %d builds / %d renders / %d refresh requests"):format(
+        self._professionKnowledgeWindowBuildCount or 0,
+        self._professionKnowledgeWindowRenderCount or 0,
+        self._professionKnowledgeWindowRefreshRequestCount or 0
+    ))
+    print(("  PK render pool since clear: %d frames / %d labels / %d textures created; %d / %d / %d reused"):format(
+        self._professionKnowledgePooledFrameCreatedCount or 0,
+        self._professionKnowledgePooledLabelCreatedCount or 0,
+        self._professionKnowledgePooledTextureCreatedCount or 0,
+        self._professionKnowledgePooledFrameReusedCount or 0,
+        self._professionKnowledgePooledLabelReusedCount or 0,
+        self._professionKnowledgePooledTextureReusedCount or 0
+    ))
+    print(("  Rares window: %d cached layouts; since clear %d builds / %d rebuilds / %d layouts / %d refreshes"):format(
+        self.GetRaresFrameCacheCount and self:GetRaresFrameCacheCount() or 0,
+        self._raresWindowBuildCount or 0,
+        self._raresWindowRebuildCount or 0,
+        self._raresWindowLayoutCount or 0,
+        self._raresWindowRefreshCount or 0
+    ))
+    print(("  Renown window: %d cached layouts; since clear %d builds / %d rebuilds / %d refreshes"):format(
+        self.GetRenownFrameCacheCount and self:GetRenownFrameCacheCount() or 0,
+        self._renownWindowBuildCount or 0,
+        self._renownWindowRebuildCount or 0,
+        self._renownWindowRefreshCount or 0
+    ))
 
     if showSources and self._refreshSourceCounts then
         local top = {}
@@ -213,7 +239,7 @@ function MR:PrintMemoryReport(details)
     end
 end
 
-function MR:NoteRefreshSource(kind)
+function MR:NoteRefreshSource(kind, grouped)
     if not self._trackRefreshSources then
         return
     end
@@ -226,7 +252,7 @@ function MR:NoteRefreshSource(kind)
         return
     end
 
-    if debugstack then
+    if debugstack and not grouped then
         local ok, stack = pcall(debugstack, 3, 6, 0)
         if ok and type(stack) == "string" then
             for line in stack:gmatch("[^\n]+") do

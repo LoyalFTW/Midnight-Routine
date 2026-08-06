@@ -99,9 +99,21 @@ function MR:SuspendHiddenSurfaceWork()
         return false
     end
 
+    local dataCanceled = self._backgroundDataDirty == true or self._scanPending == true
+    local uiCanceled = self._refreshRequestPending == true
+        or self._dataRefreshPending == true
+        or self._refreshUIPending == true
+
     for _, field in ipairs(HIDDEN_SURFACE_TIMER_FIELDS) do
         local timer = self[field]
-        if timer and self.CancelTimer then self:CancelTimer(timer) end
+        if timer then
+            if field == "_requestedScanTimer" or field == "_scanThrottleTimer" or field == "_delvesLiveProgressTimer" then
+                dataCanceled = true
+            else
+                uiCanceled = true
+            end
+            if self.CancelTimer then self:CancelTimer(timer) end
+        end
         self[field] = nil
     end
     self._refreshRequestAt = nil
@@ -110,8 +122,13 @@ function MR:SuspendHiddenSurfaceWork()
     self._dataRefreshPending = nil
     self._refreshUIPending = nil
     self._scanPending = nil
-    self:MarkBackgroundDataDirty()
-    return true
+    if dataCanceled then
+        self:MarkBackgroundDataDirty()
+    elseif uiCanceled then
+        self._refreshUIDirty = true
+        self._mainPanelNeedsRefresh = true
+    end
+    return dataCanceled or uiCanceled
 end
 
 function MR:ActivateVisibleTrackingSurface()
@@ -300,18 +317,13 @@ function MR:RefreshProfessionKnowledgeSurfaces()
     if self.RebuildGatheringLocationsFrame then
         self:RebuildGatheringLocationsFrame()
     end
-    if self.RepopulateGatheringConfig then
-        self:RepopulateGatheringConfig()
-    end
 end
 
 function MR:RequestProfessionKnowledgeSurfaceRefresh(delay)
     local gatheringVisible = self.gatheringLocationsFrame
         and self.gatheringLocationsFrame.IsShown
         and self.gatheringLocationsFrame:IsShown()
-    local configFrame = self.GetConfigFrame and self:GetConfigFrame() or nil
-    local configVisible = configFrame and configFrame.IsShown and configFrame:IsShown()
-    if not gatheringVisible and not configVisible then
+    if not gatheringVisible then
         self._professionKnowledgeSurfaceRefreshPending = true
         return
     end
@@ -344,11 +356,7 @@ function MR:RequestProfessionKnowledgeSurfaceRefresh(delay)
             local liveGatheringVisible = self.gatheringLocationsFrame
                 and self.gatheringLocationsFrame.IsShown
                 and self.gatheringLocationsFrame:IsShown()
-            local liveConfigFrame = self.GetConfigFrame and self:GetConfigFrame() or nil
-            local liveConfigVisible = liveConfigFrame
-                and liveConfigFrame.IsShown
-                and liveConfigFrame:IsShown()
-            if not liveGatheringVisible and not liveConfigVisible then
+            if not liveGatheringVisible then
                 return
             end
             self._professionKnowledgeSurfaceRefreshPending = nil

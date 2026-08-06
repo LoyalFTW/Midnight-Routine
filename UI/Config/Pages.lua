@@ -47,7 +47,6 @@ function MR:PopulateConfigFrame(f)
 
     local yOff = f.scroll and -4 or -26
     local cfgFs = GetFontSize()
-
     local moduleHeaderFs = math.max(FONT_SIZE_MIN, cfgFs - 1)
     local moduleRowFs = math.max(FONT_SIZE_MIN, cfgFs - 2)
     local moduleSubFs = math.max(FONT_SIZE_MIN, cfgFs - 3)

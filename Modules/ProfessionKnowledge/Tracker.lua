@@ -556,11 +556,18 @@ local function GetEntryIcon(entry)
 end
 
 local watchedItemIDs = {}
+local watchedQuestIDs = {}
+local watchedCurrencyIDs = {}
 for _, expansion in ipairs(ALL_EXPANSIONS or {}) do
     for _, profession in ipairs(expansion.professions or {}) do
+        if profession.catchupCurrency then watchedCurrencyIDs[profession.catchupCurrency] = true end
         for _, section in ipairs(profession.sections or {}) do
             for _, entry in ipairs(section.entries or {}) do
                 if entry.itemID then watchedItemIDs[entry.itemID] = true end
+                if entry.questID then watchedQuestIDs[entry.questID] = true end
+                for _, questID in ipairs(entry.questIDs or {}) do
+                    watchedQuestIDs[questID] = true
+                end
             end
         end
     end
@@ -669,6 +676,14 @@ itemCacheFrame:SetScript("OnEvent", function(self, event, itemID)
     if event == "GET_ITEM_INFO_RECEIVED" then
         if not watchedItemIDs[itemID] then return end
         QueueGatheringLocationsRebuild()
+        return
+    end
+
+    if event == "QUEST_TURNED_IN" and itemID and not watchedQuestIDs[itemID] then
+        return
+    end
+
+    if event == "CURRENCY_DISPLAY_UPDATE" and itemID and not watchedCurrencyIDs[itemID] then
         return
     end
 
@@ -1055,6 +1070,145 @@ local function VisibleSortedEntries(entries)
     return result
 end
 
+local renderArena
+local renderScriptNames = {
+    "OnClick",
+    "OnEnter",
+    "OnLeave",
+    "OnMouseDown",
+    "OnMouseUp",
+    "OnDragStart",
+    "OnDragStop",
+    "OnUpdate",
+}
+
+local function ResetRenderRegions(parent)
+    if parent._pkFontStrings then
+        for _, bucket in pairs(parent._pkFontStrings) do
+            bucket.used = 0
+            for _, region in ipairs(bucket) do
+                region:Hide()
+            end
+        end
+    end
+    if parent._pkTextures then
+        for _, bucket in pairs(parent._pkTextures) do
+            bucket.used = 0
+            for _, region in ipairs(bucket) do
+                region:Hide()
+            end
+        end
+    end
+end
+
+local function BeginProfessionRender(content)
+    renderArena = content._pkRenderArena
+    if not renderArena then
+        renderArena = { frames = {} }
+        content._pkRenderArena = renderArena
+    end
+    for _, bucket in pairs(renderArena.frames) do
+        bucket.used = 0
+        for _, frame in ipairs(bucket) do
+            frame:Hide()
+        end
+    end
+    ResetRenderRegions(content)
+end
+
+local function EndProfessionRender()
+    renderArena = nil
+end
+
+local function RenderFrame(frameType, parent, template)
+    local key = frameType .. ":" .. tostring(template or "")
+    local bucket = renderArena.frames[key]
+    if not bucket then
+        bucket = { used = 0 }
+        renderArena.frames[key] = bucket
+    end
+    bucket.used = bucket.used + 1
+    local frame = bucket[bucket.used]
+    if not frame then
+        frame = CreateFrame(frameType, nil, parent, template)
+        bucket[bucket.used] = frame
+        MR._professionKnowledgePooledFrameCreatedCount = (MR._professionKnowledgePooledFrameCreatedCount or 0) + 1
+    else
+        MR._professionKnowledgePooledFrameReusedCount = (MR._professionKnowledgePooledFrameReusedCount or 0) + 1
+        frame:SetParent(parent)
+    end
+    frame:ClearAllPoints()
+    frame:SetAlpha(1)
+    frame._mrHover = nil
+    frame._entry = nil
+    if frame.UnregisterAllEvents then
+        frame:UnregisterAllEvents()
+    end
+    if frame.HasScript then
+        for _, scriptName in ipairs(renderScriptNames) do
+            if frame:HasScript(scriptName) then
+                frame:SetScript(scriptName, nil)
+            end
+        end
+    end
+    if frame.EnableMouse then
+        frame:EnableMouse(frameType == "Button")
+    end
+    ResetRenderRegions(frame)
+    frame:Show()
+    return frame
+end
+
+local function RenderFontString(parent, layer)
+    parent._pkFontStrings = parent._pkFontStrings or {}
+    local key = layer or "OVERLAY"
+    local bucket = parent._pkFontStrings[key]
+    if not bucket then
+        bucket = { used = 0 }
+        parent._pkFontStrings[key] = bucket
+    end
+    bucket.used = bucket.used + 1
+    local region = bucket[bucket.used]
+    if not region then
+        region = parent:CreateFontString(nil, key)
+        bucket[bucket.used] = region
+        MR._professionKnowledgePooledLabelCreatedCount = (MR._professionKnowledgePooledLabelCreatedCount or 0) + 1
+    else
+        MR._professionKnowledgePooledLabelReusedCount = (MR._professionKnowledgePooledLabelReusedCount or 0) + 1
+    end
+    region:ClearAllPoints()
+    region:SetAlpha(1)
+    region:Show()
+    return region
+end
+
+local function RenderTexture(parent, layer)
+    parent._pkTextures = parent._pkTextures or {}
+    local key = layer or "ARTWORK"
+    local bucket = parent._pkTextures[key]
+    if not bucket then
+        bucket = { used = 0 }
+        parent._pkTextures[key] = bucket
+    end
+    bucket.used = bucket.used + 1
+    local region = bucket[bucket.used]
+    if not region then
+        region = parent:CreateTexture(nil, key)
+        bucket[bucket.used] = region
+        MR._professionKnowledgePooledTextureCreatedCount = (MR._professionKnowledgePooledTextureCreatedCount or 0) + 1
+    else
+        MR._professionKnowledgePooledTextureReusedCount = (MR._professionKnowledgePooledTextureReusedCount or 0) + 1
+    end
+    region:ClearAllPoints()
+    region:SetAlpha(1)
+    region:SetTexture(nil)
+    region:SetBlendMode("BLEND")
+    region:SetTexCoord(0, 1, 0, 1)
+    region:SetVertexColor(1, 1, 1, 1)
+    region:Show()
+    return region
+end
+
 local SECTION_RENDER_ORDER = {
     weekly = 1,
     catchup = 2,
@@ -1110,7 +1264,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     local done = current >= required
     if done and db.gatheringHideCompleted then return cardY end
 
-    local row = CreateFrame("Button", nil, card, "BackdropTemplate")
+    local row = RenderFrame("Button", card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     row:SetSize(cardW - 24, rowHeight + 4)
     row:RegisterForClicks("LeftButtonUp")
@@ -1118,11 +1272,11 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     row:SetBackdropColor(0, 0, 0, 0)
     row:SetBackdropBorderColor(0, 0, 0, 0)
 
-    local hover = row:CreateTexture(nil, "BACKGROUND")
+    local hover = RenderTexture(row, "BACKGROUND")
     hover:SetAllPoints()
     hover:SetColorTexture(cr, cg, cb, 0)
 
-    local statusBox = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    local statusBox = RenderFrame("Frame", row, "BackdropTemplate")
     statusBox:SetSize(14, 14)
     statusBox:SetPoint("LEFT", row, "LEFT", 5, 0)
     statusBox:SetBackdrop(MakeBackdrop())
@@ -1133,25 +1287,25 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         statusBox:SetBackdropBorderColor(0.24, 0.28, 0.34, 0.95 * chromeAlpha)
     end
 
-    local statusFill = statusBox:CreateTexture(nil, "ARTWORK")
+    local statusFill = RenderTexture(statusBox, "ARTWORK")
     statusFill:SetPoint("TOPLEFT", statusBox, "TOPLEFT", 2, -2)
     statusFill:SetPoint("BOTTOMRIGHT", statusBox, "BOTTOMRIGHT", -2, 2)
     statusFill:SetColorTexture(done and 0.20 or 0.09, done and 0.72 or 0.10, done and 0.42 or 0.14, (done and 0.85 or 0.70) * contentAlpha)
 
-    local statusCheck = statusBox:CreateFontString(nil, "OVERLAY")
+    local statusCheck = RenderFontString(statusBox, "OVERLAY")
     statusCheck:SetFont(FONT_HEADERS, 9, GetFontFlags())
     statusCheck:SetPoint("CENTER", statusBox, "CENTER", 0, 1)
     statusCheck:SetText("x")
     statusCheck:SetTextColor(0.03, 0.08, 0.04, 1)
     statusCheck:SetShown(done)
 
-    local rowIcon = row:CreateTexture(nil, "ARTWORK")
+    local rowIcon = RenderTexture(row, "ARTWORK")
     rowIcon:SetSize(14, 14)
     rowIcon:SetPoint("LEFT", statusBox, "RIGHT", 6, 0)
     rowIcon:SetTexture(GetEntryIcon(entry))
     rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    local statusText = row:CreateFontString(nil, "OVERLAY")
+    local statusText = RenderFontString(row, "OVERLAY")
     statusText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     statusText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     statusText:SetWidth(46)
@@ -1164,7 +1318,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
         statusText:SetTextColor(cr, cg, cb, 0.95)
     end
 
-    local nameText = row:CreateFontString(nil, "OVERLAY")
+    local nameText = RenderFontString(row, "OVERLAY")
     nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
     nameText:SetPoint("RIGHT", statusText, "LEFT", -8, 0)
@@ -1189,7 +1343,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
 end
 
 local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, cr, cg, cb, entry, sectionKey)
-    local row = CreateFrame("Button", nil, card, "BackdropTemplate")
+    local row = RenderFrame("Button", card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     row:SetSize(cardW - 24, rowHeight + 4)
     row:RegisterForClicks("LeftButtonUp")
@@ -1197,29 +1351,29 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     row:SetBackdropColor(0, 0, 0, 0)
     row:SetBackdropBorderColor(0, 0, 0, 0)
 
-    local hover = row:CreateTexture(nil, "BACKGROUND")
+    local hover = RenderTexture(row, "BACKGROUND")
     hover:SetAllPoints()
     hover:SetColorTexture(cr, cg, cb, 0)
 
-    local statusBox = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    local statusBox = RenderFrame("Frame", row, "BackdropTemplate")
     statusBox:SetSize(14, 14)
     statusBox:SetPoint("LEFT", row, "LEFT", 5, 0)
     statusBox:SetBackdrop(MakeBackdrop())
     statusBox:SetBackdropColor(0.03, 0.04, 0.06, 0.95 * contentAlpha)
     statusBox:SetBackdropBorderColor(0.24, 0.28, 0.34, 0.95 * chromeAlpha)
 
-    local statusFill = statusBox:CreateTexture(nil, "ARTWORK")
+    local statusFill = RenderTexture(statusBox, "ARTWORK")
     statusFill:SetPoint("TOPLEFT", statusBox, "TOPLEFT", 2, -2)
     statusFill:SetPoint("BOTTOMRIGHT", statusBox, "BOTTOMRIGHT", -2, 2)
     statusFill:SetColorTexture(0.09, 0.10, 0.14, 0.70 * contentAlpha)
 
-    local rowIcon = row:CreateTexture(nil, "ARTWORK")
+    local rowIcon = RenderTexture(row, "ARTWORK")
     rowIcon:SetSize(14, 14)
     rowIcon:SetPoint("LEFT", statusBox, "RIGHT", 6, 0)
     rowIcon:SetTexture(GetEntryIcon(entry))
     rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    local kpText = row:CreateFontString(nil, "OVERLAY")
+    local kpText = RenderFontString(row, "OVERLAY")
     kpText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     kpText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     kpText:SetWidth(46)
@@ -1227,7 +1381,7 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     kpText:SetText("+" .. tostring(entry.kp or 0))
     kpText:SetTextColor(cr, cg, cb, 0.95)
 
-    local nameText = row:CreateFontString(nil, "OVERLAY")
+    local nameText = RenderFontString(row, "OVERLAY")
     nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
     nameText:SetPoint("RIGHT", kpText, "LEFT", -8, 0)
@@ -1257,7 +1411,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
         return cardY
     end
 
-    local sectionChip = CreateFrame("Frame", nil, card, "BackdropTemplate")
+    local sectionChip = RenderFrame("Frame", card, "BackdropTemplate")
     sectionChip:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     sectionChip:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, -cardY)
     sectionChip:SetHeight(18)
@@ -1265,7 +1419,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     sectionChip:SetBackdropColor(0.045, 0.055, 0.095, 0.78 * contentAlpha)
     sectionChip:SetBackdropBorderColor(0, 0, 0, 0)
 
-    local sectionHeader = sectionChip:CreateFontString(nil, "OVERLAY")
+    local sectionHeader = RenderFontString(sectionChip, "OVERLAY")
     sectionHeader:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     sectionHeader:SetPoint("LEFT", sectionChip, "LEFT", 6, 0)
     sectionHeader:SetPoint("RIGHT", sectionChip, "RIGHT", -8, 0)
@@ -1275,7 +1429,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     sectionHeader:SetText(ns.GetRowGroupLabel and ns.GetRowGroupLabel("catchup") or "Catch-Up Knowledge")
     cardY = cardY + 22
 
-    local row = CreateFrame("Frame", nil, card, "BackdropTemplate")
+    local row = RenderFrame("Frame", card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
     row:SetSize(cardW - 24, rowHeight + 4)
     row:EnableMouse(true)
@@ -1283,23 +1437,23 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     row:SetBackdropColor(0, 0, 0, 0)
     row:SetBackdropBorderColor(0, 0, 0, 0)
 
-    local hover = row:CreateTexture(nil, "BACKGROUND")
+    local hover = RenderTexture(row, "BACKGROUND")
     hover:SetAllPoints()
     hover:SetColorTexture(cr, cg, cb, 0)
 
-    local statusBox = CreateFrame("Frame", nil, row, "BackdropTemplate")
+    local statusBox = RenderFrame("Frame", row, "BackdropTemplate")
     statusBox:SetSize(14, 14)
     statusBox:SetPoint("LEFT", row, "LEFT", 5, 0)
     statusBox:SetBackdrop(MakeBackdrop())
     statusBox:SetBackdropColor(0.03, 0.04, 0.06, 0.95 * contentAlpha)
     statusBox:SetBackdropBorderColor(0.24, 0.28, 0.34, 0.95 * chromeAlpha)
 
-    local statusFill = statusBox:CreateTexture(nil, "ARTWORK")
+    local statusFill = RenderTexture(statusBox, "ARTWORK")
     statusFill:SetPoint("TOPLEFT", statusBox, "TOPLEFT", 2, -2)
     statusFill:SetPoint("BOTTOMRIGHT", statusBox, "BOTTOMRIGHT", -2, 2)
     statusFill:SetColorTexture(0.09, 0.10, 0.14, 0.70 * contentAlpha)
 
-    local icon = row:CreateTexture(nil, "ARTWORK")
+    local icon = RenderTexture(row, "ARTWORK")
     icon:SetSize(14, 14)
     icon:SetPoint("LEFT", statusBox, "RIGHT", 6, 0)
     local sharedCatchupItemID = expansion and expansion.sharedCatchupItemID
@@ -1312,7 +1466,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
 
     local statusText
     if done and max then
-        statusText = row:CreateFontString(nil, "OVERLAY")
+        statusText = RenderFontString(row, "OVERLAY")
         statusText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
         statusText:SetPoint("RIGHT", row, "RIGHT", -8, 0)
         statusText:SetWidth(56)
@@ -1325,7 +1479,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
         end
     end
 
-    local nameText = row:CreateFontString(nil, "OVERLAY")
+    local nameText = RenderFontString(row, "OVERLAY")
     nameText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
     nameText:SetPoint("LEFT", icon, "RIGHT", 6, 0)
     if statusText then
@@ -1373,7 +1527,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
     local rowHeight = math.max(fontSize + 9, 20)
 
     local function RenderGroupHeader(label)
-        local headerFrame = CreateFrame("Frame", nil, card, "BackdropTemplate")
+        local headerFrame = RenderFrame("Frame", card, "BackdropTemplate")
         headerFrame:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
         headerFrame:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, -cardY)
         headerFrame:SetHeight(18)
@@ -1381,7 +1535,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         headerFrame:SetBackdropColor(0.045, 0.055, 0.095, 0.78 * contentAlpha)
         headerFrame:SetBackdropBorderColor(0, 0, 0, 0)
 
-        local headerText = headerFrame:CreateFontString(nil, "OVERLAY")
+        local headerText = RenderFontString(headerFrame, "OVERLAY")
         headerText:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
         headerText:SetPoint("LEFT", headerFrame, "LEFT", 6, 0)
         headerText:SetPoint("RIGHT", headerFrame, "RIGHT", -8, 0)
@@ -1415,7 +1569,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             rr, rg, rb = hex(rowColor)
         end
 
-        local taskFrame = CreateFrame("Button", nil, card, "BackdropTemplate")
+        local taskFrame = RenderFrame("Button", card, "BackdropTemplate")
         taskFrame:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
         taskFrame:SetSize(cardW - 24, rowHeight + 3)
         taskFrame:RegisterForClicks("LeftButtonUp")
@@ -1423,20 +1577,20 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         taskFrame:SetBackdropColor(0, 0, 0, 0)
         taskFrame:SetBackdropBorderColor(0, 0, 0, 0)
 
-        local hover = taskFrame:CreateTexture(nil, "BACKGROUND")
+        local hover = RenderTexture(taskFrame, "BACKGROUND")
         hover:SetAllPoints()
         hover:SetColorTexture(rr, rg, rb, 0)
 
-        local statusBtn = CreateFrame("Button", nil, taskFrame, "BackdropTemplate")
+        local statusBtn = RenderFrame("Button", taskFrame, "BackdropTemplate")
         statusBtn:SetSize(14, 14)
         statusBtn:SetPoint("LEFT", taskFrame, "LEFT", 5, 0)
         statusBtn:SetBackdrop(MakeBackdrop())
 
-        local statusFill = statusBtn:CreateTexture(nil, "ARTWORK")
+        local statusFill = RenderTexture(statusBtn, "ARTWORK")
         statusFill:SetPoint("TOPLEFT", statusBtn, "TOPLEFT", 2, -2)
         statusFill:SetPoint("BOTTOMRIGHT", statusBtn, "BOTTOMRIGHT", -2, 2)
 
-        local statusCheck = statusBtn:CreateFontString(nil, "OVERLAY")
+        local statusCheck = RenderFontString(statusBtn, "OVERLAY")
         statusCheck:SetFont(FONT_HEADERS, 9, GetFontFlags())
         statusCheck:SetPoint("CENTER", statusBtn, "CENTER", 0, 1)
         statusCheck:SetText("x")
@@ -1473,13 +1627,13 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         ApplyStatus()
         statusBtn:EnableMouse(canManualToggle)
 
-        local rowIcon = taskFrame:CreateTexture(nil, "ARTWORK")
+        local rowIcon = RenderTexture(taskFrame, "ARTWORK")
         rowIcon:SetSize(14, 14)
         rowIcon:SetPoint("LEFT", statusBtn, "RIGHT", 6, 0)
         rowIcon:SetTexture(GetEntryIcon(row))
         rowIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-        local valueText = taskFrame:CreateFontString(nil, "OVERLAY")
+        local valueText = RenderFontString(taskFrame, "OVERLAY")
         valueText:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         valueText:SetPoint("RIGHT", taskFrame, "RIGHT", -8, 0)
         valueText:SetWidth(row.key == "prof_catchup" and 56 or 44)
@@ -1505,7 +1659,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
             valueText:SetText("")
         end
 
-        local nameText = taskFrame:CreateFontString(nil, "OVERLAY")
+        local nameText = RenderFontString(taskFrame, "OVERLAY")
         nameText:SetFont(FONT_ROWS, math.max(8, fontSize - 1), GetFontFlags())
         nameText:SetPoint("LEFT", rowIcon, "RIGHT", 6, 0)
         nameText:SetPoint("RIGHT", valueText, "LEFT", -8, 0)
@@ -1632,32 +1786,32 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     local collapseKey = profession.key .. "_lures"
     local isCollapsed = IsProfessionCollapsed(expansion.key, collapseKey)
 
-    local card = CreateFrame("Frame", nil, content, "BackdropTemplate")
+    local card = RenderFrame("Frame", content, "BackdropTemplate")
     card:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -yOff)
     card:SetWidth(cardW)
     card:SetBackdrop(MakeBackdrop())
     card:SetBackdropColor(0.018, 0.022, 0.028, (isCollapsed and 0.58 or 0.86) * contentAlpha)
     card:SetBackdropBorderColor(0.12, 0.15, 0.18, (isCollapsed and 0.48 or 0.74) * chromeAlpha)
 
-    local iconPlate = CreateFrame("Frame", nil, card, "BackdropTemplate")
+    local iconPlate = RenderFrame("Frame", card, "BackdropTemplate")
     iconPlate:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -8)
     iconPlate:SetSize(28, 28)
     iconPlate:SetBackdrop(MakeBackdrop())
     iconPlate:SetBackdropColor(0.015, 0.018, 0.024, 0.95 * chromeAlpha)
     iconPlate:SetBackdropBorderColor(cr * 0.55, cg * 0.55, cb * 0.55, 0.85 * chromeAlpha)
 
-    local iconTex = iconPlate:CreateTexture(nil, "ARTWORK")
+    local iconTex = RenderTexture(iconPlate, "ARTWORK")
     iconTex:SetPoint("TOPLEFT", iconPlate, "TOPLEFT", 2, -2)
     iconTex:SetPoint("BOTTOMRIGHT", iconPlate, "BOTTOMRIGHT", -2, 2)
     iconTex:SetTexture(PROFESSION_ICONS[profession.key] or "Interface\\Icons\\INV_Misc_QuestionMark")
     iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    local cardGlow = card:CreateTexture(nil, "BACKGROUND")
+    local cardGlow = RenderTexture(card, "BACKGROUND")
     cardGlow:SetPoint("TOPLEFT", card, "TOPLEFT", 1, -1)
     cardGlow:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -1, 1)
     cardGlow:SetColorTexture(1, 1, 1, isCollapsed and 0 or (0.025 * contentAlpha))
 
-    local header = card:CreateFontString(nil, "OVERLAY")
+    local header = RenderFontString(card, "OVERLAY")
     header:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
     if isCollapsed then
         iconPlate:ClearAllPoints()
@@ -1679,7 +1833,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     header:SetTextColor(0.96, 0.97, 0.98, 1)
     header:SetText(L["Skin_Lures_Title"] or "Skinning Lures")
 
-    local headerMeta = card:CreateFontString(nil, "OVERLAY")
+    local headerMeta = RenderFontString(card, "OVERLAY")
     headerMeta:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
     if isCollapsed then
         headerMeta:SetPoint("RIGHT", card, "RIGHT", -10, 0)
@@ -1693,12 +1847,12 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     headerMeta:SetTextColor(0.88, 0.91, 0.94, 0.95)
     headerMeta:SetText(string.format("%d / %d", taskDone, taskTotal))
 
-    local collapseBtn = CreateFrame("Button", nil, card)
+    local collapseBtn = RenderFrame("Button", card)
     collapseBtn:SetPoint("TOPRIGHT", card, "TOPRIGHT", -7, -8)
     collapseBtn:SetSize(18, 18)
     collapseBtn:RegisterForClicks("LeftButtonUp")
 
-    local collapseLbl = collapseBtn:CreateFontString(nil, "OVERLAY")
+    local collapseLbl = RenderFontString(collapseBtn, "OVERLAY")
     collapseLbl:SetFont(FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
     collapseLbl:SetPoint("CENTER")
     collapseLbl:SetText(isCollapsed and "+" or "-")
@@ -1710,7 +1864,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
         RebuildGatheringLocationsFrame()
     end
 
-    local headerHit = CreateFrame("Button", nil, card)
+    local headerHit = RenderFrame("Button", card)
     headerHit:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
     headerHit:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
     headerHit:SetHeight(isCollapsed and collapsedRowH or 44)
@@ -1768,32 +1922,32 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 local collapsedIconSize = math.max(16, math.min(20, fontSize + 7))
                 local headerRightPad = useTaskHeader and 128 or 96
 
-                local card = CreateFrame("Frame", nil, content, "BackdropTemplate")
+                local card = RenderFrame("Frame", content, "BackdropTemplate")
                 card:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -yOff)
                 card:SetWidth(cardW)
                 card:SetBackdrop(MakeBackdrop())
                 card:SetBackdropColor(0.018, 0.022, 0.028, (isCollapsed and 0.58 or 0.86) * contentAlpha)
                 card:SetBackdropBorderColor(0.12, 0.15, 0.18, (isCollapsed and 0.48 or 0.74) * chromeAlpha)
 
-                local iconPlate = CreateFrame("Frame", nil, card, "BackdropTemplate")
+                local iconPlate = RenderFrame("Frame", card, "BackdropTemplate")
                 iconPlate:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -8)
                 iconPlate:SetSize(28, 28)
                 iconPlate:SetBackdrop(MakeBackdrop())
                 iconPlate:SetBackdropColor(0.015, 0.018, 0.024, 0.95 * chromeAlpha)
                 iconPlate:SetBackdropBorderColor(cr * 0.55, cg * 0.55, cb * 0.55, 0.85 * chromeAlpha)
 
-                local iconTex = iconPlate:CreateTexture(nil, "ARTWORK")
+                local iconTex = RenderTexture(iconPlate, "ARTWORK")
                 iconTex:SetPoint("TOPLEFT", iconPlate, "TOPLEFT", 2, -2)
                 iconTex:SetPoint("BOTTOMRIGHT", iconPlate, "BOTTOMRIGHT", -2, 2)
                 iconTex:SetTexture(PROFESSION_ICONS[profession.key] or "Interface\\Icons\\INV_Misc_QuestionMark")
                 iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-                local cardGlow = card:CreateTexture(nil, "BACKGROUND")
+                local cardGlow = RenderTexture(card, "BACKGROUND")
                 cardGlow:SetPoint("TOPLEFT", card, "TOPLEFT", 1, -1)
                 cardGlow:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -1, 1)
                 cardGlow:SetColorTexture(1, 1, 1, isCollapsed and 0 or (0.025 * contentAlpha))
 
-                local header = card:CreateFontString(nil, "OVERLAY")
+                local header = RenderFontString(card, "OVERLAY")
                 header:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
                 if isCollapsed then
                     iconPlate:ClearAllPoints()
@@ -1815,7 +1969,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 header:SetTextColor(0.96, 0.97, 0.98, 1)
                 header:SetText(profession.label)
 
-                local headerSub = card:CreateFontString(nil, "OVERLAY")
+                local headerSub = RenderFontString(card, "OVERLAY")
                 headerSub:SetFont(FONT_ROWS, math.max(8, fontSize - 2), GetFontFlags())
                 headerSub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -3)
                 headerSub:SetPoint("RIGHT", card, "RIGHT", -12, 0)
@@ -1823,7 +1977,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 headerSub:SetTextColor(0.66, 0.72, 0.78, 0.95)
                 headerSub:SetWordWrap(false)
 
-                local headerMeta = card:CreateFontString(nil, "OVERLAY")
+                local headerMeta = RenderFontString(card, "OVERLAY")
                 headerMeta:SetFont(FONT_HEADERS, math.max(9, fontSize), GetFontFlags())
                 if isCollapsed then
                     headerMeta:SetPoint("RIGHT", card, "RIGHT", -10, 0)
@@ -1837,12 +1991,12 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 headerMeta:SetTextColor(0.88, 0.91, 0.94, 0.95)
                 headerMeta:SetText(useTaskHeader and string.format("%d / %d", taskDone, taskTotal) or string.format("%d/%d", doneSources, totalSources))
 
-                local collapseBtn = CreateFrame("Button", nil, card)
+                local collapseBtn = RenderFrame("Button", card)
                 collapseBtn:SetPoint("TOPRIGHT", card, "TOPRIGHT", -7, -8)
                 collapseBtn:SetSize(18, 18)
                 collapseBtn:RegisterForClicks("LeftButtonUp")
 
-                local collapseLbl = collapseBtn:CreateFontString(nil, "OVERLAY")
+                local collapseLbl = RenderFontString(collapseBtn, "OVERLAY")
                 collapseLbl:SetFont(FONT_HEADERS, math.max(10, fontSize), GetFontFlags())
                 collapseLbl:SetPoint("CENTER")
                 collapseLbl:SetText(isCollapsed and "+" or "-")
@@ -1854,7 +2008,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                     RebuildGatheringLocationsFrame()
                 end
 
-                local headerHit = CreateFrame("Button", nil, card)
+                local headerHit = RenderFrame("Button", card)
                 headerHit:SetPoint("TOPLEFT", card, "TOPLEFT", 0, 0)
                 headerHit:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, 0)
                 headerHit:SetHeight(isCollapsed and collapsedRowH or 44)
@@ -1925,7 +2079,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                         end
 
                         if #visibleEntries > 0 then
-                            local sectionChip = CreateFrame("Frame", nil, card, "BackdropTemplate")
+                            local sectionChip = RenderFrame("Frame", card, "BackdropTemplate")
                             sectionChip:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
                             sectionChip:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, -cardY)
                             sectionChip:SetHeight(18)
@@ -1933,7 +2087,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                             sectionChip:SetBackdropColor(0.045, 0.055, 0.095, 0.78 * contentAlpha)
                             sectionChip:SetBackdropBorderColor(0, 0, 0, 0)
 
-                            local sectionHeader = sectionChip:CreateFontString(nil, "OVERLAY")
+                            local sectionHeader = RenderFontString(sectionChip, "OVERLAY")
                             sectionHeader:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
                             sectionHeader:SetPoint("LEFT", sectionChip, "LEFT", 6, 0)
                             sectionHeader:SetPoint("RIGHT", sectionChip, "RIGHT", -8, 0)
@@ -1974,7 +2128,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
 
         if #visibleProfessions > 0 and expansion.sharedCatchupItemID then
             local shardCount = GetItemCountRemaining(expansion.sharedCatchupItemID)
-            local shardRow = content:CreateFontString(nil, "OVERLAY")
+            local shardRow = RenderFontString(content, "OVERLAY")
             shardRow:SetFont(FONT_ROWS, fontSize - 1, GetFontFlags())
             shardRow:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -yOff)
             shardRow:SetTextColor(0.70, 0.85, 1.00, 0.90)
@@ -2023,6 +2177,8 @@ local function CreateKnowledgeExpansionDropdown(titleBar, gearBtn)
 end
 
 local function BuildGatheringLocationsFrame(isRetry)
+    MR._professionKnowledgeWindowBuildCount = (MR._professionKnowledgeWindowBuildCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("ProfessionKnowledge:Build", true) end
     RefreshFonts()
     local db = MR.db and MR.db.profile or {}
     local hadProfCache = MR.playerProfessions and next(MR.playerProfessions) ~= nil
@@ -2106,8 +2262,10 @@ local function BuildGatheringLocationsFrame(isRetry)
     local closeBtn = CloseButton(titleBar, function()
         gatheringFrameInteractionActive = false
         gatheringRebuildPending = nil
-        gatheringLocationsFrame = nil
-        MR.gatheringLocationsFrame = nil
+        if frame.expansionDropdown then
+            if frame.expansionDropdown._popup then frame.expansionDropdown._popup:Hide() end
+            if frame.expansionDropdown._dismiss then frame.expansionDropdown._dismiss:Hide() end
+        end
         frame:Hide()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", false) end
     end)
@@ -2187,35 +2345,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     end
 
     local yOff = 0
-    local fontSize = db.gatheringFontSize or 9
-
-    yOff = BuildProfessionCards(content, width, yOff, fontSize, contentAlpha, borderAlpha, chromeAlpha, accentAlpha, db, selectedExpansion)
-
-    frame._professionKnowledgeEmptyState = yOff == 0
-    if yOff == 0 then
-        local emptyText = content:CreateFontString(nil, "OVERLAY")
-        emptyText:SetFont(FONT_ROWS, fontSize, GetFontFlags())
-        emptyText:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -10)
-        emptyText:SetPoint("TOPRIGHT", content, "TOPRIGHT", -10, -10)
-        emptyText:SetJustifyH("LEFT")
-        emptyText:SetTextColor(0.72, 0.72, 0.72, 0.95)
-        emptyText:SetText((hasProfCache or professionsScanned) and L["Gathering_NoProfessions"] or L["Gathering_Loading"])
-        yOff = 32
-
-        local emptyDrag = CreateFrame("Frame", nil, frame)
-        emptyDrag:SetFrameLevel(scroll:GetFrameLevel() + 3)
-        emptyDrag:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
-        emptyDrag:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 0, 0)
-        emptyDrag:EnableMouse(true)
-        emptyDrag:RegisterForDrag("LeftButton")
-        emptyDrag:SetScript("OnDragStart", StartGatheringFrameMove)
-        emptyDrag:SetScript("OnDragStop", StopGatheringFrameMove)
-        frame._emptyDrag = emptyDrag
-    end
-
-    content:SetHeight(yOff)
-    scroll:SetVerticalScroll(0)
-    UpdateScrollBar()
+    local RenderContent
 
     local dragger = CreateFrame("Frame", nil, frame)
     dragger:SetSize(12, 12)
@@ -2303,41 +2433,124 @@ local function BuildGatheringLocationsFrame(isRetry)
             if frame.UpdateScrollBar then frame.UpdateScrollBar() end
         end
     end
+
+    RenderContent = function(resetScroll)
+        MR._professionKnowledgeWindowRenderCount = (MR._professionKnowledgeWindowRenderCount or 0) + 1
+        if MR.NoteRefreshSource then MR:NoteRefreshSource("ProfessionKnowledge:Render", true) end
+        RefreshFonts()
+        db = MR.db and MR.db.profile or db
+        hadProfCache = MR.playerProfessions and next(MR.playerProfessions) ~= nil
+        if not hadProfCache and MR.RefreshPlayerProfessions then
+            MR:RefreshPlayerProfessions()
+        end
+        hasProfCache = MR.playerProfessions and next(MR.playerProfessions) ~= nil
+        professionsScanned = MR.db and MR.db.char and MR.db.char.professionsScanned == true
+        alpha = db.gatheringAlpha or 1.0
+        width = db.gatheringWidth or DEFAULT_W
+        height = db.gatheringHeight or DEFAULT_H
+        minimized = db.gatheringMinimized or false
+        headerBottom = IsManagedHeaderBottom()
+        panelAlpha = math.max(0, math.min(alpha, 1))
+        contentAlpha = panelAlpha
+        borderAlpha = 0.20 + (0.75 * panelAlpha)
+        accentAlpha = 0.10 + (0.85 * panelAlpha)
+        chromeAlpha = panelAlpha
+        selectedExpansion = GetSelectedKnowledgeExpansion()
+
+        local savedScroll = not resetScroll and scroll:GetVerticalScroll() or 0
+        frame:SetWidth(width)
+        content:SetWidth(width - 8)
+        frame:SetScale(db.gatheringScale or 1.0)
+        frame:SetMovable(not db.gatheringLocked)
+
+        ApplyGatheringFrameTheme(frame, {
+            alpha = alpha,
+            bg = { 0.03, 0.05, 0.09, 0.97 * alpha },
+            border = { 0.24, 0.31, 0.42, alpha },
+            accent = { 0.18, 0.78, 0.72 },
+            headerHeight = 64,
+        })
+
+        titleBar:ClearAllPoints()
+        scroll:ClearAllPoints()
+        dragger:ClearAllPoints()
+        if headerBottom then
+            titleBar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+            titleBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+            scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -4)
+            scroll:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -8, 1)
+            dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+        else
+            titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+            titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+            scroll:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 0, -1)
+            scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 4)
+            dragger:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+        end
+
+        titleTxt:SetFont(FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
+        expansionDropdown:Update()
+        trackBg:SetColorTexture(0, 0, 0, 0.3 * chromeAlpha)
+        thumbTex:SetColorTexture(0.80, 0.53, 0.20, 0.6 * chromeAlpha)
+
+        frame._emptyDrag = nil
+        ns.HideTooltip()
+        BeginProfessionRender(content)
+        yOff = BuildProfessionCards(content, width, 0, db.gatheringFontSize or 9, contentAlpha, borderAlpha, chromeAlpha, accentAlpha, db, selectedExpansion)
+        frame._professionKnowledgeEmptyState = yOff == 0
+        if yOff == 0 then
+            local emptyText = RenderFontString(content, "OVERLAY")
+            emptyText:SetFont(FONT_ROWS, db.gatheringFontSize or 9, GetFontFlags())
+            emptyText:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -10)
+            emptyText:SetPoint("TOPRIGHT", content, "TOPRIGHT", -10, -10)
+            emptyText:SetJustifyH("LEFT")
+            emptyText:SetTextColor(0.72, 0.72, 0.72, 0.95)
+            emptyText:SetText((hasProfCache or professionsScanned) and L["Gathering_NoProfessions"] or L["Gathering_Loading"])
+            yOff = 32
+
+            local emptyDrag = RenderFrame("Frame", frame)
+            emptyDrag:SetFrameLevel(scroll:GetFrameLevel() + 3)
+            emptyDrag:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
+            emptyDrag:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 0, 0)
+            emptyDrag:EnableMouse(true)
+            emptyDrag:RegisterForDrag("LeftButton")
+            emptyDrag:SetScript("OnDragStart", StartGatheringFrameMove)
+            emptyDrag:SetScript("OnDragStop", StopGatheringFrameMove)
+            frame._emptyDrag = emptyDrag
+        end
+        EndProfessionRender()
+
+        content:SetHeight(math.max(yOff, 1))
+        scroll:SetVerticalScroll(savedScroll)
+        UpdateScrollBar()
+        ApplyMinimized(minimized, false)
+    end
+
     frame.ApplyMinimized = ApplyMinimized
+    frame.RefreshContent = function(_, resetScroll)
+        RenderContent(resetScroll)
+    end
 
-    ApplyMinimized(minimized, false)
+    RenderContent(true)
 
-    frame:SetMovable(not db.gatheringLocked)
-    frame:SetScale(db.gatheringScale or 1.0)
     MR.gatheringLocationsFrame = frame
     frame:Show()
     return frame
 end
 
 RebuildGatheringLocationsFrame = function(resetScroll)
+    MR._professionKnowledgeWindowRefreshRequestCount = (MR._professionKnowledgeWindowRefreshRequestCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("ProfessionKnowledge:RefreshRequest", true) end
     RefreshFonts()
     if gatheringFrameInteractionActive then
         gatheringRebuildPending = resetScroll and "reset" or true
         return
     end
 
-    local wasShown = gatheringLocationsFrame and gatheringLocationsFrame:IsShown()
-
-    local savedScroll = not resetScroll and gatheringLocationsFrame and gatheringLocationsFrame._scroll and gatheringLocationsFrame._scroll:GetVerticalScroll()
-    if gatheringLocationsFrame and MR.ReleaseFrameTree then
-        MR:ReleaseFrameTree(gatheringLocationsFrame)
-    elseif gatheringLocationsFrame then
-        gatheringLocationsFrame:Hide()
-        gatheringLocationsFrame:SetParent(nil)
-    end
-    gatheringLocationsFrame = BuildGatheringLocationsFrame()
-    if not wasShown then gatheringLocationsFrame:Hide() end
-
-    if savedScroll and savedScroll > 0 and gatheringLocationsFrame._scroll then
-        gatheringLocationsFrame._scroll:SetVerticalScroll(savedScroll)
-        if gatheringLocationsFrame.UpdateScrollBar then
-            gatheringLocationsFrame.UpdateScrollBar()
-        end
+    if not gatheringLocationsFrame then
+        gatheringLocationsFrame = BuildGatheringLocationsFrame()
+    elseif gatheringLocationsFrame.RefreshContent then
+        gatheringLocationsFrame:RefreshContent(resetScroll)
     end
 
     StepMemoryCleanup()
@@ -2958,6 +3171,7 @@ local function ToggleGatheringLocations()
         gatheringLocationsFrame:Hide()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", false) end
     else
+        gatheringLocationsFrame:RefreshContent()
         gatheringLocationsFrame:Show()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", true) end
     end
@@ -2966,12 +3180,22 @@ end
 MR.ToggleGatheringLocations = ToggleGatheringLocations
 
 function MR:ShowGatheringLocations()
-    if not gatheringLocationsFrame then gatheringLocationsFrame = BuildGatheringLocationsFrame() else gatheringLocationsFrame:Show() end
+    if not gatheringLocationsFrame then
+        gatheringLocationsFrame = BuildGatheringLocationsFrame()
+    else
+        gatheringLocationsFrame:RefreshContent()
+        gatheringLocationsFrame:Show()
+    end
     if self.SetManagedWindowOpen then self:SetManagedWindowOpen("gatheringLocOpen", true) end
 end
 
 function MR:EnsureGatheringLocationsShown()
-    if not gatheringLocationsFrame then gatheringLocationsFrame = BuildGatheringLocationsFrame() else gatheringLocationsFrame:Show() end
+    if not gatheringLocationsFrame then
+        gatheringLocationsFrame = BuildGatheringLocationsFrame()
+    else
+        gatheringLocationsFrame:RefreshContent()
+        gatheringLocationsFrame:Show()
+    end
     if self.SetManagedWindowOpen then self:SetManagedWindowOpen("gatheringLocOpen", true) end
 end
 

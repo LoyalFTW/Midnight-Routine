@@ -195,6 +195,8 @@ function MR:OnQuestTurnedIn(_, questID)
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
     end
+    if self.SyncAllRareKills then self:SyncAllRareKills() end
+    if self.RefreshRares then self:RefreshRares() end
 end
 
 function MR:OnQuestAccepted(_, questID)

@@ -390,8 +390,24 @@ local function OpenMajorFactionRenown(factionId)
 end
 
 local renownFrame
+local renownFrameCache = {}
+
+local function GetRenownLayoutKey()
+    local db = MR.db and MR.db.profile or {}
+    local mode = db.renownEmblemMode and "emblem" or (db.renownCompact and "compact" or "full")
+    local factionKeys = {}
+    if GetOrderedFactions then
+        for _, faction in ipairs(GetOrderedFactions()) do
+            factionKeys[#factionKeys + 1] = tostring(faction.key)
+        end
+        table.sort(factionKeys)
+    end
+    return table.concat({ mode, tostring(db.renownFontSize or 9), IsManagedHeaderBottom() and "bottom" or "top", table.concat(factionKeys, ",") }, ":")
+end
 
 local function BuildRenownFrame()
+    MR._renownWindowBuildCount = (MR._renownWindowBuildCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Renown:Build", true) end
     RefreshFonts()
     local db        = MR.db and MR.db.profile or {}
     local compact   = db.renownCompact
@@ -418,6 +434,7 @@ local function BuildRenownFrame()
     local totalH    = emblemMode and (HEADER_H + PAD + emblemContentH + PAD) or (HEADER_H + PAD + (visCount * ROW_SPACE) + PAD)
 
     local f = StyledFrame(UIParent, nil, "MEDIUM", 10)
+    f.layoutKey = GetRenownLayoutKey()
     f:SetSize(FRAME_W, minimized and HEADER_H or totalH)
     f:SetBackdropColor(0.02, 0.03, 0.08, 0.97)
     f:SetBackdropBorderColor(0.55, 0.42, 0.08, 1)
@@ -507,7 +524,6 @@ local function BuildRenownFrame()
     local yOff = emblemMode and 1 or (HEADER_H + PAD)
 
     for i, faction in ipairs(GetOrderedFactions()) do
-        if not hidden[faction.key] then
         local cr, cg, cb = GetFactionColor(faction)
         local rowAlpha = db.renownAlpha or 1.0
         if compact and not emblemMode then rowAlpha = 1.0 end
@@ -728,7 +744,6 @@ local function BuildRenownFrame()
 
         yOff = yOff + ROW_SPACE
         end
-        end
     end
 
     local divider = f:CreateTexture(nil, "ARTWORK")
@@ -816,12 +831,16 @@ end
 
 RefreshRenownFrame = function()
     if not renownFrame or not renownFrame:IsShown() then return end
+    MR._renownWindowRefreshCount = (MR._renownWindowRefreshCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Renown:Refresh", true) end
     local db         = MR.db and MR.db.profile or {}
     local showRep    = db.renownShowRep ~= false
     local hideMaxed  = db.renownHideMaxed
+    local hidden     = db.renownHiddenFactions or {}
     local showLevel  = db.renownShowLevel ~= false
     local minimized  = db.renownMinimized
-    local rowSpace   = renownFrame.rowSpace or ((db.renownCompact and ((db.renownBarH or 18) + 8)) or ((db.renownBarH or 18) + 34))
+    local rowSpace   = db.renownCompact and ((db.renownBarH or 18) + 8) or ((db.renownBarH or 18) + 34)
+    renownFrame.rowSpace = rowSpace
     local pad        = renownFrame.layoutPad or 12
     local headerH    = renownFrame.headerHeight or ((renownFrame.titleBar and renownFrame.titleBar:GetHeight()) or 24)
     local headerBottom = renownFrame.headerBottom == true
@@ -851,13 +870,14 @@ RefreshRenownFrame = function()
         local visualAlpha = (db.renownCompact and not renownFrame.emblemMode) and 1.0 or ((renownFrame and renownFrame.bgAlpha) or 1.0)
 
         if renownFrame.emblemMode then
-            if hideMaxed and capped then
+            if hidden[faction.key] or (hideMaxed and capped) then
                 row.rowFrame:Hide()
             else
                 visibleRows = visibleRows + 1
                 local iconSize = renownFrame.emblemSize or 34
                 local iconGap = renownFrame.emblemGap or 7
-                local cols = math.max(1, renownFrame.emblemCols or 1)
+                local cols = math.max(1, math.floor((((renownFrame:GetWidth() or 280) - (pad * 2)) + iconGap) / (iconSize + iconGap)))
+                renownFrame.emblemCols = cols
                 local idx = visibleRows - 1
                 local col = idx % cols
                 local gridRow = math.floor(idx / cols)
@@ -908,12 +928,13 @@ RefreshRenownFrame = function()
             row.renownBadge:SetBackdropBorderColor(cr * 0.45, cg * 0.45, cb * 0.45, 0.9)
         end
 
-        if hideMaxed and capped then
+        if hidden[faction.key] or (hideMaxed and capped) then
             row.rowFrame:Hide()
         else
             visibleRows = visibleRows + 1
             if row.rowFrame then
                 local yOff = headerH + pad + ((visibleRows - 1) * rowSpace)
+                row.rowFrame:SetHeight(rowSpace - 8)
                 row.rowFrame:ClearAllPoints()
                 if headerBottom then
                     row.rowFrame:SetPoint("BOTTOMLEFT",  renownFrame, "BOTTOMLEFT",  pad,  yOff)
@@ -998,7 +1019,8 @@ RefreshRenownFrame = function()
     if renownFrame.emblemMode then
         local iconSize = renownFrame.emblemSize or 34
         local iconGap = renownFrame.emblemGap or 7
-        local cols = math.max(1, renownFrame.emblemCols or 1)
+        local cols = math.max(1, math.floor((((renownFrame:GetWidth() or 280) - (pad * 2)) + iconGap) / (iconSize + iconGap)))
+        renownFrame.emblemCols = cols
         local rows = math.ceil(visibleRows / cols)
         local contentH = (rows > 0) and ((rows * iconSize) + ((rows - 1) * iconGap)) or 0
         renownFrame:SetHeight((rows > 0) and (headerH + pad + contentH + pad) or headerH)
@@ -1067,17 +1089,23 @@ SaveFactionOrder = function(ordered)
 end
 
 RebuildRenownFrame = function()
+    MR._renownWindowRebuildCount = (MR._renownWindowRebuildCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Renown:Rebuild", true) end
     RefreshFonts()
     local wasShown = renownFrame and renownFrame:IsShown()
-    if renownFrame and MR.ReleaseFrameTree then
-        MR:ReleaseFrameTree(renownFrame)
-        renownFrame = nil
-    elseif renownFrame then
+    if renownFrame then
+        renownFrameCache[renownFrame.layoutKey or GetRenownLayoutKey()] = renownFrame
         renownFrame:Hide()
-        renownFrame:SetParent(nil)
-        renownFrame = nil
     end
-    renownFrame = BuildRenownFrame()
+    local layoutKey = GetRenownLayoutKey()
+    renownFrame = renownFrameCache[layoutKey]
+    if not renownFrame then
+        renownFrame = BuildRenownFrame()
+        renownFrameCache[layoutKey] = renownFrame
+    end
+    RestoreManagedFramePos(renownFrame, "renownPos", 300, 0)
+    renownFrame:SetWidth((MR.db and MR.db.profile.renownWidth) or 280)
+    renownFrame:SetScale((MR.db and MR.db.profile.renownScale) or 1.0)
     MR.renownFrame = renownFrame
     if wasShown then
         renownFrame:Show()
@@ -1256,17 +1284,14 @@ PopulateRenownConfig = function(f)
             function(v)
                 db.renownWidth = math.floor(v/10)*10
                 if renownFrame then
-                    if db.renownEmblemMode then
-                        RebuildRenownFrame()
-                    else
-                        renownFrame:SetWidth(db.renownWidth)
-                    end
+                    renownFrame:SetWidth(db.renownWidth)
+                    RefreshRenownFrame()
                 end
             end,
             0.16, 0.78, 0.75)
         Slider(L["Config_BarHeight"], 10, 30, 1,
             function() return db.renownBarH or 18 end,
-            function(v) db.renownBarH = math.floor(v); RebuildRenownFrame() end,
+            function(v) db.renownBarH = math.floor(v); RefreshRenownFrame() end,
             0.85, 0.65, 0.10)
         Slider(L["BACKGROUND"], 0, 1, 0.05,
             function() return db.renownAlpha or 1.0 end,
@@ -1401,7 +1426,7 @@ PopulateRenownConfig = function(f)
             local moved = table.remove(ordered, srcIdx)
             table.insert(ordered, insertAt, moved)
             SaveFactionOrder(ordered)
-            RebuildRenownFrame()
+            RefreshRenownFrame()
         end
         drag.srcKey = nil; drag.targetIdx = nil
         PopulateRenownConfig(f)
@@ -1424,7 +1449,7 @@ PopulateRenownConfig = function(f)
         visCheck:SetScript("OnClick", function(s)
             if not db.renownHiddenFactions then db.renownHiddenFactions = {} end
             db.renownHiddenFactions[faction.key] = not s:GetChecked()
-            RebuildRenownFrame()
+            RefreshRenownFrame()
         end)
 
         local grip = CreateFrame("Button", nil, rowFr)
@@ -1465,7 +1490,7 @@ PopulateRenownConfig = function(f)
                 ResetFactionColor(faction)
                 local dr, dg, db2 = faction.color[1], faction.color[2], faction.color[3]
                 if nameLbl then nameLbl:SetTextColor(dr, dg, db2) end
-                RebuildRenownFrame()
+                RefreshRenownFrame()
                 return dr, dg, db2
             end,
             faction.label .. L["Color_Reset_Hint"])
@@ -1486,13 +1511,13 @@ PopulateRenownConfig = function(f)
     SecLabel(L["RESETS"])
     Btn(L["Config_ResetColors"], function()
         db.renownColors = {}
-        RebuildRenownFrame()
+        RefreshRenownFrame()
         PopulateRenownConfig(f)
     end)
     Btn(L["Config_ResetFactionOrder"], function()
         db.renownOrder = {}
         PopulateRenownConfig(f)
-        RebuildRenownFrame()
+        RefreshRenownFrame()
     end)
     end
 
@@ -1532,12 +1557,12 @@ function MR:ToggleRenownConfig()
 end
 
 function MR:ToggleRenown()
-    if not renownFrame then
-        renownFrame = BuildRenownFrame()
-    end
-    if renownFrame:IsShown() then
+    if renownFrame and renownFrame:IsShown() then
         self:HideRenown()
     else
+        if not renownFrame or renownFrame.layoutKey ~= GetRenownLayoutKey() then
+            RebuildRenownFrame()
+        end
         renownFrame:Show()
         MR.renownFrame = renownFrame
         if self.SetManagedWindowOpen then self:SetManagedWindowOpen("renownOpen", true) end
@@ -1554,8 +1579,8 @@ function MR:HideRenown(persistState)
 end
 
 function MR:EnsureRenownShown()
-    if not renownFrame then
-        renownFrame = BuildRenownFrame()
+    if not renownFrame or renownFrame.layoutKey ~= GetRenownLayoutKey() then
+        RebuildRenownFrame()
     end
     if not renownFrame:IsShown() then
         renownFrame:Show()
@@ -1581,6 +1606,12 @@ function MR:RepopulateRenownConfig()
     if renownCfgFrame and renownCfgFrame:IsShown() then
         PopulateRenownConfig(renownCfgFrame)
     end
+end
+
+function MR:GetRenownFrameCacheCount()
+    local count = 0
+    for _ in pairs(renownFrameCache) do count = count + 1 end
+    return count
 end
 
 function MR:RebuildRenownFrame()

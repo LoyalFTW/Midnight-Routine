@@ -414,12 +414,14 @@ end
 
 local raresFrame
 local raresCfgFrame
+local raresFrameCache = {}
 local collapsed   = {}
 local lastZoneKey = nil
 local lastVisibleZoneMode = nil
 
 local BuildRaresFrame
 local RefreshRaresFrame
+local LayoutRaresFrame
 local PopulateRaresConfig
 
 local function ApplyRaresFrameUpdater(frame)
@@ -438,13 +440,6 @@ local function ApplyRaresFrameUpdater(frame)
             end
         end
 
-        self._raresRefreshElapsed = (self._raresRefreshElapsed or 0) + (dt or 0)
-        if self._raresRefreshElapsed >= 1.0 then
-            self._raresRefreshElapsed = 0
-            if RefreshRaresFrame then
-                RefreshRaresFrame()
-            end
-        end
     end)
 end
 
@@ -493,30 +488,54 @@ local function ContentHeight(visible, W)
     return h
 end
 
+local function GetRaresLayoutKey()
+    local db = MR.db and MR.db.profile or {}
+    local parts = { IsManagedHeaderBottom() and "bottom" or "top" }
+    for _, zone in ipairs(GetVisibleZones()) do
+        parts[#parts + 1] = zone.key
+        for _, rare in ipairs(zone.rares) do
+            local questId = rare[2]
+            local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+            local killStat = (questId and GetRareKillStatus(questId)) or (flagged and "today") or nil
+            if not (db.raresHideKilled and killStat == "today") then
+                parts[#parts + 1] = tostring(questId or rare[1])
+            end
+        end
+    end
+    return table.concat(parts, ":")
+end
+
 local function RebuildRaresFrame()
+    MR._raresWindowRebuildCount = (MR._raresWindowRebuildCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Rares:Rebuild", true) end
     RefreshFonts()
     local wasShown = raresFrame and raresFrame:IsShown()
-    if raresFrame and MR.ReleaseFrameTree then
-        MR:ReleaseFrameTree(raresFrame)
-        raresFrame = nil
-    elseif raresFrame then
+    if raresFrame then
+        raresFrameCache[raresFrame.layoutKey or GetRaresLayoutKey()] = raresFrame
         raresFrame:Hide()
-        raresFrame:SetParent(nil)
-        raresFrame = nil
     end
     if MR.db and MR.db.profile.raresCollapsed then
         for k, v in pairs(MR.db.profile.raresCollapsed) do collapsed[k] = v end
     end
-    raresFrame = BuildRaresFrame()
+    local layoutKey = GetRaresLayoutKey()
+    raresFrame = raresFrameCache[layoutKey]
+    if not raresFrame then
+        raresFrame = BuildRaresFrame()
+        raresFrameCache[layoutKey] = raresFrame
+    end
+    RestoreManagedFramePos(raresFrame, "raresPos", 580, 0)
     MR.raresFrame = raresFrame
     if wasShown then
         raresFrame:Show()
     end
     raresFrame:SetScale((MR.db and MR.db.profile.raresScale) or 1.0)
+    if LayoutRaresFrame then LayoutRaresFrame(raresFrame) end
     RefreshRaresFrame()
 end
 
 BuildRaresFrame = function()
+    MR._raresWindowBuildCount = (MR._raresWindowBuildCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Rares:Build", true) end
     RefreshFonts()
     local db         = MR.db and MR.db.profile or {}
     local W          = db.raresWidth  or DEFAULT_W
@@ -536,6 +555,7 @@ BuildRaresFrame = function()
     end
 
     local f = StyledFrame(UIParent, nil, "MEDIUM", 10)
+    f.layoutKey = GetRaresLayoutKey()
     f:SetSize(W, minimized and TITLE_H or H)
     f:SetBackdropColor(0.018, 0.024, 0.034, 0.97 * alpha)
     f:SetBackdropBorderColor(0.13, 0.28, 0.34, alpha)
@@ -595,6 +615,7 @@ BuildRaresFrame = function()
 
     local titleFontSize = math.max(9, (db.raresFontSize or 9) + 1)
     local titleTxt = titleBar:CreateFontString(nil, "OVERLAY")
+    f.titleText = titleTxt
     titleTxt:SetFont(FONT_HEADERS, titleFontSize, GetFontFlags())
     titleTxt:SetPoint("LEFT",  titleBar, "LEFT", 9, 0)
     titleTxt:SetPoint("RIGHT", gearBtn, "LEFT", -6, 0)
@@ -660,11 +681,11 @@ BuildRaresFrame = function()
     f.UpdateScrollBar = UpdateScrollBar
 
     f.shimmerElapsed  = 0
-    f._raresRefreshElapsed = 0
     f.shimmerTextures = {}
     ApplyRaresFrameUpdater(f)
 
     f.zoneData = {}
+    f.visibleZones = visible
     local yOff = 2
     local innerW = W - 8 - (OUTER_PAD * 2)
     local colW   = innerW / cols
@@ -672,10 +693,14 @@ BuildRaresFrame = function()
     for _, zone in ipairs(visible) do
         local cr, cg, cb  = GetZoneColor(zone)
         local isCollapsed = (not singleZone) and collapsed[zone.key]
+        local zHdr
+        local arrow
+        local zName
+        local zCount
 
         if not singleZone then
             local zoneHeaderFontSize = math.max(8, db.raresFontSize or 9)
-            local zHdr = CreateFrame("Button", nil, content, "BackdropTemplate")
+            zHdr = CreateFrame("Button", nil, content, "BackdropTemplate")
             zHdr:SetPoint("TOPLEFT",  content, "TOPLEFT",  OUTER_PAD, -yOff)
             zHdr:SetPoint("TOPRIGHT", content, "TOPRIGHT", -OUTER_PAD, -yOff)
             zHdr:SetHeight(ZONE_HDR_H)
@@ -683,12 +708,12 @@ BuildRaresFrame = function()
             zHdr:SetBackdropColor(0.020 + cr * 0.040, 0.025 + cg * 0.040, 0.032 + cb * 0.040, 0.94 * alpha)
             zHdr:SetBackdropBorderColor(cr*0.34, cg*0.34, cb*0.34, 0.76 * alpha)
 
-            local arrow = zHdr:CreateFontString(nil, "OVERLAY")
+            arrow = zHdr:CreateFontString(nil, "OVERLAY")
             arrow:SetFont(FONT_ROWS, zoneHeaderFontSize, GetFontFlags())
             arrow:SetPoint("LEFT", zHdr, "LEFT", 9, 1)
             arrow:SetText(isCollapsed and "|cff889095+|r" or "|cff889095-|r")
 
-            local zName = zHdr:CreateFontString(nil, "OVERLAY")
+            zName = zHdr:CreateFontString(nil, "OVERLAY")
             zName:SetFont(FONT_HEADERS, math.max(9, zoneHeaderFontSize + 1), GetFontFlags())
             zName:SetPoint("LEFT", arrow, "RIGHT", 5, 0)
             zName:SetTextColor(0.90, 0.92, 0.90)
@@ -698,7 +723,7 @@ BuildRaresFrame = function()
             zName:SetWordWrap(false)
 
             local zDone, zTotal = GetZoneStatus(zone)
-            local zCount = zHdr:CreateFontString(nil, "OVERLAY")
+            zCount = zHdr:CreateFontString(nil, "OVERLAY")
             zCount:SetFont(FONT_ROWS, zoneHeaderFontSize, GetFontFlags())
             zCount:SetPoint("RIGHT", zHdr, "RIGHT", -9, 0)
             zCount:SetJustifyH("RIGHT")
@@ -713,7 +738,8 @@ BuildRaresFrame = function()
                     if not MR.db.profile.raresCollapsed then MR.db.profile.raresCollapsed = {} end
                     MR.db.profile.raresCollapsed[zone.key] = collapsed[zone.key]
                 end
-                RebuildRaresFrame()
+                LayoutRaresFrame(f)
+                RefreshRaresFrame()
             end)
             zHdr:SetScript("OnEnter", function()
                 zHdr:SetBackdropColor(0.030 + cr * 0.070, 0.035 + cg * 0.070, 0.045 + cb * 0.070, 0.98)
@@ -880,9 +906,14 @@ BuildRaresFrame = function()
 
         f.zoneData[zone.key] = {
             zone    = zone,
+            header  = zHdr,
+            arrow   = arrow,
+            name    = zName,
+            count   = zCount,
             barFill = barFill,
             barBg   = barBg,
             body    = body,
+            bodyHeight = bodyH,
         }
 
         yOff = yOff + bodyH + 4
@@ -937,10 +968,7 @@ BuildRaresFrame = function()
                 MR.db.profile.raresWidth  = newW
                 MR.db.profile.raresHeight = newH
             end
-            RebuildRaresFrame()
-            if raresCfgFrame and raresCfgFrame:IsShown() then
-                PopulateRaresConfig(raresCfgFrame)
-            end
+            LayoutRaresFrame(f)
         end
     end)
     dragger:SetScript("OnUpdate", function()
@@ -967,6 +995,8 @@ end
 
 RefreshRaresFrame = function()
     if not raresFrame or not raresFrame:IsShown() then return end
+    MR._raresWindowRefreshCount = (MR._raresWindowRefreshCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Rares:Refresh", true) end
 
     local db = MR.db and MR.db.profile or {}
     if db.raresHideKilled and raresFrame.zoneData then
@@ -1188,7 +1218,7 @@ PopulateRaresConfig = function(f)
             function() return db.raresWidth or DEFAULT_W end,
             function(v)
                 db.raresWidth = math.floor(v / 10) * 10
-                RebuildRaresFrame()
+                LayoutRaresFrame(raresFrame)
             end,
             0.25, 0.78, 0.68)
         Slider(L["HEIGHT"], MIN_H, MAX_H, 10,
@@ -1203,7 +1233,7 @@ PopulateRaresConfig = function(f)
         local syncFs = MR.db.profile.syncWindowFontSize
         Slider(L["Config_FontSize"], 7, 16, 1,
             function() return db.raresFontSize or 9 end,
-            function(v) db.raresFontSize = math.floor(v); RebuildRaresFrame(); PopulateRaresConfig(f) end,
+            function(v) db.raresFontSize = math.floor(v); LayoutRaresFrame(raresFrame); RefreshRaresFrame() end,
             0.78, 0.55, 0.16, syncFs)
 
         do
@@ -1225,7 +1255,8 @@ PopulateRaresConfig = function(f)
                 if not syncFs then
                     pb:SetScript("OnClick", function()
                         db.raresFontSize = p[2]
-                        RebuildRaresFrame()
+                        LayoutRaresFrame(raresFrame)
+                        RefreshRaresFrame()
                         PopulateRaresConfig(f)
                     end)
                     pb:SetScript("OnEnter", function() pb:SetBackdropColor(0.10, 0.28, 0.28, 1); pb:SetBackdropBorderColor(0.25, 0.90, 0.75, 1) end)
@@ -1323,6 +1354,82 @@ PopulateRaresConfig = function(f)
     end
 end
 
+LayoutRaresFrame = function(frame)
+    if not frame or not frame._content then return end
+    MR._raresWindowLayoutCount = (MR._raresWindowLayoutCount or 0) + 1
+    if MR.NoteRefreshSource then MR:NoteRefreshSource("Rares:Layout", true) end
+    local db = MR.db and MR.db.profile or {}
+    local width = db.raresWidth or DEFAULT_W
+    local cols = width >= 220 and COLS or 1
+    local rowHeight = GetRowH()
+    local innerW = width - 8 - (OUTER_PAD * 2)
+    local colW = innerW / cols
+    local yOff = 2
+    local singleZone = #(frame.visibleZones or {}) == 1
+
+    frame:SetWidth(width)
+    frame._content:SetWidth(width - 8)
+    if frame.titleText then
+        frame.titleText:SetFont(FONT_HEADERS, math.max(9, (db.raresFontSize or 9) + 1), GetFontFlags())
+    end
+
+    for _, zone in ipairs(frame.visibleZones or {}) do
+        local data = frame.zoneData and frame.zoneData[zone.key]
+        if data then
+            local isCollapsed = (not singleZone) and collapsed[zone.key]
+            if data.header then
+                data.arrow:SetFont(FONT_ROWS, math.max(8, db.raresFontSize or 9), GetFontFlags())
+                data.name:SetFont(FONT_HEADERS, math.max(9, (db.raresFontSize or 9) + 1), GetFontFlags())
+                data.count:SetFont(FONT_ROWS, math.max(8, db.raresFontSize or 9), GetFontFlags())
+                data.header:ClearAllPoints()
+                data.header:SetPoint("TOPLEFT", frame._content, "TOPLEFT", OUTER_PAD, -yOff)
+                data.header:SetPoint("TOPRIGHT", frame._content, "TOPRIGHT", -OUTER_PAD, -yOff)
+                data.arrow:SetText(isCollapsed and "|cff889095+|r" or "|cff889095-|r")
+                yOff = yOff + ZONE_HDR_H
+            end
+
+            data.barBg:ClearAllPoints()
+            data.barBg:SetPoint("TOPLEFT", frame._content, "TOPLEFT", OUTER_PAD, -yOff)
+            data.barBg:SetPoint("TOPRIGHT", frame._content, "TOPRIGHT", -OUTER_PAD, -yOff)
+            yOff = yOff + BAR_H
+
+            data.body:ClearAllPoints()
+            data.body:SetPoint("TOPLEFT", frame._content, "TOPLEFT", OUTER_PAD, -yOff)
+            data.body:SetPoint("TOPRIGHT", frame._content, "TOPRIGHT", -OUTER_PAD, -yOff)
+            local visibleCount = #(data.body.visibleRares or {})
+            data.bodyHeight = visibleCount > 0 and (math.ceil(visibleCount / cols) * rowHeight + 10) or 0
+            for index, hit in ipairs(data.body.rowBtns or {}) do
+                local col = (index - 1) % cols
+                local row = math.floor((index - 1) / cols)
+                hit:ClearAllPoints()
+                hit:SetPoint("TOPLEFT", data.body, "TOPLEFT", ROW_PAD + col * colW, -(row * rowHeight) - 5)
+                hit:SetWidth(colW - 5)
+                hit:SetHeight(rowHeight)
+                local label = data.body.nameLbls and data.body.nameLbls[index]
+                if label then
+                    label:SetFont(FONT_ROWS, db.raresFontSize or 9, GetFontFlags())
+                    label:SetHeight(rowHeight)
+                end
+            end
+            if isCollapsed then
+                data.body:Hide()
+            else
+                data.body:SetHeight(math.max(data.bodyHeight or 0, 1))
+                data.body:Show()
+                yOff = yOff + (data.bodyHeight or 0)
+            end
+            yOff = yOff + 4
+        end
+    end
+
+    frame._content:SetHeight(math.max(yOff, 1))
+    if not db.raresMinimized then
+        local naturalH = TITLE_H + 1 + math.max(yOff, 1) + 6
+        frame:SetHeight(math.min(db.raresHeight or DEFAULT_H, naturalH))
+    end
+    if frame.UpdateScrollBar then frame.UpdateScrollBar() end
+end
+
 function MR:ToggleRaresConfig()
     if not raresCfgFrame then
         raresCfgFrame = BuildRaresConfigFrame()
@@ -1358,10 +1465,10 @@ function MR:ToggleRares()
     if raresFrame and raresFrame:IsShown() then
         self:HideRares()
     else
-        if not raresFrame then
-            raresFrame = BuildRaresFrame()
-            MR.raresFrame = raresFrame
+        if not raresFrame or raresFrame.layoutKey ~= GetRaresLayoutKey() then
+            RebuildRaresFrame()
         end
+        MR.raresFrame = raresFrame
         raresFrame:Show()
         if self.SetManagedWindowOpen then self:SetManagedWindowOpen("raresOpen", true) end
         raresFrame:SetScale((MR.db and MR.db.profile.raresScale) or 1.0)
@@ -1384,10 +1491,10 @@ function MR:EnsureRaresShown()
     if MR.db and MR.db.profile.raresCollapsed then
         for k, v in pairs(MR.db.profile.raresCollapsed) do collapsed[k] = v end
     end
-    if not raresFrame then
-        raresFrame = BuildRaresFrame()
-        MR.raresFrame = raresFrame
+    if not raresFrame or raresFrame.layoutKey ~= GetRaresLayoutKey() then
+        RebuildRaresFrame()
     end
+    MR.raresFrame = raresFrame
     raresFrame:Show()
     raresFrame:SetScale((MR.db and MR.db.profile.raresScale) or 1.0)
     lastZoneKey = GetCurrentZoneKey()
@@ -1444,4 +1551,10 @@ function MR:RepopulateRaresConfig()
     if raresCfgFrame and raresCfgFrame:IsShown() then
         PopulateRaresConfig(raresCfgFrame)
     end
+end
+
+function MR:GetRaresFrameCacheCount()
+    local count = 0
+    for _ in pairs(raresFrameCache) do count = count + 1 end
+    return count
 end
