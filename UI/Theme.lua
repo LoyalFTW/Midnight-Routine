@@ -161,11 +161,16 @@ local function ResolveMediaPath(kind, name, explicitPath, fallback)
         return fallback
     end
 
+    local registeredPath = FetchSharedMedia(kind, name, nil)
+    if type(registeredPath) == "string" and registeredPath ~= "" then
+        return registeredPath
+    end
+
     if type(explicitPath) == "string" and explicitPath ~= "" then
         return explicitPath
     end
 
-    return FetchSharedMedia(kind, name, fallback)
+    return fallback
 end
 
 local function HasCustomBackground(profile)

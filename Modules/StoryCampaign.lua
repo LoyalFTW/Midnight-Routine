@@ -1,5 +1,7 @@
 local _, ns = ...
 local MR = ns.MR
+local CoreData = assert(ns.CoreData, "Core/Progress.lua must load before Modules/StoryCampaign.lua")
+local SetProgressValue = CoreData.SetProgressValue
 
 local registeredCampaigns = {}
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
@@ -101,14 +103,12 @@ end
 
 local function ScanCampaign(mod)
     if not C_CampaignInfo then return end
-    local db = MR.db.char.progress
-    if not db[mod.key] then db[mod.key] = {} end
+    local progress = MR.db.char.progress
     local dirty = false
     for _, chapterId in ipairs(mod._chapterIds) do
         local key = "ch_" .. chapterId
         local value = IsChapterDone(mod._campaignId, chapterId, mod._chapterIds) and 1 or 0
-        if db[mod.key][key] ~= value then
-            db[mod.key][key] = value
+        if SetProgressValue(progress, mod.key, key, value) then
             dirty = true
         end
     end

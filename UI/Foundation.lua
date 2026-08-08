@@ -131,10 +131,21 @@ local function SetFontIfChanged(fontString, fontPath, size, flags)
         return
     end
 
-    fontString:SetFont(fontPath, size, flags)
+    local applied = fontString:SetFont(fontPath, size, flags)
+    if applied == false then
+        local fallback = GetLocaleFont()
+        if fallback ~= fontPath then
+            applied = fontString:SetFont(fallback, size, flags)
+            fontPath = fallback
+        end
+    end
+    if applied == false then
+        return false
+    end
     fontString._mrFontPath = fontPath
     fontString._mrFontSize = size
     fontString._mrFontFlags = flags
+    return true
 end
 
 local function SetFontForText(fontString, text, size, flags)

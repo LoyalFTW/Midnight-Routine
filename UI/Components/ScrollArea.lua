@@ -38,6 +38,7 @@ function ns.AttachScrollList(scroll, content, track, opts)
         return content:GetHeight() or 0
     end
 
+    local lastNotifiedScroll
     local function UpdateScrollBar()
         local viewHeight = scroll:GetHeight()
         local contentHeight = GetContentHeight()
@@ -67,6 +68,11 @@ function ns.AttachScrollList(scroll, content, track, opts)
         thumb:ClearAllPoints()
         thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackHeight - thumbHeight) * percent))
         thumb:SetPoint("RIGHT", track, "RIGHT", 0, 0)
+
+        if opts.onScroll and currentScroll ~= lastNotifiedScroll then
+            lastNotifiedScroll = currentScroll
+            opts.onScroll(currentScroll, viewHeight)
+        end
     end
 
     local function SetScrollFromCursor(cursorY, grabOffset)

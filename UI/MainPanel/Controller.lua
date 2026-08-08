@@ -909,6 +909,11 @@ function MR:BuildUI()
     self._scrollTrack = track
     self.UpdateScrollBar = ns.AttachScrollList(scroll, content, track, {
         thumbColor = { 0.25, 0.65, 0.65, 0.75 },
+        onScroll = function()
+            if MR.RefreshMainPanelViewport then
+                MR:RefreshMainPanelViewport()
+            end
+        end,
     })
 
     self.widgets         = {}
@@ -1109,6 +1114,8 @@ function MR:RefreshUI()
 
     if refreshMain then
         self._mainPanelNeedsRefresh = nil
+        self._mainMaterializedTop = nil
+        self._mainMaterializedBottom = nil
 
         if self.titleText then
             self.titleText:SetText(L["Title"] or "Routine")
@@ -1209,6 +1216,8 @@ function MR:RefreshUI()
             modColAssign[slot] = assign
             cols[curCol] = cols[curCol] + entry.h
         end
+        self._modColAssignCount = modColAssignCount
+        self._mainPanelColumnWidth = colW
 
         local activeMainSections = self._activeMainSectionsBuffer or {}
         self._activeMainSectionsBuffer = activeMainSections

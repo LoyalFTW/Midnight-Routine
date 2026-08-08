@@ -632,14 +632,18 @@ function MR:PopulateConfigFrame(f)
             function() return MR.GetMediaSetting and MR:GetMediaSetting("fontMedia") or MR.db.profile.fontMedia end,
             function(value, path)
                 if MR.SetMediaSetting then
-                    MR:SetMediaSetting("fontMedia", value)
-                    MR:SetMediaSetting("fontMediaPath", path)
+                    MR:SetMediaSetting("fontMedia", value, true)
+                    MR:SetMediaSetting("fontMediaPath", path, true)
                 else
                     MR.db.profile.fontMedia = value
                     MR.db.profile.fontMediaPath = path
                 end
                 MR:ApplySharedMediaSettings()
-                MR:PopulateConfigFrame(f)
+                if MR.RequestConfigRepopulate then
+                    MR:RequestConfigRepopulate("fontMedia", 0.02)
+                else
+                    MR:PopulateConfigFrame(f)
+                end
             end)
         ChoiceDropdown(L["Config_FontStyle"] or "Font Style", {
                 { label = L["Config_FontStyleOutline"] or "Outline", value = "OUTLINE" },
@@ -657,12 +661,16 @@ function MR:PopulateConfigFrame(f)
             end,
             function(value)
                 if MR.SetMediaSetting then
-                    MR:SetMediaSetting("fontFlags", value)
+                    MR:SetMediaSetting("fontFlags", value, true)
                 else
                     MR.db.profile.fontFlags = value
                 end
                 MR:ApplySharedMediaSettings()
-                MR:PopulateConfigFrame(f)
+                if MR.RequestConfigRepopulate then
+                    MR:RequestConfigRepopulate("fontFlags", 0.02)
+                else
+                    MR:PopulateConfigFrame(f)
+                end
             end,
             function()
                 return "OUTLINE"
@@ -671,8 +679,8 @@ function MR:PopulateConfigFrame(f)
             function() return MR.GetMediaSetting and MR:GetMediaSetting("backgroundMedia") or MR.db.profile.backgroundMedia end,
             function(value, path)
                 if MR.SetMediaSetting then
-                    MR:SetMediaSetting("backgroundMedia", value)
-                    MR:SetMediaSetting("backgroundMediaPath", path)
+                    MR:SetMediaSetting("backgroundMedia", value, true)
+                    MR:SetMediaSetting("backgroundMediaPath", path, true)
                 else
                     MR.db.profile.backgroundMedia = value
                     MR.db.profile.backgroundMediaPath = path

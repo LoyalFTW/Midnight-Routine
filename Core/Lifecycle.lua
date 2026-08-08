@@ -121,6 +121,13 @@ function MR:PrintMemoryReport(details)
         self._mainRowWidgetPooledCount or 0,
         self._mainRowOptionalPartCreatedCount or 0
     ))
+    print(("  Main section lifecycle: %d created / %d reused / %d pooled / %d idle"):format(
+        self._mainSectionWidgetCreatedCount or 0,
+        self._mainSectionWidgetReusedCount or 0,
+        self._mainSectionWidgetPooledCount or 0,
+        #(self._mainSectionWidgetPool or {})
+    ))
+    print(("  Main viewport refreshes: %d"):format(self._mainViewportRefreshCount or 0))
     local picker = ns.WarbandBoardState and ns.WarbandBoardState.mainAltPickerFrame
     print(("  Main alt picker: %d cached rows / %d created since clear"):format(
         picker and picker.charButtons and #picker.charButtons or 0,
@@ -304,9 +311,6 @@ function MR:StartMemoryIdleAudit(duration)
     local startTicks = self._timerRowTickCount or 0
     local startModuleScanPasses = self._moduleScanPassCount or 0
     local startModuleScans = self._moduleScanModuleCount or 0
-    self._lastMemoryReportAddonKB = GetAddOnMemoryUsage and GetAddOnMemoryUsage(addonName) or nil
-    self._lastMemoryReportLuaKB = collectgarbage and collectgarbage("count") or nil
-
     print(("|cff2ae7c6MidnightRoutine:|r Starting a %d-second idle audit. Leave the UI untouched..."):format(duration))
     self._memoryAuditTimer = self:ScheduleTimer(function()
         self._memoryAuditTimer = nil
@@ -334,6 +338,15 @@ function MR:StartMemoryIdleAudit(duration)
         self._trackRefreshSourcesUntil = nil
         self._trackIdleWork = nil
     end, duration)
+
+    if collectgarbage then
+        collectgarbage("collect")
+    end
+    if UpdateAddOnMemoryUsage then
+        UpdateAddOnMemoryUsage()
+    end
+    self._lastMemoryReportAddonKB = GetAddOnMemoryUsage and GetAddOnMemoryUsage(addonName) or nil
+    self._lastMemoryReportLuaKB = collectgarbage and collectgarbage("count") or nil
 end
 
 function MR:RebuildTurnInCompletions()

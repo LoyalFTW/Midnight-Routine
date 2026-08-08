@@ -166,6 +166,56 @@ local function SetTwoAnchors(region, point1, relative1, relativePoint1, x1, y1, 
     region._mrX2, region._mrY2 = x2, y2
 end
 
+local function GetMainRenderRange(self)
+    local scrollTop = self.scroll and self.scroll:GetVerticalScroll() or 0
+    local viewHeight = self.scroll and self.scroll:GetHeight() or 0
+    local buffer = math.max(ROW_HEIGHT * 3, viewHeight * 0.35)
+    return scrollTop - buffer, scrollTop + viewHeight + buffer, viewHeight
+end
+
+local function IsMainRangeVisible(self, top, bottom)
+    local renderTop, renderBottom, viewHeight = GetMainRenderRange(self)
+    return viewHeight <= 0 or (bottom >= renderTop and top <= renderBottom)
+end
+
+local function PoolMainSectionWidget(self, modKey)
+    local sections = self._mainSectionFrames
+    local card = sections and sections[modKey]
+    if not card then return end
+
+    HideMainSectionWidget(card)
+    sections[modKey] = nil
+    if card._mrInMainSectionPool then return end
+
+    local pool = self._mainSectionWidgetPool or {}
+    self._mainSectionWidgetPool = pool
+    card._mrInMainSectionPool = true
+    pool[#pool + 1] = card
+    self._mainSectionWidgetPooledCount = (self._mainSectionWidgetPooledCount or 0) + 1
+end
+
+local function PoolOutOfRangeMainRows(self, card)
+    if not (card and card._rows) then return end
+
+    local recycleKeys = card._recycleRowKeys or {}
+    card._recycleRowKeys = recycleKeys
+    for i = #recycleKeys, 1, -1 do
+        recycleKeys[i] = nil
+    end
+
+    local sectionY = card._mrLayoutY or 0
+    for key, rowFrame in pairs(card._rows) do
+        local rowTop = sectionY + (rowFrame._mrLayoutY or 0)
+        local rowBottom = rowTop + (rowFrame._mrLayoutHeight or ROW_HEIGHT)
+        if not IsMainRangeVisible(self, rowTop, rowBottom) then
+            recycleKeys[#recycleKeys + 1] = key
+        end
+    end
+    for _, key in ipairs(recycleKeys) do
+        PoolMainRowWidget(card, key, card._rows[key])
+    end
+end
+
 local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordRegistry, expansionHeaderKey)
     local transparent = IsMainTextOnlyMode()
     local frameAlpha = MR.db.profile.frameAlpha or 1.0
@@ -184,10 +234,18 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         return nil
     end
 
-    local allDone = (secTotal > 0) and (secDone == secTotal)
-    local card = EnsureMainSectionWidget(self, mod.key)
     local expansionHeaderH = expansionHeaderKey and 22 or 0
     local sectionHeight = math.max((stats and stats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1) + expansionHeaderH
+    if not IsMainRangeVisible(self, yOff, yOff + sectionHeight) then
+        PoolMainSectionWidget(self, mod.key)
+        if recordRegistry ~= false then
+            AddSectionRegistryEntry(self, nil, mod.key, col or 1, yOff, yOff + (stats and stats.height or 0) + expansionHeaderH, expansionHeaderKey)
+        end
+        return nil
+    end
+
+    local allDone = (secTotal > 0) and (secDone == secTotal)
+    local card = EnsureMainSectionWidget(self, mod.key)
     local cardWidth = math.max(colW - 6, 1)
     if card._mrLayoutParent ~= self.content
         or card._mrLayoutX ~= xOff
@@ -321,6 +379,11 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         local hideComplete = stats and stats.hideComplete
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
         localY = RenderMainGroupedRows(self, card, mod, rows, hideComplete, localY, card:GetWidth(), usedRows, function(row, done, rowY)
+            local absoluteTop = yOff + rowY
+            local absoluteBottom = absoluteTop + ROW_HEIGHT
+            if not IsMainRangeVisible(self, absoluteTop, absoluteBottom) then
+                return nil, rowY + ROW_HEIGHT, row.key or tostring(row.label or rowY)
+            end
             return UpdateMainRowWidget(self, card, mod, row, done, rowY, card:GetWidth())
         end)
     end
@@ -339,6 +402,72 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         AddSectionRegistryEntry(self, card, mod.key, col or 1, yOff, yOff + (stats and stats.height or 0) + expansionHeaderH, expansionHeaderKey)
     end
     return card
+end
+
+function MR:RefreshMainPanelViewport()
+    if self._mainViewportRefreshInProgress or self._refreshUIInProgress then
+        return false
+    end
+    if not (self.frame and self.frame:IsShown() and self.scroll and self.content) then
+        return false
+    end
+
+    local assignments = self._modColAssignBuffer
+    local count = self._modColAssignCount or 0
+    local colW = self._mainPanelColumnWidth
+    if not assignments or count == 0 or not colW then
+        return false
+    end
+
+    local scrollTop = self.scroll:GetVerticalScroll() or 0
+    local viewHeight = self.scroll:GetHeight() or 0
+    local viewBottom = scrollTop + viewHeight
+    if self._mainMaterializedTop
+        and scrollTop >= (self._mainMaterializedTop + ROW_HEIGHT)
+        and viewBottom <= (self._mainMaterializedBottom - ROW_HEIGHT) then
+        return false
+    end
+
+    self._mainViewportRefreshInProgress = true
+    local timerRows = self._timerRows
+    if timerRows then
+        for i = #timerRows, 1, -1 do
+            timerRows[i] = nil
+        end
+    end
+
+    for i = 1, count do
+        local assign = assignments[i]
+        if assign and assign.mod then
+            local stats = GetModuleStats(self, assign.mod)
+            local expansionHeaderH = assign.expansionHeaderKey and 22 or 0
+            local sectionHeight = math.max((stats and stats.height or 0) - SECTION_GAP, HEADER_HEIGHT + 1) + expansionHeaderH
+            if not IsMainRangeVisible(self, assign.yOff or 0, (assign.yOff or 0) + sectionHeight) then
+                PoolMainSectionWidget(self, assign.mod.key)
+            end
+        end
+    end
+
+    if self._mainSectionFrames then
+        for _, card in pairs(self._mainSectionFrames) do
+            PoolOutOfRangeMainRows(self, card)
+        end
+    end
+    for i = 1, count do
+        local assign = assignments[i]
+        if assign and assign.mod then
+            local xOff = ((assign.col or 1) - 1) * colW
+            UpdateMainSectionWidget(self, assign.mod, assign.yOff or 0, xOff, colW, assign.col, false, assign.expansionHeaderKey)
+        end
+    end
+    self._mainMaterializedTop, self._mainMaterializedBottom = GetMainRenderRange(self)
+    self._mainViewportRefreshCount = (self._mainViewportRefreshCount or 0) + 1
+    self._mainViewportRefreshInProgress = nil
+
+    if self.UpdateTimerRowTicker then
+        self:UpdateTimerRowTicker()
+    end
+    return true
 end
 
 local function ClearArrayContents(t)
@@ -367,6 +496,8 @@ function MR:RefreshMainPanelSectionsOnly()
     end
 
     RecalcLayout()
+    self._mainMaterializedTop = nil
+    self._mainMaterializedBottom = nil
     self._moduleStatsCache = BuildModuleStatsCache(self)
 
     self.widgets = self.widgets or {}
@@ -455,6 +586,8 @@ function MR:RefreshMainPanelSectionsOnly()
         modColAssign[slot] = assign
         cols[curCol] = cols[curCol] + entry.h
     end
+    self._modColAssignCount = modColAssignCount
+    self._mainPanelColumnWidth = colW
 
     local activeMainSections = self._activeMainSectionsBuffer or {}
     self._activeMainSectionsBuffer = activeMainSections
@@ -588,6 +721,8 @@ function MR:FastToggleMainSection(modKey)
     end
 
     RecalcLayout()
+    self._mainMaterializedTop = nil
+    self._mainMaterializedBottom = nil
     local newOpen = not MR:IsModuleOpen(modKey)
     MR:SetModuleOpen(modKey, newOpen)
     stats.isOpen = newOpen

@@ -372,7 +372,13 @@ local function HideMainRowWidget(rowFrame)
     if rowFrame._statusBtn then
         HideTooltipIfOwned(rowFrame._statusBtn)
     end
-    rowFrame._mrData = nil
+	
+    local data = rowFrame._mrData
+    if data then
+        for key in pairs(data) do
+            data[key] = nil
+        end
+    end
     rowFrame._timerUpdate = nil
     rowFrame:Hide()
 end
@@ -559,7 +565,7 @@ local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, 
             local header = BuildMainRowGroupHeader(mod, group)
             local rowFrame, nextY, rowId = buildRowFunc(header, 0, yOff)
             yOff = nextY
-            if usedRows then usedRows[rowId] = true end
+            if usedRows and rowFrame then usedRows[rowId] = true end
         end
         lastGroup = group
 
@@ -569,7 +575,7 @@ local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, 
             if row.control or not (hideComplete and rowComplete) then
                 local rowFrame, nextY, rowId = buildRowFunc(row, done, yOff)
                 yOff = nextY
-                if usedRows then usedRows[rowId] = true end
+                if usedRows and rowFrame then usedRows[rowId] = true end
             end
         end
     end
@@ -728,7 +734,17 @@ local function EnsureMainSectionWidget(self, modKey)
         return card
     end
 
-    card = CreateSectionWidget(self.content, true, false)
+    local pool = self._mainSectionWidgetPool
+    if pool and #pool > 0 then
+        card = table.remove(pool)
+        card._mrInMainSectionPool = nil
+        MR._mainSectionWidgetReusedCount = (MR._mainSectionWidgetReusedCount or 0) + 1
+        card:SetParent(self.content)
+        card:Show()
+    else
+        card = CreateSectionWidget(self.content, true, false)
+        MR._mainSectionWidgetCreatedCount = (MR._mainSectionWidgetCreatedCount or 0) + 1
+    end
     self._mainSectionFrames[modKey] = card
     return card
 end
