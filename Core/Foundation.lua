@@ -28,6 +28,7 @@ local DEFAULTS = {
         minimized       = false,
         frameAlpha      = 1.0,
         hideFramesInInstances = false,
+        allowUpdatesDuringCombat = false,
         rememberManagedWindowsVisibility = false,
         managedWindowsBundleHidden       = false,
         transparentMode = false,

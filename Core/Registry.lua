@@ -37,7 +37,7 @@ function MR:QueueCombatDeferredUpdate(flag)
 end
 
 function MR:ShouldDeferForCombat(flag)
-    if not IsInRestrictedCombat() then
+    if not IsInRestrictedCombat() or (self.db and self.db.profile and self.db.profile.allowUpdatesDuringCombat == true) then
         return false
     end
 
@@ -58,7 +58,7 @@ function MR:QueueDeferredProgressUpdate(moduleKey, rowKey, value, maxVal)
 end
 
 function MR:FlushCombatDeferredUpdates()
-    if IsInRestrictedCombat() then
+    if IsInRestrictedCombat() and not (self.db and self.db.profile and self.db.profile.allowUpdatesDuringCombat == true) then
         return
     end
 
@@ -137,7 +137,20 @@ function MR:OnCombatEnded()
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
     end
 
+    if self.UpdateCombatDisplayState then
+        self:UpdateCombatDisplayState()
+    end
     self:FlushCombatDeferredUpdates()
+end
+
+function MR:OnCombatStarted()
+    if self.UpdateCombatDisplayState then
+        self:UpdateCombatDisplayState()
+    end
+    if self.RegisterEvent and not self._combatEndEventRegistered then
+        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
+        self._combatEndEventRegistered = true
+    end
 end
 
 function MR:GetModuleExpansionKey(modOrKey)

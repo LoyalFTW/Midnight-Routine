@@ -7,7 +7,6 @@ local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
-local IsInRestrictedCombat = Core.IsInRestrictedCombat
 local DEFAULTS = Core.defaults
 
 function MR:ApplyScaleToAll(v)
@@ -151,8 +150,7 @@ function MR:RequestUIRefresh(delay)
         return
     end
 
-    if IsInRestrictedCombat() then
-        self:QueueCombatDeferredUpdate("refreshUI")
+    if self:ShouldDeferForCombat("refreshUI") then
         return
     end
 

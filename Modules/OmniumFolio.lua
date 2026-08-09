@@ -47,6 +47,7 @@ local function BuildRows()
             control = true,
             sectionHeader = true,
             hideStatus = true,
+            hideWhenComplete = true,
             noDefaultTooltipHint = true,
         },
     }

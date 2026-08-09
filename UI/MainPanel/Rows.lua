@@ -538,6 +538,13 @@ local function BuildMainRowGroupHeader(mod, group)
     return header
 end
 
+local function ShouldRenderMainRow(row, rowComplete, hideComplete)
+    if row.control then
+        return not (hideComplete and row.hideWhenComplete and rowComplete)
+    end
+    return not (hideComplete and rowComplete)
+end
+
 local function ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComplete)
     if not IsMainRowGroupEnabled(mod, group) then
         return true
@@ -547,7 +554,7 @@ local function ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComple
         if IsMainRowInGroup(mod, row, group) and MR:IsRowEnabled(mod.key, row.key) then
             local done = MR:GetProgress(mod.key, row.key)
             local rowComplete = self:IsRowComplete(mod, row, done)
-            if row.control or not (hideComplete and rowComplete) then
+            if ShouldRenderMainRow(row, rowComplete, hideComplete) then
                 return true
             end
         end
@@ -572,7 +579,7 @@ local function RenderMainGroupedRows(self, card, mod, rows, hideComplete, yOff, 
         if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
             local done = MR:GetProgress(mod.key, row.key)
             local rowComplete = self:IsRowComplete(mod, row, done)
-            if row.control or not (hideComplete and rowComplete) then
+            if ShouldRenderMainRow(row, rowComplete, hideComplete) then
                 local rowFrame, nextY, rowId = buildRowFunc(row, done, yOff)
                 yOff = nextY
                 if usedRows and rowFrame then usedRows[rowId] = true end
@@ -600,7 +607,7 @@ local function CountMainGroupedRows(self, mod, rows, hideComplete, isOpen)
         if rowVisible and MR:IsRowEnabled(mod.key, row.key) then
             local done = MR:GetProgress(mod.key, row.key)
             local rowComplete = self:IsRowComplete(mod, row, done)
-            if row.control or not (hideComplete and rowComplete) then
+            if ShouldRenderMainRow(row, rowComplete, hideComplete) then
                 shownRows = shownRows + 1
                 if isOpen then
                     extraHeight = extraHeight + ROW_HEIGHT

@@ -743,6 +743,7 @@ function MR:OnEnable()
     self:RegisterEvent("QUEST_REMOVED",            "OnQuestRemoved")
     self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
+    self:RegisterEvent("PLAYER_REGEN_DISABLED",    "OnCombatStarted")
 
     self:ScheduleRepeatingTimer("CheckScheduledResets", 60)
 

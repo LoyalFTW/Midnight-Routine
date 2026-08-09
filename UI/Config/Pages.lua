@@ -352,6 +352,18 @@ function MR:PopulateConfigFrame(f)
                     MR:UpdateInstanceFrameVisibility()
                 end
             end)
+        Checkbox(L["Config_DisabledInCombat"] or "Disabled in Combat",
+            function() return MR.db.profile.allowUpdatesDuringCombat ~= true end,
+            function(v)
+                MR.db.profile.allowUpdatesDuringCombat = not v
+                if MR.UpdateCombatDisplayState then
+                    MR:UpdateCombatDisplayState()
+                end
+                if not v and MR.FlushCombatDeferredUpdates then
+                    MR:FlushCombatDeferredUpdates()
+                end
+                MR:PopulateConfigFrame(f)
+            end)
         Checkbox(L["Config_RememberManagedWindowsVisibility"],
             function() return MR.db.profile.rememberManagedWindowsVisibility end,
             function(v)

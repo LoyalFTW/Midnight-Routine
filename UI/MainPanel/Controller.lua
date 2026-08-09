@@ -356,6 +356,14 @@ local function GetBottomHeaderCollapseTarget(frame)
     return anchor
 end
 
+local function IsMainCombatDisabled()
+    local inCombat = (InCombatLockdown and InCombatLockdown())
+        or (UnitAffectingCombat and UnitAffectingCombat("player"))
+    return inCombat
+        and MR and MR.db and MR.db.profile
+        and MR.db.profile.allowUpdatesDuringCombat ~= true
+end
+
 local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     if not frame then
         return
@@ -372,6 +380,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     local chromeHeight = headerHeight + characterBarHeight
     local headerBottom = IsMainHeaderAtBottom()
     local minimized = MR and MR.db and MR.db.profile and MR.db.profile.minimized == true
+    local combatDisabled = IsMainCombatDisabled()
 
     if titleBar then
         titleBar:ClearAllPoints()
@@ -387,7 +396,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     if characterBar then
         characterBar:ClearAllPoints()
         characterBar:SetHeight(math.max(1, characterBarHeight))
-        characterBar:SetShown(characterBarHeight > 0 and not (MR.db and MR.db.profile and MR.db.profile.minimized))
+        characterBar:SetShown(characterBarHeight > 0 and not minimized and not combatDisabled)
         if headerBottom then
             characterBar:SetPoint("BOTTOMLEFT", titleBar, "TOPLEFT", 0, 0)
             characterBar:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", 0, 0)
@@ -399,7 +408,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if scrollBg then
         scrollBg:ClearAllPoints()
-        scrollBg:SetShown(not minimized)
+        scrollBg:SetShown(not minimized and not combatDisabled)
         if headerBottom then
             scrollBg:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
             scrollBg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, chromeHeight)
@@ -411,7 +420,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if scroll then
         scroll:ClearAllPoints()
-        scroll:SetShown(not minimized)
+        scroll:SetShown(not minimized and not combatDisabled)
         if headerBottom then
             scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -4)
             scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -9, chromeHeight + 6)
@@ -422,7 +431,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     end
 
     if track and scroll then
-        track:SetShown(not minimized)
+        track:SetShown(not minimized and not combatDisabled)
         track:ClearAllPoints()
         track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 1, 0)
         track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 1, 0)
@@ -430,7 +439,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
 
     if dragger then
         dragger:ClearAllPoints()
-        dragger:SetShown(not minimized)
+        dragger:SetShown(not minimized and not combatDisabled)
         if headerBottom then
             dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
         else
@@ -441,6 +450,12 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     if minimized then
         frame:SetHeight(GetMainFrameCollapsedHeight())
     end
+    if MR and MR._combatDisabledFrame then
+        MR._combatDisabledFrame:SetShown(combatDisabled and not minimized)
+    end
+    if MR and MR.titleCount then
+        MR.titleCount:SetShown(not combatDisabled)
+    end
     ApplyMainFrameAnchor(frame, GetMainHeaderPosition(), preserveScreenPosition == true)
 end
 
@@ -449,6 +464,7 @@ ns.IsAnimatedMinimizeEnabled = IsAnimatedMinimizeEnabled
 ns.ApplyMainFrameLayout      = ApplyMainFrameLayout
 
 local function SetMainFrameChromeVisible(visible)
+    visible = visible and not IsMainCombatDisabled()
     if MR.scroll then MR.scroll:SetShown(visible) end
     if MR._scrollBg then MR._scrollBg:SetShown(visible) end
     if MR._scrollTrack then MR._scrollTrack:SetShown(visible) end
@@ -916,6 +932,19 @@ function MR:BuildUI()
         end,
     })
 
+    local combatDisabledFrame = CreateFrame("Frame", nil, f)
+    combatDisabledFrame:SetAllPoints(scroll)
+    combatDisabledFrame:SetFrameLevel(f:GetFrameLevel() + 12)
+    combatDisabledFrame:Hide()
+    self._combatDisabledFrame = combatDisabledFrame
+
+    local combatDisabledText = combatDisabledFrame:CreateFontString(nil, "OVERLAY")
+    combatDisabledText:SetFont(ns.FONT_HEADERS, math.max(10, GetFontSize()), GetFontFlags())
+    combatDisabledText:SetPoint("CENTER", combatDisabledFrame, "CENTER", 0, 0)
+    combatDisabledText:SetText(L["Combat_Disabled"] or "Disabled during combat")
+    combatDisabledText:SetTextColor(0.92, 0.48, 0.38)
+    self._combatDisabledText = combatDisabledText
+
     self.widgets         = {}
     self.sectionRegistry = {}
 
@@ -1028,9 +1057,34 @@ function MR:BuildUI()
     if self.ActivateVisibleTrackingSurface then
         self:ActivateVisibleTrackingSurface()
     end
+    self:UpdateCombatDisplayState()
     self:RefreshUI()
     ApplyTheme()
 end
+
+function MR:UpdateCombatDisplayState()
+    if not self.frame then
+        return
+    end
+
+    ApplyMainFrameLayout(self.frame)
+    if self._tickFrame then
+        self._tickFrame:SetShown(not IsMainCombatDisabled() and self:HasVisibleMainTrackingSurface())
+    end
+    if IsMainCombatDisabled() and self.RegisterEvent and not self._combatEndEventRegistered then
+        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
+        self._combatEndEventRegistered = true
+    end
+end
+
+local combatDisplayWatcher = CreateFrame("Frame")
+combatDisplayWatcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+combatDisplayWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+combatDisplayWatcher:SetScript("OnEvent", function()
+    if MR.UpdateCombatDisplayState then
+        MR:UpdateCombatDisplayState()
+    end
+end)
 
 local function HasVisibleUISurface(self)
     if self.frame and self.frame:IsShown() then
