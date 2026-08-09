@@ -20,6 +20,31 @@ local PROFESSION_TIER_LEARN_SPELLS = {
     [2918] = 471015, [2883] = 423343, [2831] = 366258, 
 }
 
+local TIER_TO_PARENT = {}
+for parentSkillLine, midnightSkillLine in pairs(PARENT_TO_MIDNIGHT) do
+    TIER_TO_PARENT[midnightSkillLine] = parentSkillLine
+end
+
+local PARENT_TIER_SKILL_LINES = {
+    [171] = { 2906, 2871, 2823 },
+    [164] = { 2907, 2872, 2822 },
+    [333] = { 2909, 2874, 2825 },
+    [202] = { 2910, 2875, 2827 },
+    [182] = { 2912, 2877, 2832 },
+    [773] = { 2913, 2878, 2828 },
+    [755] = { 2914, 2879, 2829 },
+    [165] = { 2915, 2880, 2830 },
+    [186] = { 2916, 2881, 2833 },
+    [393] = { 2917, 2882, 2834 },
+    [197] = { 2918, 2883, 2831 },
+}
+
+for parentSkillLine, tierSkillLines in pairs(PARENT_TIER_SKILL_LINES) do
+    for _, tierSkillLine in ipairs(tierSkillLines) do
+        TIER_TO_PARENT[tierSkillLine] = parentSkillLine
+    end
+end
+
 local PROFESSION_CONCENTRATION_CURRENCIES = {
     [2906] = 3161,
     [2907] = 3162,
@@ -163,16 +188,29 @@ function MR:RefreshPlayerProfessions()
     end
 
     local previousProfessions = CopyProfessionMap(self.playerProfessions)
-    wipe(self.playerProfessions)
+    local savedProfessions = self.db and self.db.char and self.db.char.professions
+    local professions = {}
+    local knownParentProfessions = {}
     local found = false
     local scanned = false
+
+    local function MarkProfession(skillLineID)
+        if not skillLineID then
+            return
+        end
+        professions[skillLineID] = true
+        found = true
+        local parentSkillLine = TIER_TO_PARENT[skillLineID]
+        if parentSkillLine then
+            knownParentProfessions[parentSkillLine] = true
+        end
+    end
 
     if C_SpellBook and C_SpellBook.IsSpellKnown then
         scanned = true
         for tierSkillLine, learnSpellID in pairs(PROFESSION_TIER_LEARN_SPELLS) do
             if C_SpellBook.IsSpellKnown(learnSpellID) then
-                self.playerProfessions[tierSkillLine] = true
-                found = true
+                MarkProfession(tierSkillLine)
             end
         end
     end
@@ -185,19 +223,32 @@ function MR:RefreshPlayerProfessions()
                 local info = C_TradeSkillUI.GetProfessionInfoBySkillLineID and
                              C_TradeSkillUI.GetProfessionInfoBySkillLineID(skillLineID)
                 if info and (info.skillLevel or 0) > 0 then
-                    self.playerProfessions[skillLineID] = true
-                    found = true
+                    MarkProfession(skillLineID)
                     if info.parentProfessionID then
+                        knownParentProfessions[info.parentProfessionID] = true
                         local mid = PARENT_TO_MIDNIGHT[info.parentProfessionID]
                         if mid then
-                            self.playerProfessions[mid] = true
-                            found = true
+                            MarkProfession(mid)
                         end
                     end
                 end
             end
         end
     end
+
+    if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
+        scanned = true
+        for tierSkillLine in pairs(PROFESSION_TIER_LEARN_SPELLS) do
+            local info = C_TradeSkillUI.GetProfessionInfoBySkillLineID(tierSkillLine)
+            if info and (info.skillLevel or 0) > 0 then
+                MarkProfession(tierSkillLine)
+                if info.parentProfessionID then
+                    knownParentProfessions[info.parentProfessionID] = true
+                end
+            end
+        end
+    end
+
     if GetProfessions and GetProfessionInfo then
         local prof1, prof2, archaeology, fishing, cooking = GetProfessions()
         scanned = true
@@ -205,14 +256,30 @@ function MR:RefreshPlayerProfessions()
             if idx then
                 local _, _, _, _, _, _, parentSkillLine = GetProfessionInfo(idx)
                 if parentSkillLine then
+                    knownParentProfessions[parentSkillLine] = true
                     local mid = PARENT_TO_MIDNIGHT[parentSkillLine]
                     if mid then
-                        self.playerProfessions[mid] = true
-                        found = true
+                        MarkProfession(mid)
                     end
                 end
             end
         end
+    end
+
+    for parentSkillLine, tierSkillLines in pairs(PARENT_TIER_SKILL_LINES) do
+        if knownParentProfessions[parentSkillLine] then
+            for _, tierSkillLine in ipairs(tierSkillLines) do
+                if previousProfessions[tierSkillLine]
+                    or (type(savedProfessions) == "table" and savedProfessions[tierSkillLine]) then
+                    MarkProfession(tierSkillLine)
+                end
+            end
+        end
+    end
+
+    wipe(self.playerProfessions)
+    for skillLineID in pairs(professions) do
+        self.playerProfessions[skillLineID] = true
     end
 
     if self.db and self.db.char then
@@ -225,8 +292,8 @@ function MR:RefreshPlayerProfessions()
             if not found then
                 self.db.char.professionConcentration = {}
             end
-        elseif HasAnyProfessionRecord(self.db.char.professions) then
-            for skillLineID, learned in pairs(self.db.char.professions) do
+        elseif HasAnyProfessionRecord(savedProfessions) then
+            for skillLineID, learned in pairs(savedProfessions) do
                 if learned then
                     self.playerProfessions[skillLineID] = true
                 end

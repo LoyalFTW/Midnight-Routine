@@ -40,7 +40,7 @@ local function BuildRows()
     local rows = {
         {
             key = "folio_progress",
-            label = L["Omnium_Progress_Label"] or "|cffc792ffOmnium Folio Progress:|r",
+            label = "",
             max = 5,
             note = L["Omnium_Progress_Note"] or "Complete the five Seeking Knowledge quests to unlock every Omnium Folio rune row. Missed weeks can be caught up until you are current.",
             patchKey = "12.0.7",
