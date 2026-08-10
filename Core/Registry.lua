@@ -29,15 +29,16 @@ function MR:QueueCombatDeferredUpdate(flag)
 
     self._combatDeferred = self._combatDeferred or {}
     self._combatDeferred[flag] = true
+end
 
-    if self.RegisterEvent and not self._combatEndEventRegistered then
-        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
-        self._combatEndEventRegistered = true
-    end
+function MR:IsCombatUpdatesDisabled()
+    local inCombat = IsInRestrictedCombat()
+        or (UnitAffectingCombat and UnitAffectingCombat("player"))
+    return inCombat and self.db and self.db.profile and self.db.profile.disabledInCombat == true
 end
 
 function MR:ShouldDeferForCombat(flag)
-    if not IsInRestrictedCombat() or (self.db and self.db.profile and self.db.profile.allowUpdatesDuringCombat == true) then
+    if not self:IsCombatUpdatesDisabled() then
         return false
     end
 
@@ -58,7 +59,7 @@ function MR:QueueDeferredProgressUpdate(moduleKey, rowKey, value, maxVal)
 end
 
 function MR:FlushCombatDeferredUpdates()
-    if IsInRestrictedCombat() and not (self.db and self.db.profile and self.db.profile.allowUpdatesDuringCombat == true) then
+    if self:IsCombatUpdatesDisabled() then
         return
     end
 
@@ -132,11 +133,6 @@ function MR:FlushCombatDeferredUpdates()
 end
 
 function MR:OnCombatEnded()
-    self._combatEndEventRegistered = nil
-    if self.UnregisterEvent then
-        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-    end
-
     if self.UpdateCombatDisplayState then
         self:UpdateCombatDisplayState()
     end
@@ -146,10 +142,6 @@ end
 function MR:OnCombatStarted()
     if self.UpdateCombatDisplayState then
         self:UpdateCombatDisplayState()
-    end
-    if self.RegisterEvent and not self._combatEndEventRegistered then
-        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
-        self._combatEndEventRegistered = true
     end
 end
 
@@ -529,13 +521,36 @@ function MR:RegisterPatch(def)
 end
 
 
+function MR:GetProfessionKnowledgePosition()
+    if not self.db then
+        return nil
+    end
+    if self:IsCharacterWindowLayoutEnabled() then
+        return tonumber(self.db.char and self.db.char.professionKnowledgePosition)
+    end
+    return tonumber(self.db.profile and self.db.profile.professionKnowledgePosition)
+end
+
+function MR:SetProfessionKnowledgePosition(position)
+    if not self.db then
+        return
+    end
+    position = math.max(0, math.floor((tonumber(position) or 0) + 0.5))
+    if self:IsCharacterWindowLayoutEnabled() then
+        self.db.char.professionKnowledgePosition = position
+    else
+        self.db.profile.professionKnowledgePosition = position
+    end
+    self._orderedAllModulesCache = nil
+end
+
 function MR:GetOrderedModules(expansionKey)
     if expansionKey == "all" then
         if self._orderedAllModulesCache then
             return self._orderedAllModulesCache
         end
 
-        local result, professionBlocks, trailing = {}, {}, {}
+        local normalModules, professionBlocks, trailing = {}, {}, {}
         for _, expansion in ipairs(self:GetSelectableExpansions()) do
             for _, mod in ipairs(self:GetOrderedModules(expansion.key)) do
                 if mod.profSkillLine then
@@ -544,13 +559,30 @@ function MR:GetOrderedModules(expansionKey)
                 elseif mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")) then
                     trailing[#trailing + 1] = mod
                 else
-                    result[#result + 1] = mod
+                    normalModules[#normalModules + 1] = mod
                 end
             end
         end
+        local professionModules = {}
         for _, expansion in ipairs(self:GetSelectableExpansions()) do
             for _, mod in ipairs(professionBlocks[expansion.key] or {}) do
-                result[#result + 1] = mod
+                professionModules[#professionModules + 1] = mod
+            end
+        end
+        local position = self:GetProfessionKnowledgePosition()
+        if position == nil then
+            position = #normalModules
+        end
+        position = math.max(0, math.min(math.floor(position), #normalModules))
+        local result = {}
+        for index = 0, #normalModules do
+            if index == position then
+                for _, mod in ipairs(professionModules) do
+                    result[#result + 1] = mod
+                end
+            end
+            if index < #normalModules then
+                result[#result + 1] = normalModules[index + 1]
             end
         end
         for _, mod in ipairs(trailing) do

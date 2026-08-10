@@ -377,6 +377,10 @@ function MR:OnInitialize()
         defaults = DEFAULTS,
         defaultProfile = true,
     })
+    if self.db.profile.allowUpdatesDuringCombat ~= nil then
+        self.db.profile.disabledInCombat = self.db.profile.allowUpdatesDuringCombat ~= true
+        self.db.profile.allowUpdatesDuringCombat = nil
+    end
     for _, charData in pairs(self.db.sv.char or {}) do
         if type(charData) == "table" then
             PruneProgressStore(charData.progress)
@@ -714,6 +718,13 @@ function MR:OnEnable()
     }, 2, "OnQuestDataChanged")
 
     self:RegisterBucketEvent({
+        "QUEST_LOG_UPDATE",
+        "UNIT_QUEST_LOG_CHANGED",
+        "CRITERIA_UPDATE",
+        "ACHIEVEMENT_EARNED",
+    }, 0.25, "OnRareProgressChanged")
+
+    self:RegisterBucketEvent({
         "SKILL_LINES_CHANGED",
         "TRADE_SKILL_LIST_UPDATE",
         "SKILL_LINE_SPECS_RANKS_CHANGED",
@@ -737,6 +748,7 @@ function MR:OnEnable()
 
     self:RegisterEvent("ENCOUNTER_END",            "OnEncounterEnd")
     self:RegisterEvent("BOSS_KILL",                "OnBossKill")
+    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnRareCombatLog")
     self:RegisterEvent("CURRENCY_DISPLAY_UPDATE",  "OnCurrencyDisplayUpdate")
     self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnedIn")
     self:RegisterEvent("QUEST_ACCEPTED",           "OnQuestAccepted")
@@ -744,6 +756,7 @@ function MR:OnEnable()
     self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
     self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
     self:RegisterEvent("PLAYER_REGEN_DISABLED",    "OnCombatStarted")
+    self:RegisterEvent("PLAYER_REGEN_ENABLED",     "OnCombatEnded")
 
     self:ScheduleRepeatingTimer("CheckScheduledResets", 60)
 

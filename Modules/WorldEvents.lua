@@ -214,6 +214,7 @@ MR:RegisterModule({
     labelColor  = "#ff4444",
     resetType   = "weekly",
     defaultOpen = true,
+    isVisible = function() return not MR:IsPatchAvailable("12.1.0") end,
     scanReturnsChanged = true,
 
     onScan = function(mod)

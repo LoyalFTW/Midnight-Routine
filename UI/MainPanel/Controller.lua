@@ -357,11 +357,7 @@ local function GetBottomHeaderCollapseTarget(frame)
 end
 
 local function IsMainCombatDisabled()
-    local inCombat = (InCombatLockdown and InCombatLockdown())
-        or (UnitAffectingCombat and UnitAffectingCombat("player"))
-    return inCombat
-        and MR and MR.db and MR.db.profile
-        and MR.db.profile.allowUpdatesDuringCombat ~= true
+    return MR and MR.IsCombatUpdatesDisabled and MR:IsCombatUpdatesDisabled()
 end
 
 local function ApplyMainFrameLayout(frame, preserveScreenPosition)
@@ -1071,20 +1067,7 @@ function MR:UpdateCombatDisplayState()
     if self._tickFrame then
         self._tickFrame:SetShown(not IsMainCombatDisabled() and self:HasVisibleMainTrackingSurface())
     end
-    if IsMainCombatDisabled() and self.RegisterEvent and not self._combatEndEventRegistered then
-        self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnCombatEnded")
-        self._combatEndEventRegistered = true
-    end
 end
-
-local combatDisplayWatcher = CreateFrame("Frame")
-combatDisplayWatcher:RegisterEvent("PLAYER_REGEN_DISABLED")
-combatDisplayWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-combatDisplayWatcher:SetScript("OnEvent", function()
-    if MR.UpdateCombatDisplayState then
-        MR:UpdateCombatDisplayState()
-    end
-end)
 
 local function HasVisibleUISurface(self)
     if self.frame and self.frame:IsShown() then

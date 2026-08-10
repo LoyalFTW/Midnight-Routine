@@ -353,13 +353,13 @@ function MR:PopulateConfigFrame(f)
                 end
             end)
         Checkbox(L["Config_DisabledInCombat"] or "Disabled in Combat",
-            function() return MR.db.profile.allowUpdatesDuringCombat ~= true end,
+            function() return MR.db.profile.disabledInCombat == true end,
             function(v)
-                MR.db.profile.allowUpdatesDuringCombat = not v
+                MR.db.profile.disabledInCombat = v and true or false
                 if MR.UpdateCombatDisplayState then
                     MR:UpdateCombatDisplayState()
                 end
-                if not v and MR.FlushCombatDeferredUpdates then
+                if v ~= true and MR.FlushCombatDeferredUpdates then
                     MR:FlushCombatDeferredUpdates()
                 end
                 MR:PopulateConfigFrame(f)
@@ -930,11 +930,13 @@ function MR:PopulateConfigFrame(f)
             local expansionKey = MR:GetSelectedExpansionKey()
             if MR:IsCharacterWindowLayoutEnabled() then
                 MR.db.char.moduleOrder = {}
+                MR.db.char.professionKnowledgePosition = nil
                 if MR.db.char.expansionModuleOrder then
                     MR.db.char.expansionModuleOrder[expansionKey] = {}
                 end
             else
                 MR.db.profile.moduleOrder = {}
+                MR.db.profile.professionKnowledgePosition = nil
                 if MR.db.profile.expansionModuleOrder then
                     MR.db.profile.expansionModuleOrder[expansionKey] = {}
                 end
@@ -948,6 +950,7 @@ function MR:PopulateConfigFrame(f)
                 end
             end
             MR._orderedModulesCache = nil
+            MR._orderedAllModulesCache = nil
             MR._moduleStatsCache = nil
             MR:RefreshUI()
             MR:PopulateConfigFrame(f)

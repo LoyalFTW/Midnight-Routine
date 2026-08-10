@@ -119,7 +119,9 @@ function Config.BuildModulesPage(ctx)
         return (orderIndex[a.key] or 9999) < (orderIndex[b.key] or 9999)
     end)
 
+    local PROFESSION_GROUP_KEY = "__profession_knowledge"
     local _cfgRows = {}
+    local _cfgModuleRows = {}
     local _cfgRowRows = {}
 
     local function FormatReleaseSuffix(patchKey)
@@ -286,6 +288,16 @@ function Config.BuildModulesPage(ctx)
 
     local CommitDrag
 
+    local function GetActiveDragRows()
+        if drag.mode == "row" and drag.moduleKey then
+            return _cfgRowRows[drag.moduleKey] or {}
+        end
+        if drag.mode == "profession_group" then
+            return _cfgRows
+        end
+        return _cfgModuleRows
+    end
+
     local function DragOnUpdate()
         if not drag.active then return end
         if not IsMouseButtonDown("LeftButton") then
@@ -294,7 +306,7 @@ function Config.BuildModulesPage(ctx)
             end
             return
         end
-        local rows = (drag.mode == "row" and drag.moduleKey and _cfgRowRows[drag.moduleKey]) or _cfgRows or {}
+        local rows = GetActiveDragRows()
         if #rows == 0 then return end
 
         local cx, cy = GetCursorPosition()
@@ -361,7 +373,7 @@ function Config.BuildModulesPage(ctx)
 
     CommitDrag = function()
         if not drag.active then return end
-        local rows = (drag.mode == "row" and drag.moduleKey and _cfgRowRows[drag.moduleKey]) or _cfgRows or {}
+        local rows = GetActiveDragRows()
         local mode, moduleKey = drag.mode, drag.moduleKey
         drag.active = false
         f:SetScript("OnUpdate", nil)
@@ -403,9 +415,59 @@ function Config.BuildModulesPage(ctx)
             return
         end
 
+        if mode == "profession_group" then
+            local layoutKeys = {}
+            local srcIdx
+            for index, row in ipairs(rows) do
+                layoutKeys[index] = row.key
+                if row.key == drag.srcKey then
+                    srcIdx = index
+                end
+            end
+            if srcIdx then
+                local insertAt = slot + 1
+                if srcIdx < insertAt then
+                    insertAt = insertAt - 1
+                end
+                insertAt = math.max(1, math.min(insertAt, #layoutKeys))
+                local moved = table.remove(layoutKeys, srcIdx)
+                table.insert(layoutKeys, insertAt, moved)
+                local nextNormalKey
+                local passedGroup = false
+                for _, key in ipairs(layoutKeys) do
+                    if key == PROFESSION_GROUP_KEY then
+                        passedGroup = true
+                    elseif passedGroup then
+                        local mod = MR.moduleByKey and MR.moduleByKey[key]
+                        if mod and not mod.profSkillLine and not IsStoryConfigModule(mod) then
+                            nextNormalKey = key
+                            break
+                        end
+                    end
+                end
+                local normalBefore = 0
+                for _, mod in ipairs(MR:GetOrderedModules("all")) do
+                    if mod and not mod.profSkillLine and not IsStoryConfigModule(mod) then
+                        if mod.key == nextNormalKey then
+                            break
+                        end
+                        normalBefore = normalBefore + 1
+                    end
+                end
+                MR:SetProfessionKnowledgePosition(normalBefore)
+                MR:RefreshUI()
+            end
+            drag.srcKey = nil
+            drag.targetIdx = nil
+            drag.mode = "module"
+            drag.moduleKey = nil
+            MR:PopulateConfigFrame(f)
+            return
+        end
+
         local allMods = MR:GetOrderedModules("all")
         local visMods = {}
-        for _, row in ipairs(_cfgRows) do
+        for _, row in ipairs(_cfgModuleRows) do
             for _, m in ipairs(allMods) do
                 if m.key == row.key then table.insert(visMods, m); break end
             end
@@ -424,7 +486,7 @@ function Config.BuildModulesPage(ctx)
             local moved = table.remove(visMods, srcIdx)
             table.insert(visMods, insertAt, moved)
             local inCfgRows = {}
-            for _, row in ipairs(_cfgRows) do inCfgRows[row.key] = true end
+            for _, row in ipairs(_cfgModuleRows) do inCfgRows[row.key] = true end
             local newOrder = {}
             local vi = 1
             for _, m in ipairs(allMods) do
@@ -451,6 +513,19 @@ function Config.BuildModulesPage(ctx)
     local storyGroupOpen = MR._cfgExpanded.__storyCampaigns == true
     local storyTotal, storyEnabled = 0, 0
     local professionSource = MR.GetMainFrameProgressSource and MR:GetMainFrameProgressSource() or nil
+
+    local function StartProfessionGroupDrag()
+        if drag.active then return end
+        drag.active = true
+        f:SetScript("OnUpdate", DragOnUpdate)
+        drag.mode = "profession_group"
+        drag.moduleKey = nil
+        drag.srcKey = PROFESSION_GROUP_KEY
+        drag.targetIdx = nil
+        dragGhostLbl:SetText(L["ProfKnowledge_Title"] or "Profession Knowledge")
+        ns.HideTooltip()
+    end
+
     local function IsProfessionKnownForConfig(profession)
         if not profession then
             return false
@@ -492,9 +567,15 @@ function Config.BuildModulesPage(ctx)
         headerFr:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
         headerFr:SetBackdropBorderColor(0.24, 0.76, 0.70, 1)
 
+        local grip = Config.CreateGrip(headerFr, ROW_H, true, StartProfessionGroupDrag, function()
+            if drag.active and drag.mode == "profession_group" then
+                CommitDrag()
+            end
+        end)
+
         local badge = CreateFrame("Frame", nil, headerFr, "BackdropTemplate")
         badge:SetSize(28, 24)
-        badge:SetPoint("LEFT", headerFr, "LEFT", 7, 0)
+        badge:SetPoint("LEFT", grip, "RIGHT", 5, 0)
         badge:SetBackdrop(MakeBackdrop())
         badge:SetBackdropColor(0.06, 0.17, 0.18, 0.95)
         badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
@@ -554,6 +635,7 @@ function Config.BuildModulesPage(ctx)
             arrowLbl:SetTextColor(0.45, 0.75, 0.70)
         end)
 
+        _cfgRows[#_cfgRows + 1] = { key = PROFESSION_GROUP_KEY, frame = headerFr, label = L["ProfKnowledge_Title"] or "Profession Knowledge" }
         yOff = yOff - ROW_H - 3
     end
 
@@ -996,6 +1078,7 @@ function Config.BuildModulesPage(ctx)
                 end or nil,
             })
             _cfgRows[#_cfgRows + 1] = { key = key, frame = moduleFrame, label = currentMod.label }
+            _cfgModuleRows[#_cfgModuleRows + 1] = { key = key, frame = moduleFrame, label = currentMod.label }
             yOff = yOff - moduleHeight
 
             if MR._cfgExpanded[key] then

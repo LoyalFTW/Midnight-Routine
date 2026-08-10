@@ -210,6 +210,9 @@ local function MainRowOnEnter(selfRow)
                     tooltip:AddLine(" ")
                     tooltip:AddLine(string.format(L["Gathering_Coords"], row.x, row.y), 0.7, 1, 0.9)
                     tooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
+                elseif data.hasNavigation then
+                    tooltip:AddLine(" ")
+                    tooltip:AddLine(L["Waypoint_ClickNavigate"] or "Left-click: show destination", 0.45, 0.85, 1)
                 end
                 if row.tooltipFunc then
                     row.tooltipFunc(tooltip)
@@ -221,7 +224,7 @@ local function MainRowOnEnter(selfRow)
                     tooltip:AddLine(L["Tooltip_AutoQuest"], 0.4, 1, 0.6)
                 elseif row.spellId or row.itemId then
                     tooltip:AddLine(L["Tooltip_AutoItem"], 0.9, 0.6, 1)
-                elseif not data.hasWaypoint then
+                elseif not data.hasNavigation then
                     tooltip:AddLine(L["Tooltip_ManualClick"], 0.5, 0.5, 0.5)
                 end
             end
@@ -265,10 +268,10 @@ local function MainRowOnMouseDown(selfRow, button)
     if button == "LeftButton" and mod and mod.profSkillLine and (row.professionKnowledgeEntry or row.profKnowledgeSectionKey) and MR.SetProfessionKnowledgeWaypoint then
         MR:SetProfessionKnowledgeWaypoint(row, row.profKnowledgeSectionKey)
         return
-    elseif button == "LeftButton" and data.hasWaypoint then
-        local ok, source = MR:SetWaypoint(row)
+    elseif button == "LeftButton" and data.hasNavigation then
+        local ok, source, target = MR:NavigateToRow(row)
         if ok then
-            print(string.format(L["Waypoint_Set"], source, row.waypointTitle or row.label, row.x, row.y))
+            print(string.format(L["Waypoint_Set"], source, target.waypointTitle or target.label, target.x, target.y))
         else
             print(L["Waypoint_Unavailable"])
         end
@@ -1143,6 +1146,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         or (row.currencyId ~= nil)
         or (row.itemId ~= nil)
     local hasWaypoint = row.zone and row.x and row.y
+    local hasNavigation = hasWaypoint or type(row.getWaypoint) == "function" or type(row.navigationQuestIds or row.questIds) == "table"
     local isComplete = self:IsRowComplete(mod, row, done)
     local collapsed = false
     local rowH = collapsed and 8 or ROW_HEIGHT
@@ -1155,6 +1159,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     rowFrame._mrData.frameAlpha = frameAlpha
     rowFrame._mrData.isAutoTracked = isAutoTracked
     rowFrame._mrData.hasWaypoint = hasWaypoint
+    rowFrame._mrData.hasNavigation = hasNavigation
     rowFrame._mrData.isComplete = isComplete
     if rowFrame._mrLayoutSection ~= section
         or rowFrame._mrLayoutY ~= yOff

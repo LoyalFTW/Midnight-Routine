@@ -352,6 +352,14 @@ defaultCrestRows = {
         labelColorHex = "e8c96e",
     },
     {
+        key = "spark_tides",
+        itemId = 274476,
+        noMax = true,
+        patchKey = "12.1.0",
+        fallbackLabel = "Spark of Tides",
+        labelColorHex = "58c9d4",
+    },
+    {
         key = "undercoin",
         currencyId = 2803,
         noMax = true,
@@ -369,6 +377,21 @@ defaultCrestRows = {
         key = "nebulous_voidcore",
         currencyId = 3418,
         label = CurrencyLabel(3418, "Nebulous Voidcore"),
+    },
+    {
+        key = "corrosive_coin",
+        currencyId = 3448,
+        noMax = true,
+        patchKey = "12.1.0",
+        label = CurrencyLabel(3448, "Corrosive Coin", "2eae6b"),
+    },
+    {
+        key = "corrosive_soul",
+        itemId = 273000,
+        noMax = true,
+        patchKey = "12.1.0",
+        fallbackLabel = "Corrosive Soul",
+        labelColorHex = "58c9d4",
     },
 }
 crestRows = {}
@@ -388,6 +411,6 @@ MR:RegisterModule({
 local itemCacheFrame = CreateFrame("Frame")
 itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 itemCacheFrame:SetScript("OnEvent", function(_, _, itemID)
-    if itemID ~= 232875 then return end
+    if itemID ~= 232875 and itemID ~= 273000 and itemID ~= 274476 then return end
     RefreshCrestItemLabels()
 end)

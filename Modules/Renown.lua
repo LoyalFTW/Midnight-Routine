@@ -89,6 +89,15 @@ local BASE_FACTIONS = {
         color     = { 0.45, 0.22, 0.82 },
         hex       = "7238d1",
     },
+    {
+        key       = "zuljarras_forces",
+        label     = L["Faction_ZuljarrasForces"] or "Zul'jarra's Forces",
+        factionId = 2772,
+        maxRenown = 20,
+        color     = { 0.18, 0.68, 0.42 },
+        hex       = "2eae6b",
+        patchKey  = "12.1.0",
+    },
 }
 
 local function GetFactionRenownCap(factionId, fallback)
@@ -143,8 +152,10 @@ local function BuildDynamicFactions()
     local factions = {}
     local seenFactionIds = {}
     for _, faction in ipairs(BASE_FACTIONS) do
-        factions[#factions + 1] = faction
-        seenFactionIds[faction.factionId] = true
+        if not faction.patchKey or MR:IsPatchAvailable(faction.patchKey) then
+            factions[#factions + 1] = faction
+            seenFactionIds[faction.factionId] = true
+        end
     end
 
     local delvesFactionId = C_DelvesUI and C_DelvesUI.GetDelvesFactionForSeason and C_DelvesUI.GetDelvesFactionForSeason()

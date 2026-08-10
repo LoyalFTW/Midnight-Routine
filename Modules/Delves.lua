@@ -17,7 +17,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local EXPANSIONS = {
     {
         label  = L["Midnight"],
-        mapIds = { [2393]=true, [2395]=true, [2405]=true, [2413]=true, [2424]=true, [2437]=true },
+        mapIds = { [2393]=true, [2395]=true, [2405]=true, [2413]=true, [2424]=true, [2437]=true, [2512]=true, [2635]=true },
         zones  = {
             { uiMapId = 2393, delves = { {8426,8425,91186}, {8440,8439,92444} } },
             { uiMapId = 2424, delves = { {8428,8427,91182} } },
@@ -25,6 +25,7 @@ local EXPANSIONS = {
             { uiMapId = 2405, delves = { {8432,8431,91184}, {8430,8429,91183} } },
             { uiMapId = 2413, delves = { {8434,8433,91185}, {8436,8435,91187} } },
             { uiMapId = 2437, delves = { {8444,8443,91188}, {8442,8441,91190} } },
+            { uiMapId = 2512, delves = {}, dynamicDelves = true },
         },
     },
     {
@@ -77,6 +78,18 @@ local function ScanExpansion(exp, mdb)
                 total = total + 1
                 active = active + 1
                 entries[#entries + 1] = zoneName .. ": " .. (poiInfo.name or "?")
+            end
+        end
+        if zone.dynamicDelves and C_AreaPoiInfo.GetAreaPOIForMap then
+            for _, poiID in ipairs(C_AreaPoiInfo.GetAreaPOIForMap(zone.uiMapId) or {}) do
+                local poiInfo = C_AreaPoiInfo.GetAreaPOIInfo(zone.uiMapId, poiID)
+                local name = poiInfo and poiInfo.name
+                local atlasName = tostring(poiInfo and (poiInfo.atlasName or poiInfo.textureAtlasName) or "")
+                if name and atlasName:lower():find("bount", 1, true) then
+                    total = total + 1
+                    active = active + 1
+                    entries[#entries + 1] = zoneName .. ": " .. name
+                end
             end
         end
     end

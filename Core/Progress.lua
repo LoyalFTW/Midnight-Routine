@@ -247,6 +247,61 @@ function MR:SetWaypoint(target)
     return false, "No waypoint API available"
 end
 
+function MR:GetRowWaypointTarget(row)
+    if type(row) ~= "table" then
+        return nil
+    end
+
+    if type(row.getWaypoint) == "function" then
+        local ok, target = pcall(row.getWaypoint, row)
+        if ok and type(target) == "table" and target.zone and target.x and target.y then
+            return target
+        end
+    end
+
+    local questIds = row.navigationQuestIds or row.questIds
+    if type(questIds) == "table" and C_QuestLog and C_QuestLog.GetNextWaypoint then
+        for _, questId in ipairs(questIds) do
+            local ok, mapID, x, y = pcall(C_QuestLog.GetNextWaypoint, questId)
+            if ok and mapID and x and y then
+                if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
+                    pcall(C_SuperTrack.SetSuperTrackedQuestID, questId)
+                end
+                local waypointText
+                if C_QuestLog.GetNextWaypointText then
+                    local textOk, textValue = pcall(C_QuestLog.GetNextWaypointText, questId)
+                    if textOk then
+                        waypointText = textValue
+                    end
+                end
+                return {
+                    zone = mapID,
+                    x = x * 100,
+                    y = y * 100,
+                    label = waypointText or self:GetQuestName(questId, row.label),
+                    waypointTitle = waypointText or self:GetQuestName(questId, CleanDisplayLabel(row.label)),
+                }
+            end
+        end
+    end
+
+    if row.zone and row.x and row.y then
+        return row
+    end
+
+    return nil
+end
+
+function MR:NavigateToRow(row)
+    local target = self:GetRowWaypointTarget(row)
+    if not target then
+        return false, "No destination available"
+    end
+
+    local ok, source = self:SetWaypoint(target)
+    return ok, source, target
+end
+
 function MR:GetManualOverride(modKey, rowKey)
     if modKey == "custom_tasks" and self.IsCustomTaskAccountWideCompletion and self:IsCustomTaskAccountWideCompletion(rowKey) then
         local m = self.db and self.db.global and self.db.global.customTaskManualOverrides

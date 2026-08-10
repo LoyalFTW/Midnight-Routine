@@ -169,7 +169,9 @@ local MIDNIGHT_MAP_IDS = {
     [2405] = true,
     [2413] = true,
     [2437] = true,
+    [2512] = true,
     [2576] = true,
+    [2635] = true,
     [2600] = true,
     [2601] = true,
 }
@@ -1405,6 +1407,10 @@ MR:RegisterModule({
             note     = L["Weekly_Nymrissa_Note"] or "Complete the Tidebound Grotto Lair weekly reward.",
             patchKey = "12.1.0",
             questIds = { 97128 },
+            zone = 2512,
+            x = 59.9,
+            y = 66.3,
+            waypointTitle = L["Weekly_Nymrissa_Waypoint"] or "The Tidebound Grotto Lair Entrance",
         },
         {
             key      = "vaults_weekly_reward",
@@ -1412,6 +1418,10 @@ MR:RegisterModule({
             max      = 1,
             note     = L["Weekly_VaultsReward_Note"] or "Use the weekly Vaults opportunity for a chance at improved gear.",
             patchKey = "12.1.0",
+            zone = 2512,
+            x = 45.72,
+            y = 64.94,
+            waypointTitle = L["Weekly_VaultsReward_Waypoint"] or "Vaults of Atal'Utek Entrance",
         },
     },
 })

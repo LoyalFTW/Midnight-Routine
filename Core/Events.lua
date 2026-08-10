@@ -10,6 +10,27 @@ local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 
 local TURN_IN_COMPLETIONS = assert(Core.turnInCompletions, "Core lifecycle must load first")
 
+function MR:RestoreSavedManagedWindows()
+    if not self.db or self:IsManagedWindowsBundleHidden() or self._instanceFramesHidden then
+        return
+    end
+    local windows = {
+        { "renownOpen", "renownFrame", "EnsureRenownShown" },
+        { "raresOpen", "raresFrame", "EnsureRaresShown" },
+        { "gatheringLocOpen", "gatheringLocationsFrame", "EnsureGatheringLocationsShown" },
+        { "concentrationTrackerOpen", "concentrationTrackerFrame", "EnsureConcentrationTrackerShown" },
+    }
+    for _, window in ipairs(windows) do
+        local frame = self[window[2]]
+        local ensure = self[window[3]]
+        if self:GetManagedWindowOpen(window[1])
+            and type(ensure) == "function"
+            and not (frame and frame.IsShown and frame:IsShown()) then
+            ensure(self)
+        end
+    end
+end
+
 function MR:OnEnteringWorld()
     local _, classFile = UnitClass("player")
     if classFile then
@@ -27,6 +48,8 @@ function MR:OnEnteringWorld()
     local managedBundleVisible = not self:IsManagedWindowsBundleHidden()
     local trackingSurfaceRequested = managedBundleVisible and (
         self.db.char.panelOpen ~= false
+        or self:GetManagedWindowOpen("renownOpen")
+        or self:GetManagedWindowOpen("raresOpen")
         or self:GetManagedWindowOpen("gatheringLocOpen")
         or self:GetManagedWindowOpen("concentrationTrackerOpen")
     )
@@ -115,6 +138,7 @@ function MR:OnEnteringWorld()
         elseif self.RefreshGatheringLocationsFrame then
             self:RefreshGatheringLocationsFrame()
         end
+        self:RestoreSavedManagedWindows()
     end, 0.5)
     self:RequestScan(1.0)
 end
@@ -175,6 +199,18 @@ end
 
 function MR:OnAreaPoisUpdated()
     self:RefreshModuleScans({ "delves", "s1_weekly" }, true)
+end
+
+function MR:OnRareProgressChanged()
+    if not (self.raresFrame and self.raresFrame.IsShown and self.raresFrame:IsShown()) then
+        return
+    end
+    if self.SyncAllRareKills then
+        self:SyncAllRareKills()
+    end
+    if self.RefreshRares then
+        self:RefreshRares()
+    end
 end
 
 function MR:OnQuestTurnedIn(_, questID)
@@ -363,4 +399,13 @@ function MR:OnBossKill(_, bossId, bossName)
         self:RequestDataRefresh()
     end
 end
+
+local managedWindowRestoreFrame = CreateFrame("Frame")
+managedWindowRestoreFrame:RegisterEvent("PLAYER_LOGIN")
+managedWindowRestoreFrame:SetScript("OnEvent", function(self)
+    self:UnregisterEvent("PLAYER_LOGIN")
+    C_Timer.After(0, function()
+        MR:RestoreSavedManagedWindows()
+    end)
+end)
 

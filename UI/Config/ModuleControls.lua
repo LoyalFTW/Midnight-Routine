@@ -78,6 +78,8 @@ local function CreateGrip(parent, height, enabled, onStart, onCommit)
     return grip
 end
 
+Config.CreateGrip = CreateGrip
+
 local function CreateExpandButton(parent, expanded, onToggle)
     local isExpanded = expanded == true
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
