@@ -19,7 +19,10 @@ local PROFESSIONS = {
             T{ itemID = 238537, questID = 89116, kp = 3, zone = 2536, x = 49.1, y = 23.1 }, T{ itemID = 238534, questID = 89113, kp = 3, zone = 2413, x = 34.7, y = 24.7 },
             T{ itemID = 238533, questID = 89112, kp = 3, zone = 2444, x = 41.8, y = 40.5 }, T{ itemID = 238539, questID = 89118, kp = 3, zone = 2405, x = 32.8, y = 43.3 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 262645, questID = 93794, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 262645, questID = 93794, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274500, questID = 96459, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245755, questID = 95127, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "alch_treatise", mainMenuLabel = L["Alch_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263454, questID = 93690, kp = 1, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "alch_notebook", mainMenuLabel = L["Alch_Quest"], mainMenuOrder = 1 },
@@ -34,7 +37,10 @@ local PROFESSIONS = {
             T{ itemID = 238541, questID = 89178, kp = 3, zone = 2395, x = 48.3, y = 75.7 }, T{ itemID = 238542, questID = 89179, kp = 3, zone = 2536, x = 33.2, y = 65.8 },
             T{ itemID = 238545, questID = 89182, kp = 3, zone = 2413, x = 66.3, y = 50.8 }, T{ itemID = 238544, questID = 89181, kp = 3, zone = 2444, x = 30.6, y = 68.9 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 262644, questID = 93795, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 262644, questID = 93795, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274515, questID = 96511, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245763, questID = 95128, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "bs_treatise", mainMenuLabel = L["BS_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263455, questID = 93691, kp = 2, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "bs_notebook", mainMenuLabel = L["BS_Quest"], mainMenuOrder = 1 },
@@ -52,6 +58,7 @@ local PROFESSIONS = {
         { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
             S{ itemID = 257600, questID = 92374, kp = 10, zone = 2395, x = 43.4, y = 47.4, note = L["ProfKnowledge_StudyUnlock"] },
             S{ itemID = 250445, questID = 92186, kp = 10, zone = 2437, x = 31.6, y = 26.3, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274511, questID = 96512, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
         } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245759, questID = 95129, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "ench_treatise", mainMenuLabel = L["Ench_Treatise"], mainMenuOrder = 5 },
@@ -69,7 +76,10 @@ local PROFESSIONS = {
             T{ itemID = 238563, questID = 89140, kp = 3, zone = 2437, x = 34.2, y = 87.9 }, T{ itemID = 238559, questID = 89136, kp = 3, zone = 2413, x = 67.9, y = 49.8 },
             T{ itemID = 238560, questID = 89137, kp = 3, zone = 2444, x = 54.0, y = 51.0 }, T{ itemID = 238557, questID = 89134, kp = 3, zone = 2444, x = 29.0, y = 39.2 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 262646, questID = 93796, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 262646, questID = 93796, kp = 10, zone = 2405, x = 52.6, y = 72.9, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274516, questID = 96513, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245809, questID = 95138, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "eng_treatise", mainMenuLabel = L["Eng_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263456, questID = 93692, kp = 1, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "eng_notebook", mainMenuLabel = L["Eng_Quest"], mainMenuOrder = 1 },
@@ -87,6 +97,7 @@ local PROFESSIONS = {
         { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
             S{ itemID = 258410, questID = 93411, kp = 10, zone = 2413, x = 51.0, y = 50.8, note = L["ProfKnowledge_StudyUnlock"] },
             S{ itemID = 250443, questID = 92174, kp = 10, zone = 2437, x = 31.6, y = 26.3, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274513, questID = 96514, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
         } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245761, questID = 95130, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "herb_treatise", mainMenuLabel = L["Herb_Treatise"], mainMenuOrder = 4 },
@@ -103,7 +114,10 @@ local PROFESSIONS = {
             T{ itemID = 238573, questID = 89068, kp = 3, zone = 2437, x = 40.5, y = 49.4 }, T{ itemID = 238575, questID = 89070, kp = 3, zone = 2413, x = 52.4, y = 52.6 },
             T{ itemID = 238576, questID = 89071, kp = 3, zone = 2413, x = 52.7, y = 50.0 }, T{ itemID = 238572, questID = 89067, kp = 3, zone = 2444, x = 60.7, y = 84.1 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 258411, questID = 93412, kp = 10, zone = 2413, x = 51.0, y = 50.8, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 258411, questID = 93412, kp = 10, zone = 2413, x = 51.0, y = 50.8, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274514, questID = 96515, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245757, questID = 95131, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "insc_treatise", mainMenuLabel = L["Insc_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263457, questID = 93693, kp = 4, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "insc_notebook", mainMenuLabel = L["Insc_Quest"], mainMenuOrder = 1 },
@@ -118,7 +132,10 @@ local PROFESSIONS = {
             T{ itemID = 238587, questID = 89129, kp = 3, zone = 2395, x = 39.7, y = 38.8 }, T{ itemID = 238581, questID = 89123, kp = 3, zone = 2444, x = 30.6, y = 69.0 },
             T{ itemID = 238586, questID = 89128, kp = 3, zone = 2444, x = 54.2, y = 51.2 }, T{ itemID = 238584, questID = 89126, kp = 3, zone = 2444, x = 62.9, y = 53.5 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 257599, questID = 93222, kp = 10, zone = 2395, x = 43.4, y = 47.4, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 257599, questID = 93222, kp = 10, zone = 2395, x = 43.4, y = 47.4, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274510, questID = 96516, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245760, questID = 95133, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "jc_treatise", mainMenuLabel = L["JC_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263458, questID = 93694, kp = 3, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "jc_notebook", mainMenuLabel = L["JC_Quest"], mainMenuOrder = 1 },
@@ -133,7 +150,10 @@ local PROFESSIONS = {
             T{ itemID = 238589, questID = 89090, kp = 3, zone = 2405, x = 34.8, y = 56.9 }, T{ itemID = 238593, questID = 89094, kp = 3, zone = 2413, x = 51.8, y = 51.3 },
             T{ itemID = 238594, questID = 89095, kp = 3, zone = 2413, x = 36.1, y = 25.2 }, T{ itemID = 238592, questID = 89093, kp = 3, zone = 2444, x = 53.8, y = 51.6 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 250922, questID = 92371, kp = 10, zone = 2437, x = 45.8, y = 65.8, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 250922, questID = 92371, kp = 10, zone = 2437, x = 45.8, y = 65.8, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274507, questID = 96517, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245758, questID = 95134, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "lw_treatise", mainMenuLabel = L["LW_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263459, questID = 93695, kp = 2, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "lw_notebook", mainMenuLabel = L["LW_Quest"], mainMenuOrder = 1 },
@@ -151,6 +171,7 @@ local PROFESSIONS = {
         { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
             S{ itemID = 250924, questID = 92372, kp = 10, zone = 2437, x = 45.8, y = 65.8, note = L["ProfKnowledge_StudyUnlock"] },
             S{ itemID = 250444, questID = 92187, kp = 10, zone = 2437, x = 31.6, y = 26.3, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274509, questID = 96518, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
         } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245762, questID = 95135, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "mine_treatise", mainMenuLabel = L["Mine_Treatise"], mainMenuOrder = 4 },
@@ -170,6 +191,7 @@ local PROFESSIONS = {
         { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
             S{ itemID = 250923, questID = 92373, kp = 10, zone = 2437, x = 45.8, y = 65.8, note = L["ProfKnowledge_StudyUnlock"] },
             S{ itemID = 250360, questID = 92188, kp = 10, zone = 2437, x = 31.6, y = 26.3, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274508, questID = 96519, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
         } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245828, questID = 95136, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "skin_treatise", mainMenuLabel = L["Skin_Treatise"], mainMenuOrder = 4 },
@@ -193,7 +215,10 @@ local PROFESSIONS = {
             T{ itemID = 238612, questID = 89078, kp = 3, zone = 2413, x = 70.5, y = 50.8 }, T{ itemID = 238615, questID = 89081, kp = 3, zone = 2413, x = 69.8, y = 51.0 },
             T{ itemID = 238616, questID = 89082, kp = 3, zone = 2444, x = 61.9, y = 83.7 }, T{ itemID = 238617, questID = 89083, kp = 3, zone = 2444, x = 61.4, y = 85.0 },
         } },
-        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = { S{ itemID = 257601, questID = 93201, kp = 10, zone = 2395, x = 43.4, y = 47.4, note = L["ProfKnowledge_StudyUnlock"] } } },
+        { key = "studies", label = L["ProfKnowledge_Section_Studies"], entries = {
+            S{ itemID = 257601, questID = 93201, kp = 10, zone = 2395, x = 43.4, y = 47.4, note = L["ProfKnowledge_StudyUnlock"] },
+            S{ itemID = 274512, questID = 96520, kp = 10, zone = 2512, x = 58.6, y = 46.0, note = L["ProfKnowledge_ZuljarraBookNote"] },
+        } },
         { key = "weekly", label = L["ProfKnowledge_Section_Weekly"], entries = {
             WQ{ itemID = 245756, questID = 95137, kp = 1, zone = 2393, x = 45.0, y = 55.6, note = L["ProfKnowledge_TreatiseNote"], rowKey = "tail_treatise", mainMenuLabel = L["Tail_Treatise"], mainMenuOrder = 3 },
             WQ{ itemID = 263460, questID = 93696, kp = 2, zone = 2393, x = 45.0, y = 55.2, note = L["ProfKnowledge_ServiceQuest"], rowKey = "tail_notebook", mainMenuLabel = L["Tail_Quest"], mainMenuOrder = 1 },

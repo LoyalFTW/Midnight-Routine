@@ -214,7 +214,6 @@ MR.patches = {
         label = L["Patch_1210"] or "12.1 Curse of Ula'tek",
         shortLabel = "12.1",
         order = 120100,
-        minInterface = 120100,
     },
 }
 
