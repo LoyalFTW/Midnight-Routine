@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120007, 120100
 ## Title: |cff2ae7c6Midnight|r Routine
 ## Notes: Auto-tracking quest log style todo list for Midnight
 ## Notes-zhCN: 自动追踪至暗之夜任务进度及其他待办日志
