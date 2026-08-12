@@ -565,6 +565,18 @@ function MR:SetManagedWindowOpen(key, value)
     local newValue = value and true or false
     local oldValue = self:GetWindowLayoutValue(key) == true
     self:SetWindowLayoutValue(key, newValue)
+    if self._instanceFramesHidden then
+        local stateKey = ({
+            renownOpen = "renown",
+            raresOpen = "rares",
+            gatheringLocOpen = "gathering",
+            concentrationTrackerOpen = "concentration",
+        })[key]
+        if stateKey then
+            self._instanceRestoreState = self._instanceRestoreState or {}
+            self._instanceRestoreState[stateKey] = newValue
+        end
+    end
 
     if oldValue ~= newValue then
         if self.RequestConfigRepopulate then

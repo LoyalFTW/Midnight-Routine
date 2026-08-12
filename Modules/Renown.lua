@@ -1571,6 +1571,11 @@ function MR:ToggleRenown()
     if renownFrame and renownFrame:IsShown() then
         self:HideRenown()
     else
+        if self.ClearManagedWindowsBundleHidden then self:ClearManagedWindowsBundleHidden() end
+        if self._instanceFramesHidden then
+            if self.SetManagedWindowOpen then self:SetManagedWindowOpen("renownOpen", true) end
+            return
+        end
         if not renownFrame or renownFrame.layoutKey ~= GetRenownLayoutKey() then
             RebuildRenownFrame()
         end
@@ -1590,6 +1595,10 @@ function MR:HideRenown(persistState)
 end
 
 function MR:EnsureRenownShown()
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then self:SetManagedWindowOpen("renownOpen", true) end
+        return
+    end
     if not renownFrame or renownFrame.layoutKey ~= GetRenownLayoutKey() then
         RebuildRenownFrame()
     end

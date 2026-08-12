@@ -8,6 +8,18 @@ local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 
+local function CanImportLegacyCustomTaskProgress(self, rowKey)
+    local taskId = type(rowKey) == "string" and tonumber(rowKey:match("^shared_task_(%d+)")) or nil
+    local task = taskId and self.GetCustomTaskById and self:GetCustomTaskById(taskId, "shared") or nil
+    if not task then
+        return false
+    end
+
+    local region = (GetCurrentRegion and GetCurrentRegion()) or 1
+    local stampPrefix = task.resetType == "daily" and "lastCustomTaskDailyResetAt_" or "lastCustomTaskWeeklyResetAt_"
+    return not (self.db and self.db.global and tonumber(self.db.global[stampPrefix .. tostring(region)]))
+end
+
 function MR:GetProgress(moduleKey, rowKey)
     if moduleKey == "custom_tasks" and self.IsCustomTaskAccountWideCompletion and self:IsCustomTaskAccountWideCompletion(rowKey) then
         local progress = self.db and self.db.global and self.db.global.customTaskProgress
@@ -17,10 +29,14 @@ function MR:GetProgress(moduleKey, rowKey)
         end
 
         local taskId = type(rowKey) == "string" and rowKey:match("^shared_task_(%d+)")
-        local legacyKey = taskId and ("task_" .. taskId) or nil
+        local legacyKey = taskId and CanImportLegacyCustomTaskProgress(self, rowKey) and ("task_" .. taskId) or nil
         local legacyValue = legacyKey and m and m[legacyKey] or nil
         if legacyValue ~= nil then
             return legacyValue
+        end
+
+        if not CanImportLegacyCustomTaskProgress(self, rowKey) then
+            return 0
         end
 
         local source = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil
@@ -311,10 +327,14 @@ function MR:GetManualOverride(modKey, rowKey)
         end
 
         local taskId = type(rowKey) == "string" and rowKey:match("^shared_task_(%d+)")
-        local legacyKey = taskId and ("task_" .. taskId) or nil
+        local legacyKey = taskId and CanImportLegacyCustomTaskProgress(self, rowKey) and ("task_" .. taskId) or nil
         local legacyValue = legacyKey and modOverrides and modOverrides[legacyKey] or nil
         if legacyValue ~= nil then
             return legacyValue
+        end
+
+        if not CanImportLegacyCustomTaskProgress(self, rowKey) then
+            return 0
         end
 
         local source = self.GetMainFrameProgressSource and self:GetMainFrameProgressSource() or nil

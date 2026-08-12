@@ -254,51 +254,37 @@ function MR:PopulateConfigFrame(f)
     if activePage == "windows" then
         SectionLabel(L["Title"])
         Checkbox(L["Config_ShowMainFrame"],
-            function() return MR.frame and MR.frame:IsShown() or false end,
+            function() return MR:GetMainPanelOpen() end,
             function(v)
                 if v then
-                    if not MR.frame then
-                        MR:BuildUI()
-                    elseif not MR.frame:IsShown() then
-                        MR.frame:Show()
-                    end
-                    MR:SetMainPanelOpen(true, true)
-                    if MR.ClearManagedWindowsBundleHidden then
-                        MR:ClearManagedWindowsBundleHidden()
-                    end
+                    MR:ShowMainPanel(true)
                 else
-                    if MR.frame then
-                        MR.frame:Hide()
-                    end
-                    MR:SetMainPanelOpen(false, true)
+                    MR:HideMainPanel(true)
                 end
             end, "#2ae7c6")
 
         Checkbox(L["Config_OpenRenown"],
             function() return MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("renownOpen") end,
             function(v)
-                if MR.SetManagedWindowOpen then
-                    MR:SetManagedWindowOpen("renownOpen", v)
-                end
-                if MR.ToggleRenown then MR:ToggleRenown() end
+                if v and MR.ClearManagedWindowsBundleHidden then MR:ClearManagedWindowsBundleHidden() end
+                if v and MR.EnsureRenownShown then MR:EnsureRenownShown()
+                elseif not v and MR.HideRenown then MR:HideRenown() end
             end, "#d9b82e")
 
         Checkbox(L["Config_OpenRares"],
             function() return MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("raresOpen") end,
             function(v)
-                if MR.SetManagedWindowOpen then
-                    MR:SetManagedWindowOpen("raresOpen", v)
-                end
-                if MR.ToggleRares then MR:ToggleRares() end
+                if v and MR.ClearManagedWindowsBundleHidden then MR:ClearManagedWindowsBundleHidden() end
+                if v and MR.EnsureRaresShown then MR:EnsureRaresShown()
+                elseif not v and MR.HideRares then MR:HideRares() end
             end, "#e05050")
 
         Checkbox(L["Profession_Knowledge"],
             function() return MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("gatheringLocOpen") end,
             function(v)
-                if MR.SetManagedWindowOpen then
-                    MR:SetManagedWindowOpen("gatheringLocOpen", v)
-                end
-                if MR.ToggleGatheringLocations then MR:ToggleGatheringLocations() end
+                if v and MR.ClearManagedWindowsBundleHidden then MR:ClearManagedWindowsBundleHidden() end
+                if v and MR.EnsureGatheringLocationsShown then MR:EnsureGatheringLocationsShown()
+                elseif not v and MR.HideGatheringLocations then MR:HideGatheringLocations() end
             end, "#c9853f")
 
         Gap(4); Divider()
@@ -339,7 +325,7 @@ function MR:PopulateConfigFrame(f)
             function() return MR.db.profile.locked end,
             function(v)
                 MR.db.profile.locked = v
-                MR.frame:SetMovable(not v)
+                if MR.frame then MR.frame:SetMovable(not v) end
             end)
         Checkbox(L["Config_HideMinimap"],
             function() return MR.db.profile.minimap and MR.db.profile.minimap.hide or false end,

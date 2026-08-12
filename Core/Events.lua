@@ -39,15 +39,11 @@ function MR:OnEnteringWorld()
     self.db.char.lastSyncAt = GetServerTime()
     self:RebuildTurnInCompletions()
     local temporarilyHidden = self._toggleRestoreState ~= nil
-
-    if not self.db.profile.firstSeen and not self.db.char.panelOpenUserSet then
-        self:SetMainPanelOpen(false, false)
-        self:SetManagedWindowOpen("renownOpen", false)
-    end
+    local mainPanelOpen = self:GetMainPanelOpen()
 
     local managedBundleVisible = not self:IsManagedWindowsBundleHidden()
     local trackingSurfaceRequested = managedBundleVisible and (
-        self.db.char.panelOpen ~= false
+        mainPanelOpen
         or self:GetManagedWindowOpen("renownOpen")
         or self:GetManagedWindowOpen("raresOpen")
         or self:GetManagedWindowOpen("gatheringLocOpen")
@@ -63,11 +59,11 @@ function MR:OnEnteringWorld()
     local shouldHideFrames = self:ShouldHideFramesInCurrentInstance()
 
     if not shouldHideFrames then
-        local shouldBuildMainFrame = self.db.char.panelOpen ~= false
+        local shouldBuildMainFrame = mainPanelOpen
         if shouldBuildMainFrame and not self.frame then
             self:BuildUI()
         end
-        if self.frame and self.db.char.panelOpen == false then
+        if self.frame and not mainPanelOpen then
             self.frame:Hide()
         end
     end
@@ -174,6 +170,7 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
 end
 
 function MR:OnQuestDataChanged()
+    self:OnRareProgressChanged()
     if not self:HasVisibleMainTrackingSurface() then
         self:MarkBackgroundDataDirty()
         return

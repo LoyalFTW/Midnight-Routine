@@ -521,11 +521,49 @@ function MR:ManagedWindowStateHasVisibleFrames(state)
 end
 
 function MR:SetMainPanelOpen(open, userSet)
-    if not (self.db and self.db.char) then return end
-    self.db.char.panelOpen = open and true or false
-    if userSet then
-        self.db.char.panelOpenUserSet = true
+    if not self.db then return end
+    self:SetWindowLayoutValue("panelOpen", open and true or false)
+    if self._instanceFramesHidden then
+        self._instanceRestoreState = self._instanceRestoreState or {}
+        self._instanceRestoreState.panel = open and true or false
     end
+end
+
+function MR:GetMainPanelOpen()
+    if not self.db then return true end
+    return self:GetWindowLayoutValue("panelOpen") ~= false
+end
+
+function MR:ShowMainPanel(userSet)
+    self:SetMainPanelOpen(true, userSet ~= false)
+    self:ClearManagedWindowsBundleHidden()
+    if self._instanceFramesHidden then
+        return false
+    end
+    if not self.frame and self.BuildUI then
+        self:BuildUI()
+    elseif self.frame then
+        self.frame:Show()
+    end
+    return self.frame and self.frame:IsShown() or false
+end
+
+function MR:HideMainPanel(userSet)
+    if self.HideCurrencyBrowserFrame then
+        self:HideCurrencyBrowserFrame()
+    end
+    if self.frame then
+        self.frame:Hide()
+    end
+    self:SetMainPanelOpen(false, userSet ~= false)
+end
+
+function MR:ToggleMainPanel()
+    if self.frame and self.frame:IsShown() then
+        self:HideMainPanel(true)
+        return false
+    end
+    return self:ShowMainPanel(true)
 end
 
 function MR:PersistManagedWindowState(state)
@@ -561,13 +599,6 @@ end
 
 function MR:HideManagedWindows(persistState)
     if persistState then
-        self:PersistManagedWindowState({
-            panel = false,
-            renown = false,
-            rares = false,
-            gathering = false,
-            concentration = false,
-        })
         if self.db.profile.rememberManagedWindowsVisibility then
             self.db.profile.managedWindowsBundleHidden = true
         end
@@ -627,6 +658,14 @@ function MR:ToggleManagedWindows()
         return false
     end
 
+    local state = self:CaptureManagedWindowState()
+    if self:ManagedWindowStateHasVisibleFrames(state) then
+        self._toggleRestoreState = state
+        self:SetManagedWindowRestoreState(state)
+        self:HideManagedWindows(true)
+        return false
+    end
+
     local restoreState = self._toggleRestoreState
         or (self.db and self.db.profile and self.db.profile.managedWindowRestoreState)
 
@@ -637,23 +676,7 @@ function MR:ToggleManagedWindows()
         return true
     end
 
-    local state = self:CaptureManagedWindowState()
-    if self:ManagedWindowStateHasVisibleFrames(state) then
-        self._toggleRestoreState = state
-        self:SetManagedWindowRestoreState(state)
-        self:HideManagedWindows(true)
-        return false
-    end
-
-    if not self.frame and self.BuildUI then
-        self:BuildUI()
-    end
-    if self.frame then
-        self.frame:Show()
-    end
-    self:SetMainPanelOpen(true, true)
-    self:ClearManagedWindowsBundleHidden()
-    return true
+    return self:ShowMainPanel(true)
 end
 
 function MR:UpdateInstanceFrameVisibility()
@@ -718,8 +741,6 @@ function MR:OnEnable()
     }, 2, "OnQuestDataChanged")
 
     self:RegisterBucketEvent({
-        "QUEST_LOG_UPDATE",
-        "UNIT_QUEST_LOG_CHANGED",
         "CRITERIA_UPDATE",
         "ACHIEVEMENT_EARNED",
     }, 0.25, "OnRareProgressChanged")
@@ -748,7 +769,6 @@ function MR:OnEnable()
 
     self:RegisterEvent("ENCOUNTER_END",            "OnEncounterEnd")
     self:RegisterEvent("BOSS_KILL",                "OnBossKill")
-    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnRareCombatLog")
     self:RegisterEvent("CURRENCY_DISPLAY_UPDATE",  "OnCurrencyDisplayUpdate")
     self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnedIn")
     self:RegisterEvent("QUEST_ACCEPTED",           "OnQuestAccepted")

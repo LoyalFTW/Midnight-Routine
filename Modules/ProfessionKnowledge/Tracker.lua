@@ -3164,6 +3164,10 @@ function MR:ToggleGatheringLocationsConfig()
 end
 
 local function ToggleGatheringLocations()
+    if MR._instanceFramesHidden then
+        if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", true) end
+        return
+    end
     if not gatheringLocationsFrame then
         gatheringLocationsFrame = BuildGatheringLocationsFrame()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", true) end
@@ -3171,6 +3175,7 @@ local function ToggleGatheringLocations()
         gatheringLocationsFrame:Hide()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", false) end
     else
+        if MR.ClearManagedWindowsBundleHidden then MR:ClearManagedWindowsBundleHidden() end
         gatheringLocationsFrame:RefreshContent()
         gatheringLocationsFrame:Show()
         if MR.SetManagedWindowOpen then MR:SetManagedWindowOpen("gatheringLocOpen", true) end
@@ -3180,6 +3185,11 @@ end
 MR.ToggleGatheringLocations = ToggleGatheringLocations
 
 function MR:ShowGatheringLocations()
+    if self.ClearManagedWindowsBundleHidden then self:ClearManagedWindowsBundleHidden() end
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then self:SetManagedWindowOpen("gatheringLocOpen", true) end
+        return
+    end
     if not gatheringLocationsFrame then
         gatheringLocationsFrame = BuildGatheringLocationsFrame()
     else
@@ -3190,6 +3200,10 @@ function MR:ShowGatheringLocations()
 end
 
 function MR:EnsureGatheringLocationsShown()
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then self:SetManagedWindowOpen("gatheringLocOpen", true) end
+        return
+    end
     if not gatheringLocationsFrame then
         gatheringLocationsFrame = BuildGatheringLocationsFrame()
     else

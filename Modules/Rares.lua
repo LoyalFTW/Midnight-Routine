@@ -1656,6 +1656,11 @@ function MR:ToggleRares()
     if raresFrame and raresFrame:IsShown() then
         self:HideRares()
     else
+        if self.ClearManagedWindowsBundleHidden then self:ClearManagedWindowsBundleHidden() end
+        if self._instanceFramesHidden then
+            if self.SetManagedWindowOpen then self:SetManagedWindowOpen("raresOpen", true) end
+            return
+        end
         if not raresFrame or raresFrame.layoutKey ~= GetRaresLayoutKey() then
             RebuildRaresFrame()
         end
@@ -1679,6 +1684,10 @@ function MR:HideRares(persistState)
 end
 
 function MR:EnsureRaresShown()
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then self:SetManagedWindowOpen("raresOpen", true) end
+        return
+    end
     if MR.db and MR.db.profile.raresCollapsed then
         for k, v in pairs(MR.db.profile.raresCollapsed) do collapsed[k] = v end
     end

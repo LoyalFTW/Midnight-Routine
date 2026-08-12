@@ -69,6 +69,9 @@ function MR:RegisterBucketEvent(events, interval, callback)
         end,
     })
 
+    if not bucket then
+        return nil
+    end
     self._buckets[bucket] = true
     return bucket
 end

@@ -4,13 +4,6 @@ local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 
 local DAY_SECONDS = 24 * 60 * 60
 local WEEK_SECONDS = 7 * DAY_SECONDS
-local WEEKLY_RESET_SCHEDULE = {
-    [1] = { weekday = 3, hour = 3 },
-    [2] = { weekday = 4, hour = 3 },
-    [3] = { weekday = 3, hour = 3 },
-    [4] = { weekday = 4, hour = 3 },
-    [5] = { weekday = 4, hour = 3 },
-}
 
 local function GetResetTimestampFromCountdown(secondsUntilReset, cycleSeconds)
     if type(secondsUntilReset) ~= "number" then
@@ -18,7 +11,7 @@ local function GetResetTimestampFromCountdown(secondsUntilReset, cycleSeconds)
     end
 
     secondsUntilReset = math.floor(secondsUntilReset)
-    if secondsUntilReset < 0 then
+    if secondsUntilReset <= 0 then
         return nil
     end
 
@@ -27,7 +20,13 @@ local function GetResetTimestampFromCountdown(secondsUntilReset, cycleSeconds)
         return nil
     end
 
-    return GetServerTime() + secondsUntilReset - cycleSeconds
+    local now = GetServerTime()
+    local resetAt = now + secondsUntilReset - cycleSeconds
+    if resetAt > now then
+        return nil
+    end
+
+    return resetAt
 end
 
 function MR:GetLastDailyTimestamp()
@@ -38,21 +37,7 @@ function MR:GetLastDailyTimestamp()
         end
     end
 
-    local region    = GetCurrentRegion() or 1
-    local resetInfo = WEEKLY_RESET_SCHEDULE[region]
-    local resetHour = resetInfo and resetInfo.hour or 0
-
-    local cal = C_DateAndTime.GetCurrentCalendarTime()
-    if not cal then return nil end
-    local now = GetServerTime()
-    local secondsSinceMidnight = (cal.hour * 3600) + (cal.minute * 60) + (cal.second or 0)
-    local todayReset = now - secondsSinceMidnight + (resetHour * 3600)
-
-    if todayReset > now then
-        todayReset = todayReset - DAY_SECONDS
-    end
-
-    return todayReset
+    return nil
 end
 
 function MR:CheckDailyReset()
@@ -60,7 +45,7 @@ function MR:CheckDailyReset()
     if not lastDailyAt then return end
     local prevDailyAt = self.db.char.lastDailyAt
     if not prevDailyAt or prevDailyAt == 0 then
-        self.db.char.lastDailyAt = lastDailyAt
+        self:DoDailyReset()
         return
     end
     if lastDailyAt > prevDailyAt + 300 then
@@ -78,6 +63,9 @@ function MR:DoDailyReset()
 
     local ts = self:GetLastDailyTimestamp()
     if ts then self.db.char.lastDailyAt = ts end
+
+    self._scanSuppressedUntil = math.max(self._scanSuppressedUntil or 0, GetTime() + 15)
+
     for _, mod in ipairs(self.modules) do
         if mod.resetType == "daily" then
             self.db.char.progress[mod.key] = {}
@@ -90,6 +78,7 @@ function MR:DoDailyReset()
         self:ResetCustomTasksByType("daily")
     end
     self:RefreshUI()
+    self:RequestScan(20)
 end
 
 function MR:GetLastResetTimestamp()
@@ -100,22 +89,7 @@ function MR:GetLastResetTimestamp()
         end
     end
 
-    local region    = GetCurrentRegion() or 1
-    local resetInfo = WEEKLY_RESET_SCHEDULE[region]
-    if not resetInfo then return nil end
-
-    local cal = C_DateAndTime.GetCurrentCalendarTime()
-    if not cal then return nil end
-
-    local now                 = GetServerTime()
-    local secondsSinceMidnight = (cal.hour * 3600) + (cal.minute * 60) + (cal.second or 0)
-    local todayReset          = now - secondsSinceMidnight + (resetInfo.hour * 3600)
-    local diffDays            = ((cal.weekday - resetInfo.weekday) + 7) % 7
-    local candidate           = todayReset - (diffDays * 24 * 3600)
-
-    if candidate > now then candidate = candidate - (7 * 24 * 3600) end
-
-    return candidate
+    return nil
 end
 
 function MR:GetCurrentWeekKey()
@@ -128,8 +102,8 @@ function MR:CheckWeeklyReset()
 
     local prevResetAt = self.db.char.lastResetAt
 
-    if not prevResetAt then
-        self.db.char.lastResetAt = lastResetAt
+    if not prevResetAt or prevResetAt == 0 then
+        self:DoWeeklyReset()
         return
     end
 
@@ -149,7 +123,7 @@ function MR:DoWeeklyReset()
     local ts = self:GetLastResetTimestamp()
     if ts then self.db.char.lastResetAt = ts end
 
-    self._scanSuppressedUntil = GetTime() + 15
+    self._scanSuppressedUntil = math.max(self._scanSuppressedUntil or 0, GetTime() + 15)
 
     for _, mod in ipairs(self.modules) do
         if mod.resetType == "weekly" then

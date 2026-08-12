@@ -617,11 +617,7 @@ function MR:BuildUI()
     )
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -BTN_MARGIN, 0)
     closeBtn:SetScript("OnClick", function()
-        if MR.HideCurrencyBrowserFrame then
-            MR:HideCurrencyBrowserFrame()
-        end
-        f:Hide()
-        MR.db.char.panelOpen = false
+        MR:HideMainPanel(true)
     end)
     self.closeBtn = closeBtn
 

@@ -141,6 +141,16 @@ function MR:ToggleConcentrationTracker()
         return
     end
 
+    if self.ClearManagedWindowsBundleHidden then
+        self:ClearManagedWindowsBundleHidden()
+    end
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then
+            self:SetManagedWindowOpen("concentrationTrackerOpen", true)
+        end
+        return
+    end
+
     if not self.concentrationTrackerFrame then
         local frame = StyledFrame(UIParent, nil, "DIALOG", 35)
         local savedSize = GetWindowLayoutValue("concentrationTrackerSize")
@@ -360,6 +370,12 @@ function MR:HideConcentrationTracker(persistState)
 end
 
 function MR:EnsureConcentrationTrackerShown()
+    if self._instanceFramesHidden then
+        if self.SetManagedWindowOpen then
+            self:SetManagedWindowOpen("concentrationTrackerOpen", true)
+        end
+        return
+    end
     if not (self.concentrationTrackerFrame and self.concentrationTrackerFrame:IsShown()) then
         self:ToggleConcentrationTracker()
         return

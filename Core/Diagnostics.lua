@@ -91,6 +91,38 @@ function MR:RunSelfTest()
         return true
     end)
 
+    run("Daily and weekly reset boundaries", function()
+        local now = GetServerTime()
+        local dailyAt = self:GetLastDailyTimestamp()
+        local weeklyAt = self:GetLastResetTimestamp()
+        if type(dailyAt) ~= "number" or dailyAt > now or dailyAt < now - 86400 - 7200 then
+            return false, "daily reset boundary is outside the expected cycle"
+        end
+        if type(weeklyAt) ~= "number" or weeklyAt > now or weeklyAt < now - 604800 - 7200 then
+            return false, "weekly reset boundary is outside the expected cycle"
+        end
+        return true
+    end)
+
+    run("Window visibility controls", function()
+        local required = {
+            "ShowMainPanel",
+            "HideMainPanel",
+            "ToggleMainPanel",
+            "ToggleManagedWindows",
+            "EnsureRenownShown",
+            "EnsureRaresShown",
+            "EnsureGatheringLocationsShown",
+            "EnsureConcentrationTrackerShown",
+        }
+        for _, name in ipairs(required) do
+            if type(self[name]) ~= "function" then
+                return false, name .. " is unavailable"
+            end
+        end
+        return true
+    end)
+
     run("Modules registered", function()
         local count = #self.modules
         if count == 0 then return false, "no modules registered" end
@@ -328,41 +360,17 @@ SlashCmdList["MIDROUTE"] = function(msg)
         if MR.frame then MR.frame:SetMovable(true) end
         print(L["Frame_Unlocked"])
     elseif msg == "hide" then
-        if MR.frame then MR.frame:Hide() end
-        MR:SetMainPanelOpen(false, true)
+        MR:HideMainPanel(true)
     elseif msg == "show" then
-        if not MR.frame and MR.BuildUI then
-            MR:BuildUI()
-        end
-        if MR.frame then MR.frame:Show() end
-        MR:SetMainPanelOpen(true, true)
-        MR:ClearManagedWindowsBundleHidden()
+        MR:ShowMainPanel(true)
     elseif msg == "toggle" then
         MR:ToggleManagedWindows()
     elseif msg == "main" or msg == "main toggle" then
-        if not MR.frame and MR.BuildUI then
-            MR:BuildUI()
-        end
-        if MR.frame then
-            if MR.frame:IsShown() then
-                MR.frame:Hide()
-                MR:SetMainPanelOpen(false, true)
-            else
-                MR.frame:Show()
-                MR:SetMainPanelOpen(true, true)
-                MR:ClearManagedWindowsBundleHidden()
-            end
-        end
+        MR:ToggleMainPanel()
     elseif msg == "main show" then
-        if not MR.frame and MR.BuildUI then
-            MR:BuildUI()
-        end
-        if MR.frame then MR.frame:Show() end
-        MR:SetMainPanelOpen(true, true)
-        MR:ClearManagedWindowsBundleHidden()
+        MR:ShowMainPanel(true)
     elseif msg == "main hide" then
-        if MR.frame then MR.frame:Hide() end
-        MR:SetMainPanelOpen(false, true)
+        MR:HideMainPanel(true)
     elseif msg == "minimap" then
         local newHide = not (MR.db.profile.minimap and MR.db.profile.minimap.hide)
         MR:SetMinimapHidden(newHide)
