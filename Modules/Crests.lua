@@ -1,7 +1,6 @@
 local _, ns = ...
 local MR = ns.MR
 
-local CREST_CAP = 100
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local crestRows
 local defaultCrestRows
@@ -29,6 +28,18 @@ local function CurrencyLabel(currencyID, fallback, color)
     local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(currencyID)
     local currencyName = info and info.name
     return string.format("|cff%s%s:|r", color or "e8c96e", currencyName or fallback or ("Currency " .. tostring(currencyID)))
+end
+
+local function IsCurrencyDiscovered(currencyID)
+    local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(currencyID)
+    if not info then
+        return false
+    end
+
+    return info.discovered == true
+        or (tonumber(info.quantity) or 0) > 0
+        or (tonumber(info.quantityEarnedThisWeek) or 0) > 0
+        or (tonumber(info.totalEarned) or 0) > 0
 end
 
 local function RefreshCrestItemLabels()
@@ -158,6 +169,10 @@ function MR:RefreshCurrenciesModule(refreshUI)
     wipe(crestRows)
 
     for _, row in ipairs(defaultCrestRows or {}) do
+        if row.currencyId and custom and custom[row.currencyId] then
+            custom[row.currencyId] = nil
+            RemoveCurrencyProgress(row.currencyId, "custom_currency_" .. tostring(row.currencyId))
+        end
         if not (row.currencyId and hiddenDefaults and hiddenDefaults[row.currencyId]) then
             crestRows[#crestRows + 1] = CopyDefaultCurrencyRow(row)
         end
@@ -278,35 +293,39 @@ end
 
 defaultCrestRows = {
     {
-        key = "crest_adventurer",
-        currencyId = 3383,
-
-		noMax = true,
-        label = CurrencyLabel(3383, nil, "b7b7b7"),
+        key = "mistcrest_adventurer",
+        currencyId = 3442,
+        noMax = true,
+        isVisible = function() return IsCurrencyDiscovered(3442) end,
+        label = CurrencyLabel(3442, "Adventurer Mistcrest", "b7b7b7"),
     },
     {
-        key = "crest_veteran",
-        currencyId = 3341,
+        key = "mistcrest_veteran",
+        currencyId = 3443,
         noMax = true,
-        label = CurrencyLabel(3341, nil, "1eff00"),
+        isVisible = function() return IsCurrencyDiscovered(3443) end,
+        label = CurrencyLabel(3443, "Veteran Mistcrest", "1eff00"),
     },
     {
-        key = "crest_champion",
-        currencyId = 3343,
+        key = "mistcrest_champion",
+        currencyId = 3444,
         noMax = true,
-        label = CurrencyLabel(3343, nil, "f1c232"),
+        isVisible = function() return IsCurrencyDiscovered(3444) end,
+        label = CurrencyLabel(3444, "Champion Mistcrest", "f1c232"),
     },
     {
-        key = "crest_hero",
-        currencyId = 3345,
+        key = "mistcrest_hero",
+        currencyId = 3445,
         noMax = true,
-        label = CurrencyLabel(3345, nil, "0070dd"),
+        isVisible = function() return IsCurrencyDiscovered(3445) end,
+        label = CurrencyLabel(3445, "Hero Mistcrest", "0070dd"),
     },
     {
-        key = "crest_myth",
-        currencyId = 3347,
+        key = "mistcrest_myth",
+        currencyId = 3446,
         noMax = true,
-        label = CurrencyLabel(3347, nil, "ff8000"),
+        isVisible = function() return IsCurrencyDiscovered(3446) end,
+        label = CurrencyLabel(3446, "Myth Mistcrest", "ff8000"),
     },
 	{
 		key = "field_accolade",
