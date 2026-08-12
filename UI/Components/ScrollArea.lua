@@ -133,6 +133,7 @@ function ns.AttachScrollList(scroll, content, track, opts)
     scroll:SetScript("OnMouseWheel", function(_, delta)
         ns.ScrollByDelta(scroll, content, delta, opts.wheelStep, UpdateScrollBar)
     end)
+    scroll:SetScript("OnSizeChanged", UpdateScrollBar)
     scroll:SetScript("OnScrollRangeChanged", UpdateScrollBar)
     scroll:SetScript("OnVerticalScroll", UpdateScrollBar)
 

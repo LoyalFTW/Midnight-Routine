@@ -959,10 +959,31 @@ function MR:BuildUI()
     end)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
+    local function FinishMainFrameResize()
+        if not dragger._dragging then
+            return
+        end
+        dragger._dragging = false
+        dragger:SetScript("OnUpdate", nil)
+        local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, math.floor(f:GetWidth())))
+        local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, math.floor(f:GetHeight())))
+        MR.db.profile.width = newW
+        MR.db.profile.height = newH
+        f:SetWidth(newW)
+        f:SetHeight(newH)
+        MR:RefreshUI()
+        local configFrame = MR.GetConfigFrame and MR:GetConfigFrame()
+        if configFrame and configFrame:IsShown() then
+            MR:PopulateConfigFrame(configFrame)
+        end
+    end
     local function ResizeMainFrame()
-        if not dragger._dragging or not IsMouseButtonDown("LeftButton") then
-            dragger._dragging = false
+        if not dragger._dragging then
             dragger:SetScript("OnUpdate", nil)
+            return
+        end
+        if not IsMouseButtonDown("LeftButton") then
+            FinishMainFrameResize()
             return
         end
         local cx, cy = GetCursorPosition()
@@ -975,6 +996,9 @@ function MR:BuildUI()
         local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
         f:SetWidth(newW)
         f:SetHeight(newH)
+        if MR.UpdateScrollBar then
+            MR.UpdateScrollBar()
+        end
     end
     dragger:SetScript("OnMouseDown", function(_, button)
         if button == "LeftButton" and not MR.db.profile.locked then
@@ -989,18 +1013,8 @@ function MR:BuildUI()
         end
     end)
     dragger:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" and dragger._dragging then
-            dragger._dragging = false
-            dragger:SetScript("OnUpdate", nil)
-            local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, math.floor(f:GetWidth())))
-            local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, math.floor(f:GetHeight())))
-            MR.db.profile.width  = newW
-            MR.db.profile.height = newH
-            f:SetWidth(newW)
-            f:SetHeight(newH)
-            MR:RefreshUI()
-            local configFrame = MR.GetConfigFrame and MR:GetConfigFrame()
-            if configFrame and configFrame:IsShown() then MR:PopulateConfigFrame(configFrame) end
+        if button == "LeftButton" then
+            FinishMainFrameResize()
         end
     end)
     self._dragger = dragger
