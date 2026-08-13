@@ -263,7 +263,7 @@ function MR:SetWaypoint(target)
     return false, "No waypoint API available"
 end
 
-function MR:GetRowWaypointTarget(row)
+function MR:GetRowWaypointTarget(row, activateNavigation)
     if type(row) ~= "table" then
         return nil
     end
@@ -280,7 +280,7 @@ function MR:GetRowWaypointTarget(row)
         for _, questId in ipairs(questIds) do
             local ok, mapID, x, y = pcall(C_QuestLog.GetNextWaypoint, questId)
             if ok and mapID and x and y then
-                if C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
+                if activateNavigation ~= false and C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID then
                     pcall(C_SuperTrack.SetSuperTrackedQuestID, questId)
                 end
                 local waypointText

@@ -272,7 +272,7 @@ local function MainRowOnMouseDown(selfRow, button)
         local ok, source, target = MR:NavigateToRow(row)
         if ok then
             print(string.format(L["Waypoint_Set"], source, target.waypointTitle or target.label, target.x, target.y))
-        else
+        elseif source == "No waypoint API available" then
             print(L["Waypoint_Unavailable"])
         end
     elseif not data.isAutoTracked and not row.encounterIds and button == "LeftButton" then
@@ -464,6 +464,14 @@ end
 
 local function IsMainRowVisible(mod, row)
     return MR.IsRowVisibleForCharacter and MR:IsRowVisibleForCharacter(mod, row) or (not row.isVisible or row.isVisible())
+end
+
+local function GetReservedTextWidth(rowFrame, desiredWidth)
+    local rowWidth = rowFrame:GetWidth() or 0
+    local minimumLabelWidth = math.max(40, GetFontSize() * 4)
+    local fixedLeftWidth = PADDING + 32
+    local maximumWidth = math.max(rowWidth - fixedLeftWidth - minimumLabelWidth, 0)
+    return math.max(math.min(desiredWidth, maximumWidth), 0)
 end
 
 local function IsMainRowInGroup(mod, row, group)
@@ -1146,7 +1154,10 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         or (row.currencyId ~= nil)
         or (row.itemId ~= nil)
     local hasWaypoint = row.zone and row.x and row.y
-    local hasNavigation = hasWaypoint or type(row.getWaypoint) == "function" or type(row.navigationQuestIds or row.questIds) == "table"
+    local hasNavigation = hasWaypoint
+    if not hasNavigation and MR.GetRowWaypointTarget then
+        hasNavigation = MR:GetRowWaypointTarget(row, false) ~= nil
+    end
     local isComplete = self:IsRowComplete(mod, row, done)
     local collapsed = false
     local rowH = collapsed and 8 or ROW_HEIGHT
@@ -1350,6 +1361,10 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     local isProfessionRow = mod and mod.profSkillLine
     local hasCoordText = hasWaypoint and not row.hideCoordText and not isProfessionRow
     local hasKnowledgeText = type(row.kpTotal) == "number" and row.kpTotal > 0
+    local availableRightWidth = math.max(colW - (PADDING + 32) - math.max(40, GetFontSize() * 4), 0)
+    if hasCoordText and (hasKnowledgeText and 168 or 128) > availableRightWidth then
+        hasCoordText = false
+    end
     local lblRightOff = isCurrencyRow and -96 or (hasCoordText and (hasKnowledgeText and -168 or -128) or (hasKnowledgeText and -64 or -52))
 
     SetFontForText(rowFrame._label, CleanLabelText(row.label), GetFontSize(), GetFontFlags())
@@ -1417,11 +1432,9 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             if type(row.countWidth) == "number" and row.countWidth > 0 then
                 reservedWidth = row.countWidth
             else
-                reservedWidth = math.min(
-                    math.max(math.floor((rowFrame._count:GetStringWidth() or 0) + 8), 64),
-                    math.floor(math.max(rowFrame:GetWidth() * 0.5, 64))
-                )
+                reservedWidth = math.floor((rowFrame._count:GetStringWidth() or 0) + 8)
             end
+            reservedWidth = GetReservedTextWidth(rowFrame, reservedWidth)
             SetWidthIfChanged(rowFrame._count, reservedWidth)
             if hasRowIcon then
                 SetTwoAnchors(rowFrame._label,

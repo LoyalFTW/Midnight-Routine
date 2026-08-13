@@ -959,12 +959,14 @@ function MR:BuildUI()
     end)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
+    local resizeLayoutElapsed = 0
     local function FinishMainFrameResize()
         if not dragger._dragging then
             return
         end
         dragger._dragging = false
         dragger:SetScript("OnUpdate", nil)
+        resizeLayoutElapsed = 0
         local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, math.floor(f:GetWidth())))
         local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, math.floor(f:GetHeight())))
         MR.db.profile.width = newW
@@ -977,7 +979,7 @@ function MR:BuildUI()
             MR:PopulateConfigFrame(configFrame)
         end
     end
-    local function ResizeMainFrame()
+    local function ResizeMainFrame(_, elapsed)
         if not dragger._dragging then
             dragger:SetScript("OnUpdate", nil)
             return
@@ -996,7 +998,17 @@ function MR:BuildUI()
         local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
         f:SetWidth(newW)
         f:SetHeight(newH)
-        if MR.UpdateScrollBar then
+        resizeLayoutElapsed = resizeLayoutElapsed + (elapsed or 0)
+        if resizeLayoutElapsed >= 0.04 then
+            resizeLayoutElapsed = 0
+            MR.db.profile.width = math.floor(newW)
+            MR.db.profile.height = math.floor(newH)
+            if MR.RefreshMainPanelSectionsOnly then
+                MR:RefreshMainPanelSectionsOnly()
+            elseif MR.UpdateScrollBar then
+                MR.UpdateScrollBar()
+            end
+        elseif MR.UpdateScrollBar then
             MR.UpdateScrollBar()
         end
     end
@@ -1008,6 +1020,7 @@ function MR:BuildUI()
             local scale = f:GetEffectiveScale()
             dragStartX = dragStartX / scale
             dragStartY = dragStartY / scale
+            resizeLayoutElapsed = 0
             dragger._dragging = true
             dragger:SetScript("OnUpdate", ResizeMainFrame)
         end

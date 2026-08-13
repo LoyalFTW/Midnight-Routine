@@ -4,6 +4,7 @@ local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local crestRows
 local defaultCrestRows
+local pendingItemLoads = {}
 
 local function CleanLabel(text)
     text = tostring(text or "")
@@ -21,6 +22,10 @@ end
 
 local function ItemLabel(itemID, fallback, color)
     local itemName = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(itemID)
+    if not itemName and C_Item and C_Item.RequestLoadItemDataByID and not pendingItemLoads[itemID] then
+        pendingItemLoads[itemID] = true
+        C_Item.RequestLoadItemDataByID(itemID)
+    end
     return string.format("|cff%s%s:|r", color or "e8c96e", itemName or fallback or ("Item " .. tostring(itemID)))
 end
 
@@ -42,7 +47,7 @@ local function IsCurrencyDiscovered(currencyID)
         or (tonumber(info.totalEarned) or 0) > 0
 end
 
-local function RefreshCrestItemLabels()
+local function RefreshCrestItemLabels(forceRefresh)
     if not crestRows then return end
     local dirty = false
     for _, row in ipairs(crestRows) do
@@ -54,7 +59,7 @@ local function RefreshCrestItemLabels()
             end
         end
     end
-    if dirty then
+    if dirty or forceRefresh then
         if MR.RequestUIRefresh then
             MR:RequestUIRefresh(0.05)
         elseif MR.RefreshUI then
@@ -62,6 +67,15 @@ local function RefreshCrestItemLabels()
         end
     end
 end
+
+local itemCacheFrame = CreateFrame("Frame")
+itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+itemCacheFrame:SetScript("OnEvent", function(_, _, itemID, success)
+    if not pendingItemLoads[itemID] then return end
+    pendingItemLoads[itemID] = nil
+    if success == false then return end
+    RefreshCrestItemLabels(true)
+end)
 
 local function GetCurrencyStorage()
     if not (MR and MR.db and MR.db.char) then
@@ -426,10 +440,3 @@ MR:RegisterModule({
     defaultOpen = true,
     rows = crestRows,
 })
-
-local itemCacheFrame = CreateFrame("Frame")
-itemCacheFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-itemCacheFrame:SetScript("OnEvent", function(_, _, itemID)
-    if itemID ~= 232875 and itemID ~= 273000 and itemID ~= 274476 then return end
-    RefreshCrestItemLabels()
-end)
