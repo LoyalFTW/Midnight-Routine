@@ -657,10 +657,26 @@ local function EnsureMainExpansionHeaderWidget(self, expansionKey)
         return frame
     end
 
-    frame = CreateFrame("Frame", nil, self.content, "BackdropTemplate")
+    frame = CreateFrame("Button", nil, self.content, "BackdropTemplate")
     frame:SetBackdrop(MakeBackdrop())
+    frame:RegisterForClicks("LeftButtonUp")
     frame._label = frame:CreateFontString(nil, "OVERLAY")
     frame._label:SetJustifyH("LEFT")
+    frame._arrow = CreateFrame("Frame", nil, frame)
+    frame:SetScript("OnClick", function(button)
+        local profile = MR.db and MR.db.profile
+        local expansion = button._expansionKey
+        if not (profile and expansion) then
+            return
+        end
+        profile.collapsedProfessionExpansions = profile.collapsedProfessionExpansions or {}
+        if profile.collapsedProfessionExpansions[expansion] then
+            profile.collapsedProfessionExpansions[expansion] = nil
+        else
+            profile.collapsedProfessionExpansions[expansion] = true
+        end
+        MR:RefreshUI()
+    end)
     self._mainExpansionHeaderFrames[key] = frame
     return frame
 end
@@ -670,6 +686,8 @@ local function UpdateMainExpansionHeaderWidget(self, expansionKey, yOff, xOff, c
     local info = MR.GetExpansionInfo and MR:GetExpansionInfo(expansionKey) or nil
     local label = (info and (info.shortLabel or info.label or info.key)) or tostring(expansionKey or "")
     local frameAlpha = MR.db.profile.frameAlpha or 1.0
+    local collapsed = MR.db.profile.collapsedProfessionExpansions and MR.db.profile.collapsedProfessionExpansions[expansionKey] == true
+    frame._expansionKey = expansionKey
     frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT", self.content, "TOPLEFT", xOff + 3, -yOff)
     frame:SetSize(math.max(colW - 6, 1), 18)
@@ -677,10 +695,12 @@ local function UpdateMainExpansionHeaderWidget(self, expansionKey, yOff, xOff, c
     frame:SetBackdropColor(0.035, 0.055, 0.070, 0.86 * frameAlpha)
     frame:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.80 * frameAlpha)
     frame._label:SetFont(ns.FONT_HEADERS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    frame._label:ClearAllPoints()
     frame._label:SetPoint("LEFT", frame, "LEFT", 7, 0)
-    frame._label:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+    frame._label:SetPoint("RIGHT", frame, "RIGHT", -24, 0)
     frame._label:SetText(label)
     frame._label:SetTextColor(0.72, 0.86, 0.88, 0.95)
+    StyleSectionCollapseIndicator(frame._arrow, not collapsed)
     return frame
 end
 
@@ -1003,7 +1023,10 @@ EnsureMainRowWidget = function(section, rowKey, widgetKind)
     rowFrame._statusCheck:SetPoint("CENTER", rowFrame._statusBtn, "CENTER", 0, 1)
     rowFrame._statusCheck:SetText("x")
 
-    rowFrame._label = rowFrame:CreateFontString(nil, "OVERLAY")
+    rowFrame._labelClip = CreateFrame("Frame", nil, rowFrame)
+    rowFrame._labelClip:SetClipsChildren(true)
+    rowFrame._label = rowFrame._labelClip:CreateFontString(nil, "OVERLAY")
+    rowFrame._label:SetPoint("LEFT", rowFrame._labelClip, "LEFT", 0, 0)
     if rowFrame._label.SetWordWrap then
         rowFrame._label:SetWordWrap(false)
     end
@@ -1172,6 +1195,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     rowFrame._mrData.hasWaypoint = hasWaypoint
     rowFrame._mrData.hasNavigation = hasNavigation
     rowFrame._mrData.isComplete = isComplete
+    rowFrame._labelClip:SetHeight(rowH)
     if rowFrame._mrLayoutSection ~= section
         or rowFrame._mrLayoutY ~= yOff
         or rowFrame._mrLayoutWidth ~= colW
@@ -1369,11 +1393,11 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
 
     SetFontForText(rowFrame._label, CleanLabelText(row.label), GetFontSize(), GetFontFlags())
     if hasRowIcon then
-        SetTwoAnchors(rowFrame._label,
+        SetTwoAnchors(rowFrame._labelClip,
             "LEFT", rowFrame._rowIcon, "RIGHT", 8, 0,
             "RIGHT", rowFrame, "RIGHT", lblRightOff, 0)
     else
-        SetTwoAnchors(rowFrame._label,
+        SetTwoAnchors(rowFrame._labelClip,
             "LEFT", rowFrame._statusBtn, "RIGHT", 8, 0,
             "RIGHT", rowFrame, "RIGHT", lblRightOff, 0)
     end
@@ -1437,11 +1461,11 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             reservedWidth = GetReservedTextWidth(rowFrame, reservedWidth)
             SetWidthIfChanged(rowFrame._count, reservedWidth)
             if hasRowIcon then
-                SetTwoAnchors(rowFrame._label,
+                SetTwoAnchors(rowFrame._labelClip,
                     "LEFT", rowFrame._rowIcon, "RIGHT", 8, 0,
                     "RIGHT", rowFrame._count, "LEFT", -8, 0)
             else
-                SetTwoAnchors(rowFrame._label,
+                SetTwoAnchors(rowFrame._labelClip,
                     "LEFT", rowFrame._statusBtn, "RIGHT", 8, 0,
                     "RIGHT", rowFrame._count, "LEFT", -8, 0)
             end
@@ -1457,7 +1481,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         if walletText then walletText:SetShown(not row.hideWallet) end
         if row.hideWallet then
             local leftAnchor = hasRowIcon and rowFrame._rowIcon or rowFrame._statusBtn
-            SetTwoAnchors(rowFrame._label,
+            SetTwoAnchors(rowFrame._labelClip,
                 "LEFT", leftAnchor, "RIGHT", 8, 0,
                 "RIGHT", rowFrame._count, "LEFT", -8, 0)
         else
@@ -1466,7 +1490,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             walletText:SetJustifyH("RIGHT")
             walletText:SetText(string.format("|cffaaaaaa(%d)|r", wallet))
             local leftAnchor = hasRowIcon and rowFrame._rowIcon or rowFrame._statusBtn
-            SetTwoAnchors(rowFrame._label,
+            SetTwoAnchors(rowFrame._labelClip,
                 "LEFT", leftAnchor, "RIGHT", 8, 0,
                 "RIGHT", walletText, "LEFT", -8, 0)
         end
@@ -1480,7 +1504,7 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             rowFrame._count:SetTextColor(countColor(done, row.max))
         end
         if hasCountIcon and row.currencyId then
-            SetTwoAnchors(rowFrame._label,
+            SetTwoAnchors(rowFrame._labelClip,
                 "LEFT", rowFrame._statusBtn, "RIGHT", 8, 0,
                 "RIGHT", rowFrame._count, "LEFT", -8, 0)
         end
@@ -1614,11 +1638,11 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         rowFrame._count:Hide()
         local reservedRight = badgeZoneWidth + 32
         if hasRowIcon then
-            SetTwoAnchors(rowFrame._label,
+            SetTwoAnchors(rowFrame._labelClip,
                 "LEFT", rowFrame._rowIcon, "RIGHT", 8, 0,
                 "RIGHT", rowFrame, "RIGHT", -(reservedRight + 8), 0)
         else
-            SetTwoAnchors(rowFrame._label,
+            SetTwoAnchors(rowFrame._labelClip,
                 "LEFT", rowFrame._statusBtn, "RIGHT", 8, 0,
                 "RIGHT", rowFrame, "RIGHT", -(reservedRight + 8), 0)
         end

@@ -34,6 +34,7 @@ local RebuildGatheringLocationsFrame
 local gatheringFrameInteractionActive = false
 local gatheringRebuildPending
 local configExpandedProfessions = {} 
+local configCollapsedExpansions = {}
 
 local function StepMemoryCleanup()
     if collectgarbage then
@@ -2922,26 +2923,50 @@ PopulateGatheringConfig = function(frame)
 
             yOff = yOff - 17
         end
-        local function ExpansionHeader(text)
+        local function ExpansionHeader(expansion)
             local ROW_H = 26
-            local header = CreateFrame("Frame", nil, body, "BackdropTemplate")
+            local isExpanded = not configCollapsedExpansions[expansion.key]
+            local header = CreateFrame("Button", nil, body, "BackdropTemplate")
             header:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
             header:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad, yOff)
             header:SetHeight(ROW_H)
             header:SetBackdrop(MakeBackdrop())
             header:SetBackdropColor(0.020, 0.085, 0.100, 0.95)
             header:SetBackdropBorderColor(0.22, 0.68, 0.64, 0.92)
+            header:RegisterForClicks("LeftButtonUp")
 
             local lbl = header:CreateFontString(nil, "OVERLAY")
             lbl:SetFont(ns.FONT_HEADERS, math.max(10, cfgFs), GetFontFlags())
             lbl:SetPoint("LEFT", header, "LEFT", 9, 0)
-            lbl:SetPoint("RIGHT", header, "RIGHT", -8, 0)
+            lbl:SetPoint("RIGHT", header, "RIGHT", -28, 0)
             lbl:SetJustifyH("LEFT")
             lbl:SetWordWrap(false)
-            lbl:SetText(text)
+            lbl:SetText(expansion.label)
             lbl:SetTextColor(0.88, 1.00, 0.94, 0.98)
 
+            local arrow = header:CreateFontString(nil, "OVERLAY")
+            arrow:SetFont(ns.FONT_HEADERS, math.max(10, cfgFs), GetFontFlags())
+            arrow:SetPoint("RIGHT", header, "RIGHT", -9, 0)
+            arrow:SetText(isExpanded and "v" or ">")
+            arrow:SetTextColor(0.64, 0.90, 0.84, 0.98)
+
+            header:SetScript("OnClick", function()
+                configCollapsedExpansions[expansion.key] = isExpanded and true or nil
+                PopulateGatheringConfig(frame)
+            end)
+            header:SetScript("OnEnter", function()
+                header:SetBackdropColor(0.025, 0.115, 0.130, 0.98)
+                header:SetBackdropBorderColor(0.32, 0.88, 0.78, 1)
+                arrow:SetTextColor(1, 1, 1, 1)
+            end)
+            header:SetScript("OnLeave", function()
+                header:SetBackdropColor(0.020, 0.085, 0.100, 0.95)
+                header:SetBackdropBorderColor(0.22, 0.68, 0.64, 0.92)
+                arrow:SetTextColor(0.64, 0.90, 0.84, 0.98)
+            end)
+
             yOff = yOff - ROW_H - 2
+            return isExpanded
         end
         local function IsProfessionEnabled(expansion, profession)
             return IsProfessionCardVisible(expansion.key, profession.key)
@@ -2960,8 +2985,9 @@ PopulateGatheringConfig = function(frame)
             end
             if #learnedProfessions > 0 then
             Gap(4)
-            ExpansionHeader(expansion.label)
-            for _, profession in ipairs(learnedProfessions) do
+            local expansionOpen = ExpansionHeader(expansion)
+            if expansionOpen then
+                for _, profession in ipairs(learnedProfessions) do
                     local cr, cg, cb = GetProfessionColor(profession.key)
                     local profExpandKey = expansion.key .. ":" .. profession.key
                     local isExpanded = configExpandedProfessions[profExpandKey]
@@ -3098,6 +3124,7 @@ PopulateGatheringConfig = function(frame)
                                 end
                             end
                         end
+                end
             end
             end
         end

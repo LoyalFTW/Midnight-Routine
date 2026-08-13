@@ -519,7 +519,6 @@ function MR:RefreshMainPanelSectionsOnly()
     self._visibleModsBuffer = visibleMods
     local visibleModCount = 0
     local lastVisibleExpansionKey
-    local pendingExpansionHeaderKey
     for _, mod in ipairs(MR:GetOrderedModules("all")) do
         local modVisible = not mod.isVisible or mod:isVisible()
         if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
@@ -529,18 +528,26 @@ function MR:RefreshMainPanelSectionsOnly()
             if shownRows > 0 then
                 local expansionKey = MR:GetModuleExpansionKey(mod)
                 if mod.profSkillLine and expansionKey ~= lastVisibleExpansionKey then
-                    pendingExpansionHeaderKey = expansionKey
                     lastVisibleExpansionKey = expansionKey
+                    visibleModCount = visibleModCount + 1
+                    local headerEntry = visibleMods[visibleModCount] or {}
+                    headerEntry.mod = nil
+                    headerEntry.expansionKey = expansionKey
+                    headerEntry.expansionHeaderKey = nil
+                    headerEntry.h = 22
+                    visibleMods[visibleModCount] = headerEntry
                 end
-                visibleModCount = visibleModCount + 1
-                local slot = visibleModCount
-                local entry = visibleMods[slot] or {}
-                entry.mod = mod
-                entry.expansionKey = nil
-                entry.expansionHeaderKey = pendingExpansionHeaderKey
-                entry.h = (stats and stats.height or 0) + (pendingExpansionHeaderKey and 22 or 0)
-                visibleMods[slot] = entry
-                pendingExpansionHeaderKey = nil
+                local expansionCollapsed = mod.profSkillLine and MR.db.profile.collapsedProfessionExpansions and MR.db.profile.collapsedProfessionExpansions[expansionKey] == true
+                if not expansionCollapsed then
+                    visibleModCount = visibleModCount + 1
+                    local slot = visibleModCount
+                    local entry = visibleMods[slot] or {}
+                    entry.mod = mod
+                    entry.expansionKey = nil
+                    entry.expansionHeaderKey = nil
+                    entry.h = stats and stats.height or 0
+                    visibleMods[slot] = entry
+                end
                 allTotal = allTotal + shownRows
                 allDone = allDone + math.min(doneRows, shownRows)
             end
@@ -616,12 +623,25 @@ function MR:RefreshMainPanelSectionsOnly()
                 activeMainSections[assign.mod.key] = true
                 self.widgets[#self.widgets + 1] = section
             end
+        elseif assign.expansionKey then
+            local header = UpdateMainExpansionHeaderWidget(self, assign.expansionKey, assign.yOff, xOff, colW)
+            self.widgets[#self.widgets + 1] = header
         end
     end
 
     if self._mainExpansionHeaderFrames then
-        for _, frame in pairs(self._mainExpansionHeaderFrames) do
-            HideMainExpansionHeaderWidget(frame)
+        for _, header in pairs(self._mainExpansionHeaderFrames) do
+            local key = header._expansionKey
+            local active = false
+            for i = 1, modColAssignCount do
+                if modColAssign[i].expansionKey == key then
+                    active = true
+                    break
+                end
+            end
+            if not active then
+                HideMainExpansionHeaderWidget(header)
+            end
         end
     end
 

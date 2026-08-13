@@ -100,6 +100,7 @@ local DEFAULTS = {
         gatheringHideCompleted = false,
         professionKnowledgeShowTasks = true,
         professionKnowledgeHideMainTasks = false,
+        collapsedProfessionExpansions = {},
         professionKnowledgeTaskCategories = {
             quests = true,
             drops = true,

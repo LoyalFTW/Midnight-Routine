@@ -103,7 +103,72 @@ local function IsAltBoardModule(mod)
         return true
     end
 
+    if mod.key == "custom_tasks" then
+        return true
+    end
+
     return mod.key:match("^story_campaign_") ~= nil
+end
+
+local function GetAltBoardModuleRows(mod, charData, globalData)
+    if mod.key ~= "custom_tasks" then
+        return mod.rows
+    end
+
+    local rows = {}
+    local tasks = {}
+
+    local function appendTasks(source, scope)
+        for _, task in ipairs(source or {}) do
+            if type(task) == "table" then
+                tasks[#tasks + 1] = {
+                    task = task,
+                    scope = scope,
+                }
+            end
+        end
+    end
+
+    appendTasks(charData.customTasks, "character")
+    appendTasks(globalData and globalData.customTasks, "shared")
+    table.sort(tasks, function(a, b)
+        local aOrder = tonumber(a.task.order) or math.huge
+        local bOrder = tonumber(b.task.order) or math.huge
+        if aOrder ~= bOrder then
+            return aOrder < bOrder
+        end
+        if a.scope ~= b.scope then
+            return a.scope < b.scope
+        end
+        return (tonumber(a.task.id) or 0) < (tonumber(b.task.id) or 0)
+    end)
+
+    for _, entry in ipairs(tasks) do
+        local task = entry.task
+        local taskId = tonumber(task.id)
+        if taskId then
+            local maxValue = math.max(1, math.min(999, math.floor(tonumber(task.max) or 1)))
+            local difficultyCount = 0
+            if type(task.encounterDifficulties) == "table" then
+                for _, enabled in pairs(task.encounterDifficulties) do
+                    if enabled == true then
+                        difficultyCount = difficultyCount + 1
+                    end
+                end
+            end
+            if difficultyCount >= 2 then
+                maxValue = difficultyCount
+            end
+            rows[#rows + 1] = {
+                key = (entry.scope == "shared" and "shared_task_" or "task_") .. tostring(taskId),
+                label = tostring(task.label or ""),
+                max = maxValue,
+                accountWideComplete = task.accountWideComplete == true,
+            }
+        end
+    end
+
+    return rows
 end
 
 local function HasAnyProfessionRecord(source)
@@ -690,7 +755,7 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                 or sharedModuleStates
 
             for _, mod in ipairs(self.modules) do
-                if IsAltBoardModule(mod) and self:GetModuleExpansionKey(mod) == selectedExpansion then
+                if IsAltBoardModule(mod) and (mod.key == "custom_tasks" or self:GetModuleExpansionKey(mod) == selectedExpansion) then
                     local moduleSettings = type(moduleStates) == "table" and moduleStates[mod.key] or nil
                     local professionModuleStates = type(charData.professionModuleStates) == "table" and charData.professionModuleStates or nil
                     local professionSettings = mod.profSkillLine and professionModuleStates and professionModuleStates[mod.key] or nil
@@ -709,14 +774,15 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                     if moduleVisible and knowsProfession then
                         local moduleEntry = {
                             key = mod.key,
-                            label = CleanAccountLabel(mod.label),
+                            label = CleanAccountLabel(mod.key == "custom_tasks" and charData.customTasksTitle or mod.label),
                             color = mod.labelColor or "#ffffff",
                             rows = {},
                             totalRows = 0,
                             doneRows = 0,
                         }
 
-                        local orderedRows = self.GetOrderedRows and self:GetOrderedRows(mod) or mod.rows
+                        local sourceRows = GetAltBoardModuleRows(mod, charData, self.db.global)
+                        local orderedRows = mod.key ~= "custom_tasks" and self.GetOrderedRows and self:GetOrderedRows(mod) or sourceRows
                         for _, row in ipairs(orderedRows) do
                             local rowVisible = self.IsRowVisibleForCharacter and self:IsRowVisibleForCharacter(mod, row, charData) or (not row.isVisible or row.isVisible())
                             local rowEnabled = not (effectiveSettings and effectiveSettings.hiddenRows and effectiveSettings.hiddenRows[row.key] == false)
@@ -787,7 +853,7 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                             end
                         end
 
-                        if moduleEntry.totalRows > 0 and (mod.resetType == "weekly" or moduleEntry.doneRows < moduleEntry.totalRows) then
+                        if moduleEntry.totalRows > 0 and (mod.resetType == "weekly" or mod.key == "custom_tasks" or moduleEntry.doneRows < moduleEntry.totalRows) then
                             table.insert(snapshot.modules, moduleEntry)
                         end
                     end

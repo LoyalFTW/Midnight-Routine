@@ -413,8 +413,7 @@ local function MainSectionHeaderOnMouseUp(selfFrame, button)
     end
 
     if button == "LeftButton" then
-        if not selfFrame._mrDetachedHost and MR.FastToggleMainSection and MR:FastToggleMainSection(mod.key) then
-        elseif not selfFrame._mrDetachedHost and MR.RefreshMainPanelSectionsOnly then
+        if not selfFrame._mrDetachedHost and MR.RefreshMainPanelSectionsOnly then
             MR:SetModuleOpen(mod.key, not MR:IsModuleOpen(mod.key))
             MR:RefreshMainPanelSectionsOnly()
         elseif MR.RequestUIRefresh then

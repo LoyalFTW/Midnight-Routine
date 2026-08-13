@@ -914,21 +914,48 @@ function Config.BuildModulesPage(ctx)
 
     local function BuildProfessionExpansionHeader(expansionKey)
         local expansionInfo = MR:GetExpansionInfo(expansionKey)
-        local frame = CreateFrame("Frame", nil, body, "BackdropTemplate")
+        local stateKey = "__profession_expansion:" .. expansionKey
+        local isExpanded = MR._cfgExpanded[stateKey] ~= false
+        local frame = CreateFrame("Button", nil, body, "BackdropTemplate")
         frame:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
         frame:SetSize(contentW - 4, moduleRowH)
         frame:SetBackdrop(MakeBackdrop())
         frame:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
         frame:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
+        frame:RegisterForClicks("LeftButtonUp")
 
         local label = frame:CreateFontString(nil, "OVERLAY")
         label:SetFont(ns.FONT_HEADERS, moduleRowFs, GetFontFlags())
         label:SetPoint("LEFT", frame, "LEFT", 7, 0)
-        label:SetPoint("RIGHT", frame, "RIGHT", -7, 0)
+        label:SetPoint("RIGHT", frame, "RIGHT", -24, 0)
         label:SetJustifyH("LEFT")
         label:SetText((expansionInfo and (expansionInfo.shortLabel or expansionInfo.label or expansionInfo.key)) or expansionKey)
         label:SetTextColor(0.72, 0.86, 0.88)
+
+        local arrow = frame:CreateFontString(nil, "OVERLAY")
+        arrow:SetFont(ns.FONT_HEADERS, moduleRowFs, GetFontFlags())
+        arrow:SetPoint("RIGHT", frame, "RIGHT", -8, 0)
+        arrow:SetText(isExpanded and "v" or ">")
+        arrow:SetTextColor(0.45, 0.75, 0.70)
+
+        frame:SetScript("OnClick", function()
+            MR._cfgExpanded[stateKey] = not isExpanded
+            RebuildExpandedState()
+        end)
+        frame:SetScript("OnEnter", function()
+            frame:SetBackdropColor(0.045, 0.090, 0.105, 0.95)
+            frame:SetBackdropBorderColor(0.22, 0.62, 0.62, 0.92)
+            label:SetTextColor(0.86, 0.96, 0.96)
+            arrow:SetTextColor(1, 1, 1)
+        end)
+        frame:SetScript("OnLeave", function()
+            frame:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
+            frame:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
+            label:SetTextColor(0.72, 0.86, 0.88)
+            arrow:SetTextColor(0.45, 0.75, 0.70)
+        end)
         yOff = yOff - moduleRowH
+        return isExpanded
     end
 
     local function RenderModuleRows(mod, moduleAvailable)
@@ -999,6 +1026,7 @@ function Config.BuildModulesPage(ctx)
 
     local lastPatchKey
     local lastProfessionExpansionKey
+    local professionExpansionOpen = true
     for _, mod in ipairs(_allMods) do
         local currentMod = mod
         local key = currentMod.key
@@ -1037,15 +1065,18 @@ function Config.BuildModulesPage(ctx)
             lastPatchKey = patchKey
         end
 
-        if optVisible then
-            if mod.profSkillLine then
-                local expansionKey = MR:GetModuleExpansionKey(mod)
-                if expansionKey ~= lastProfessionExpansionKey then
-                    BuildProfessionExpansionHeader(expansionKey)
-                    lastProfessionExpansionKey = expansionKey
-                end
+        if optVisible and mod.profSkillLine then
+            local expansionKey = MR:GetModuleExpansionKey(mod)
+            if expansionKey ~= lastProfessionExpansionKey then
+                professionExpansionOpen = BuildProfessionExpansionHeader(expansionKey)
+                lastProfessionExpansionKey = expansionKey
             end
+            if not professionExpansionOpen then
+                optVisible = false
+            end
+        end
 
+        if optVisible then
             local moduleAvailable = MR:IsModuleAvailable(currentMod)
             local moduleHeight = currentMod.profSkillLine and math.max(24, moduleHeaderFs + 14) or moduleHeaderH
             local moduleFrame = Config.CreateModuleControl({
