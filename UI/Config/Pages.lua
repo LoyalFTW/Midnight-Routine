@@ -863,7 +863,7 @@ function MR:PopulateConfigFrame(f)
             { lang = "Simplified Chinese",      name = "Nanjuekaien1" },
             { lang = "Latin American Spanish",  name = "DarkChiken" },
             { lang = "Russian",                 name = "Hubbotu" },
-            { lang = "German",                  name = "Papspatu" },
+            { lang = "German",                  name = "Paspatu" },
             { lang = "Korean",                  name = "Crazyyoungs" },
         }
 
