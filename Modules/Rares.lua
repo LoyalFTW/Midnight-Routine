@@ -188,11 +188,11 @@ local ZONES = {
             { L["Rare_Auredar"] or "Auredar", nil, 2600, 28.08, 50.52 },
             { L["Rare_IndomitableMkXII"] or "Indomitable Mk XII", nil, 2600, 53.07, 54.98 },
             { L["Rare_Broxion"] or "Broxion", nil, 2600, 43.66, 50.44 },
-            { L["Rare_Lomelith"] or "Lomelith", nil, 2600, 67.08, 62.89 },
-            { L["Rare_WarpAgentXigrivr"] or "Warp Agent Xi'grivr", nil, 2600, 70.31, 76.36 },
+            { L["Rare_Lomelith"] or "Lomelith", nil, 2600, 67.08, 62.89, 263955 },
+            { L["Rare_WarpAgentXigrivr"] or "Warp Agent Xi'grivr", nil, 2600, 70.31, 76.36, 264574 },
             { L["Rare_Slaipaan"] or "Slaipaan", nil, 2600, 57.03, 60.24 },
-            { L["Rare_WarbringerThalkuur"] or "Warbringer Thal'kuur", nil, 2600, 29.83, 19.42 },
-            { L["Rare_VoidwarpedSporebat"] or "Voidwarped Sporebat", nil, 2600, 49.54, 48.51 },
+            { L["Rare_WarbringerThalkuur"] or "Warbringer Thal'kuur", nil, 2600, 29.83, 19.42, 267422 },
+            { L["Rare_VoidwarpedSporebat"] or "Voidwarped Sporebat", nil, 2600, 49.54, 48.51, 265698 },
         },
     } or nil,
     MR:IsPatchAvailable("12.0.7") and {
@@ -276,6 +276,9 @@ local function ResolveRareQuestIDs(zone)
     local rareByName = {}
     for _, rare in ipairs(zone.rares) do
         rareByName[NormalizeRareName(rare[1])] = rare
+        if rare[6] then
+            RARE_BY_NPC_ID[rare[6]] = rare
+        end
     end
 
     local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
@@ -385,17 +388,22 @@ local function SyncNewAchievementCriteriaKills(zone)
     end
 end
 
-local function GetStoredRareKillStatus(charData, questId, weekKey, dayKey)
-    if type(charData) ~= "table" or type(charData.raresKills) ~= "table" or not questId then
+local function GetStoredRareKillStatus(charData, key, weekKey, dayKey)
+    if type(charData) ~= "table" or type(charData.raresKills) ~= "table" or not key then
         return nil
     end
 
-    local rec = charData.raresKills[tostring(questId)]
+    local rec = charData.raresKills[key]
     if type(rec) ~= "table" or rec.w ~= weekKey then
         return nil
     end
 
     return (rec.d == dayKey) and "today" or "week"
+end
+
+local function BetterKillStatus(a, b)
+    if a == "today" or b == "today" then return "today" end
+    return a or b
 end
 
 local function GetCharacterTooltipName(charKey, charData, currentKey)
@@ -414,9 +422,11 @@ local function GetCharacterTooltipName(charKey, charData, currentKey)
     return name
 end
 
-local function GetWarbandRareStatuses(questId)
+local function GetWarbandRareStatuses(rare)
     local svChars = MR.db and MR.db.sv and MR.db.sv.char
-    if type(svChars) ~= "table" or not questId then
+    local questKey = rare and rare[2] and tostring(rare[2]) or nil
+    local npcKey = rare and rare[6] and ("npc:" .. tostring(rare[6])) or nil
+    if type(svChars) ~= "table" or not (questKey or npcKey) then
         return nil, 0, 0
     end
 
@@ -434,7 +444,10 @@ local function GetWarbandRareStatuses(questId)
 
     for charKey, charData in pairs(svChars) do
         if type(charData) == "table" and (showHidden or not hiddenChars[charKey]) then
-            local status = GetStoredRareKillStatus(charData, questId, weekKey, dayKey)
+            local status = BetterKillStatus(
+                GetStoredRareKillStatus(charData, questKey, weekKey, dayKey),
+                GetStoredRareKillStatus(charData, npcKey, weekKey, dayKey)
+            )
             local lastSyncAt = tonumber(charData.lastSyncAt) or 0
             local stale = weeklyReset > 0 and lastSyncAt > 0 and lastSyncAt < weeklyReset
             if status then
@@ -467,8 +480,10 @@ local function GetWarbandRareStatuses(questId)
     return rows, killed, #rows
 end
 
-local function AddWarbandRareTooltipLines(tip, questId)
-    local rows, killed, total = GetWarbandRareStatuses(questId)
+local WARBAND_SHORT_LIST_COUNT = 4
+
+local function AddWarbandRareTooltipLines(tip, rare)
+    local rows, killed, total = GetWarbandRareStatuses(rare)
     if not rows or total <= 0 then
         return
     end
@@ -477,7 +492,10 @@ local function AddWarbandRareTooltipLines(tip, questId)
     tip:AddLine(" ")
     tip:AddLine(string.format(headerText, killed, total), 0.65, 0.90, 1)
 
-    for _, row in ipairs(rows) do
+    local expanded = IsShiftKeyDown()
+    local shown = expanded and total or math.min(total, WARBAND_SHORT_LIST_COUNT)
+    for i = 1, shown do
+        local row = rows[i]
         if row.status == "today" then
             tip:AddDoubleLine(row.name, L["Rares_Tooltip_WarbandToday"] or "Killed today", 0.90, 0.90, 0.90, 0.20, 0.85, 0.45)
         elseif row.status == "week" then
@@ -487,6 +505,10 @@ local function AddWarbandRareTooltipLines(tip, questId)
         else
             tip:AddDoubleLine(row.name, L["Rares_Tooltip_WarbandNotKilled"] or "Not killed", 0.90, 0.90, 0.90, 0.50, 0.50, 0.50)
         end
+    end
+
+    if not expanded and total > shown then
+        tip:AddLine(L["Rares_Tooltip_HoldShiftFullList"] or "Hold Shift for full list", 0.55, 0.55, 0.60)
     end
 end
 
@@ -621,6 +643,8 @@ local raresFrameCache = {}
 local collapsed   = {}
 local lastZoneKey = nil
 local lastVisibleZoneMode = nil
+local hoveredWarbandHit
+local lastWarbandShiftState = false
 
 local BuildRaresFrame
 local RefreshRaresFrame
@@ -640,6 +664,15 @@ local function ApplyRaresFrameUpdater(frame)
             local pulse = 0.06 + 0.04 * math.sin(self.shimmerElapsed * 2)
             for _, tex in ipairs(self.shimmerTextures or {}) do
                 tex:SetAlpha(pulse)
+            end
+        end
+
+        if hoveredWarbandHit then
+            local shiftDown = IsShiftKeyDown()
+            if shiftDown ~= lastWarbandShiftState then
+                lastWarbandShiftState = shiftDown
+                local onEnter = hoveredWarbandHit:GetScript("OnEnter")
+                if onEnter then onEnter(hoveredWarbandHit) end
             end
         end
 
@@ -1047,6 +1080,8 @@ BuildRaresFrame = function()
 
             hit:SetScript("OnEnter", function()
                 hit._mrHover = true
+                hoveredWarbandHit = hit
+                lastWarbandShiftState = IsShiftKeyDown()
                 local questId = rare[2]
                 local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
                 if flagged then SyncRareKillRecord(questId) end
@@ -1066,7 +1101,7 @@ BuildRaresFrame = function()
                         else
                             tooltip:AddLine(L["Rares_Tooltip_NotKilled"], 0.50, 0.50, 0.50)
                         end
-                        AddWarbandRareTooltipLines(tooltip, questId)
+                        AddWarbandRareTooltipLines(tooltip, rare)
                         if rare[3] and rare[4] and rare[5] then
                             tooltip:AddLine(" ")
                             tooltip:AddLine(L["Gathering_ClickWaypoint"], 0.45, 0.85, 1)
@@ -1076,6 +1111,7 @@ BuildRaresFrame = function()
             end)
             hit:SetScript("OnLeave", function()
                 hit._mrHover = nil
+                if hoveredWarbandHit == hit then hoveredWarbandHit = nil end
                 local questId = rare[2]
                 local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
                 if flagged then SyncRareKillRecord(questId) end
