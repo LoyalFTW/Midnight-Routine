@@ -18,18 +18,21 @@ local SEASON_2_AVAILABLE = MR:IsPatchAvailable("12.1.0")
 if SEASON_2_AVAILABLE then
     SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
         quest = 95918,
+        unlock = 96307,
         name = L["SA_WraithWrath"] or "Wraith Wrath",
         zone = 2512,
         zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
     }
     SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
         quest = 95921,
+        unlock = 96492,
         name = L["SA_DemandAndSupply"] or "Demand and Supply",
         zone = 2512,
         zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
     }
     SA_ASSIGNMENTS[#SA_ASSIGNMENTS + 1] = {
-        dynamicTitle = L["SA_FaceTheSwarm"] or "Face the Swarm",
+        quest = 95922,
+        unlock = 96029,
         name = L["SA_FaceTheSwarm"] or "Face the Swarm",
         zone = 2512,
         zoneLabel = L["Zone_CoiledIsle"] or "The Coiled Isle",
@@ -53,6 +56,8 @@ local UATV_BRANCHES = {
     { quest = 94386, name = L["Unity_VoidAssaults"] or "Midnight: Void Assaults" },
     { quest = 93913, name = L["Unity_WorldBoss"]     },
     { quest = 93766, name = L["Unity_WorldQuests"]   },
+    { quest = 95843, name = L["Unity_RitualSites"] or "Midnight: Ritual Sites" },
+    { quest = 95842, name = L["Unity_VoidAssaults"] or "Midnight: Void Assaults" },
 }
 
 if SEASON_2_AVAILABLE then
@@ -111,10 +116,22 @@ local RITUAL_SITE_WEEKLIES = {
 }
 
 local VOID_INVASION_SHOWDOWNS = {
+    { quest = 96716, mapId = 2601, name = L["Weekly_Showdown_Val"] or "Showdown on Val" },
+    { quest = 96720, mapId = 2600, name = L["Weekly_Showdown_Naigtal"] or "Showdown on Naigtal" },
     { quest = 96717, mapId = 2600, name = L["Weekly_Showdown_Naigtal"] or "Showdown on Naigtal" },
     { quest = 96718, mapId = 2600, name = L["Weekly_Showdown_Naigtal_Heroic"] or "Showdown on Naigtal (Heroic)" },
     { quest = 96713, mapId = 2601, name = L["Weekly_Showdown_Val"] or "Showdown on Val" },
     { quest = 96714, mapId = 2601, name = L["Weekly_Showdown_Val_Heroic"] or "Showdown on Val (Heroic)" },
+}
+
+local VOID_INVASION_DANGEROUS_HEROIC = {
+    { quest = 97083, mapId = 2601, name = L["Weekly_DangerousEnemies_Val"] or "Dangerous Enemies: Val (Heroic)" },
+    { quest = 97086, mapId = 2600, name = L["Weekly_DangerousEnemies_Naigtal"] or "Dangerous Enemies: Naigtal (Heroic)" },
+}
+
+local VOID_INVASION_DISRUPTION_HEROIC = {
+    { quest = 97081, mapId = 2601, name = L["Weekly_MoreDisruptions_Val"] or "More Disruptions: Val (Heroic)" },
+    { quest = 97087, mapId = 2600, name = L["Weekly_MoreDisruptions_Naigtal"] or "More Disruption: Naigtal (Heroic)" },
 }
 
 local ABYSS_ANGLERS_WEEKLY_QUEST_ID = 92447
@@ -128,6 +145,8 @@ local LOST_LEGENDS_FIRST_TIME_RELICS = {
     { quest = 88997, name = L["Legends_RussulasOutreach"] },
     { quest = 88998, name = L["Legends_RootOfTheWorld"] },
     { quest = 88999, name = L["Legends_SkysHope"] },
+    { quest = 90733, name = L["Legends_TheListener"] or "The Listener" },
+    { quest = 90734, name = L["Legends_InTheNameOfTheGoddess"] or "In the Name of the Goddess" },
 }
 
 local LOST_LEGENDS_REPEAT_RELICS = {
@@ -1112,7 +1131,7 @@ MR:RegisterModule({
             label    = L["Weekly_Showdown_Label"] or "|cff2ae7c6Void Invasion Showdown:|r",
             max      = 1,
             note     = L["Weekly_Showdown_Note"] or "Complete the active Naigtal or Val Showdown. Normal or Heroic counts.",
-            questIds = { 96717, 96718, 96713, 96714 },
+            questIds = { 96716, 96720, 96717, 96718, 96713, 96714 },
             patchKey = "12.0.7",
             turnInTracked = true,
             allowQuestFlagBackfill = true,
@@ -1135,6 +1154,70 @@ MR:RegisterModule({
                     tip:AddLine("  " .. (activeName or GetVariantName(activeVariants, 1, L["Weekly_Showdown_Label"] or "Void Invasion Showdown")), 1, 0.9, 0.3)
                 else
                     tip:AddLine(L["Tooltip_No_Showdown"] or "|cffaaaaaa? Void Invasion Showdown not yet detected this week.|r", 1, 1, 1)
+                    tip:AddLine(L["Tooltip_Visit_Showdown"] or "  Visit the active Void Invasion zone in Naigtal or Val.", 0.7, 0.7, 0.7)
+                end
+            end,
+        },
+        {
+            key      = "void_invasion_dangerous_heroic",
+            label    = L["Weekly_DangerousEnemies_Label"] or "|cff2ae7c6Dangerous Enemies:|r",
+            max      = 1,
+            note     = L["Weekly_DangerousEnemies_Note"] or "Complete the active heroic Dangerous Enemies weekly on Naigtal or Val.",
+            questIds = { 97083, 97086 },
+            patchKey = "12.0.7",
+            turnInTracked = true,
+            allowQuestFlagBackfill = true,
+            completedNameKey = "dangerous_heroic_completed_name",
+            activeNameKey = "dangerous_heroic_active_name",
+            tooltipFunc = function(tip)
+                local completedVariants, activeVariants = CollectQuestVariants(VOID_INVASION_DANGEROUS_HEROIC)
+                local s1db = GetMainWeeklyProgress()
+                local completedName = s1db["dangerous_heroic_completed_name"]
+                local activeName = s1db["dangerous_heroic_active_name"]
+                local rowDone = (tonumber(s1db["void_invasion_dangerous_heroic"]) or 0) > 0
+                local fallbackName = L["Done"] or "Done"
+
+                tip:AddLine(" ")
+                if completedName or #completedVariants > 0 or rowDone then
+                    tip:AddLine(L["Tooltip_Done_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. (completedName or GetVariantName(completedVariants, 1, fallbackName)), 0.4, 0.85, 0.4)
+                elseif activeName or #activeVariants > 0 then
+                    tip:AddLine(L["Tooltip_Active_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. (activeName or GetVariantName(activeVariants, 1, L["Weekly_DangerousEnemies_Label"] or "Dangerous Enemies")), 1, 0.9, 0.3)
+                else
+                    tip:AddLine(L["Tooltip_No_DangerousEnemies"] or "|cffaaaaaa? Dangerous Enemies not yet detected this week.|r", 1, 1, 1)
+                    tip:AddLine(L["Tooltip_Visit_Showdown"] or "  Visit the active Void Invasion zone in Naigtal or Val.", 0.7, 0.7, 0.7)
+                end
+            end,
+        },
+        {
+            key      = "void_invasion_disruption_heroic",
+            label    = L["Weekly_MoreDisruptions_Label"] or "|cff2ae7c6More Disruptions:|r",
+            max      = 1,
+            note     = L["Weekly_MoreDisruptions_Note"] or "Complete the active heroic More Disruptions weekly on Naigtal or Val.",
+            questIds = { 97081, 97087 },
+            patchKey = "12.0.7",
+            turnInTracked = true,
+            allowQuestFlagBackfill = true,
+            completedNameKey = "disruption_heroic_completed_name",
+            activeNameKey = "disruption_heroic_active_name",
+            tooltipFunc = function(tip)
+                local completedVariants, activeVariants = CollectQuestVariants(VOID_INVASION_DISRUPTION_HEROIC)
+                local s1db = GetMainWeeklyProgress()
+                local completedName = s1db["disruption_heroic_completed_name"]
+                local activeName = s1db["disruption_heroic_active_name"]
+                local rowDone = (tonumber(s1db["void_invasion_disruption_heroic"]) or 0) > 0
+                local fallbackName = L["Done"] or "Done"
+
+                tip:AddLine(" ")
+                if completedName or #completedVariants > 0 or rowDone then
+                    tip:AddLine(L["Tooltip_Done_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. (completedName or GetVariantName(completedVariants, 1, fallbackName)), 0.4, 0.85, 0.4)
+                elseif activeName or #activeVariants > 0 then
+                    tip:AddLine(L["Tooltip_Active_Variant"], 1, 1, 1)
+                    tip:AddLine("  " .. (activeName or GetVariantName(activeVariants, 1, L["Weekly_MoreDisruptions_Label"] or "More Disruptions")), 1, 0.9, 0.3)
+                else
+                    tip:AddLine(L["Tooltip_No_MoreDisruptions"] or "|cffaaaaaa? More Disruptions not yet detected this week.|r", 1, 1, 1)
                     tip:AddLine(L["Tooltip_Visit_Showdown"] or "  Visit the active Void Invasion zone in Naigtal or Val.", 0.7, 0.7, 0.7)
                 end
             end,
@@ -1175,7 +1258,7 @@ MR:RegisterModule({
             max      = 1,
             note     = L["Weekly_Halduron_Note"],
             patchKey = "12.0.0",
-            questIds = { 93753, 93754, 93755, 93756, 93757, 93758, 95468 },
+            questIds = { 93751, 93752, 93753, 93754, 93755, 93756, 93757, 93758, 95468 },
             completedNameKey = "halduron_completed_name",
             activeNameKey = "halduron_active_name",
             tooltipFunc = function(tip)
@@ -1215,6 +1298,17 @@ MR:RegisterModule({
             max      = 1,
             patchKey = "12.0.0",
             questIds = { 89507 },
+        },
+        {
+            key      = "neighborhood",
+            label    = L["Weekly_Neighborhood_Label"] or "|cff2ae7c6Neighborhood:|r",
+            max      = 1,
+            note     = L["Weekly_Neighborhood_Note"] or "Complete one of the weekly neighborhood tasks.",
+            patchKey = "12.0.0",
+            turnInTracked = true,
+            questIds = { 95413, 95416, 95438, 95440 },
+            completedNameKey = "neighborhood_completed_name",
+            activeNameKey = "neighborhood_active_name",
         },
         {
             key      = "lost_legends",
@@ -1399,6 +1493,22 @@ MR:RegisterModule({
             note     = L["Weekly_TurnBackSurge_Note"] or "Defeat 3 Curse Surges on the Coiled Isle.",
             patchKey = "12.1.0",
             questIds = { 96995 },
+        },
+        {
+            key      = "trailing_xalatath",
+            label    = L["Weekly_TrailingXalatath_Label"] or "Trailing Xal'atath:",
+            max      = 1,
+            note     = L["Weekly_TrailingXalatath_Note"] or "Complete the weekly Trailing Xal'atath task on the Coiled Isle.",
+            patchKey = "12.1.0",
+            questIds = { 98172 },
+        },
+        {
+            key      = "purging_vaults",
+            label    = L["Weekly_PurgingVaults_Label"] or "Purging the Vaults:",
+            max      = 1,
+            note     = L["Weekly_PurgingVaults_Note"] or "Complete Purging the Vaults after unlocking it on the Coiled Isle.",
+            patchKey = "12.1.0",
+            questIds = { 95520 },
         },
         {
             key      = "nymrissa_lair",

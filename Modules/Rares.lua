@@ -274,18 +274,21 @@ local function ResolveRareQuestIDs(zone)
 
     local mapIDs = zone.mapIDs or { zone.rares[1] and zone.rares[1][3] }
     local rareByName = {}
-    local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
-    for index, rare in ipairs(zone.rares) do
+    for _, rare in ipairs(zone.rares) do
         rareByName[NormalizeRareName(rare[1])] = rare
-        if index <= (criteriaCount or 0) then
-            local ok, criteriaName, _, _, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
-            if ok and criteriaName then
-                rareByName[NormalizeRareName(criteriaName)] = rare
-            end
-            assetID = tonumber(assetID)
-            if ok and assetID and assetID > 0 then
-                rare[6] = assetID
-                RARE_BY_NPC_ID[assetID] = rare
+    end
+
+    local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
+    for index = 1, (criteriaCount or 0) do
+        local ok, criteriaName, _, _, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
+        if ok and criteriaName then
+            local rare = rareByName[NormalizeRareName(criteriaName)]
+            if rare then
+                assetID = tonumber(assetID)
+                if assetID and assetID > 0 then
+                    rare[6] = assetID
+                    RARE_BY_NPC_ID[assetID] = rare
+                end
             end
         end
     end
@@ -356,19 +359,28 @@ local function SyncNewAchievementCriteriaKills(zone)
     if not zone or type(GetAchievementCriteriaInfo) ~= "function" then
         return
     end
-    for index, rare in ipairs(zone.rares or {}) do
-        local ok, _, _, completed, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
-        if ok then
-            assetID = tonumber(assetID)
-            if assetID and assetID > 0 then
-                rare[6] = assetID
-                RARE_BY_NPC_ID[assetID] = rare
+    local rareByName = {}
+    for _, rare in ipairs(zone.rares or {}) do
+        rareByName[NormalizeRareName(rare[1])] = rare
+    end
+
+    local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
+    for index = 1, (criteriaCount or 0) do
+        local ok, criteriaName, _, completed, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
+        if ok and criteriaName then
+            local rare = rareByName[NormalizeRareName(criteriaName)]
+            if rare then
+                assetID = tonumber(assetID)
+                if assetID and assetID > 0 then
+                    rare[6] = assetID
+                    RARE_BY_NPC_ID[assetID] = rare
+                end
+                local key = tostring(zone.achievId) .. ":" .. tostring(index)
+                if RARE_CRITERIA_COMPLETION[key] == false and completed == true and assetID then
+                    SyncRareKillRecord("npc:" .. tostring(assetID))
+                end
+                RARE_CRITERIA_COMPLETION[key] = completed == true
             end
-            local key = tostring(zone.achievId) .. ":" .. tostring(index)
-            if RARE_CRITERIA_COMPLETION[key] == false and completed == true and assetID then
-                SyncRareKillRecord("npc:" .. tostring(assetID))
-            end
-            RARE_CRITERIA_COMPLETION[key] = completed == true
         end
     end
 end
@@ -1502,6 +1514,19 @@ PopulateRaresConfig = function(f)
             rowFr:SetHeight(ROW_H2)
 
             local nameLbl
+            local zoneEnabled = not (db.raresHiddenZones and db.raresHiddenZones[zone.key])
+
+            local enableBtn = CreateFrame("CheckButton", nil, rowFr, "UICheckButtonTemplate")
+            enableBtn:SetSize(20, 20)
+            enableBtn:SetPoint("LEFT", rowFr, "LEFT", 0, 0)
+            enableBtn:SetChecked(zoneEnabled)
+            enableBtn:SetScript("OnClick", function(s)
+                if not db.raresHiddenZones then db.raresHiddenZones = {} end
+                db.raresHiddenZones[zone.key] = (not s:GetChecked()) or nil
+                RebuildRaresFrame()
+                PopulateRaresConfig(f)
+            end)
+
             local swatch = OptionsColorSwatch(rowFr, cr, cg, cb,
                 function(r, g, b)
                     SetZoneColor(zone, r, g, b)
@@ -1520,11 +1545,12 @@ PopulateRaresConfig = function(f)
 
             nameLbl = rowFr:CreateFontString(nil, "OVERLAY")
             nameLbl:SetFont(ns.FONT_ROWS, 10, GetFontFlags())
-            nameLbl:SetPoint("LEFT",  rowFr,  "LEFT",  0,  0)
+            nameLbl:SetPoint("LEFT",  enableBtn, "RIGHT", 2,  0)
             nameLbl:SetPoint("RIGHT", swatch, "LEFT", -4,  0)
             nameLbl:SetText(zone.label)
             nameLbl:SetTextColor(cr, cg, cb)
             nameLbl:SetJustifyH("LEFT")
+            nameLbl:SetAlpha(zoneEnabled and 1 or 0.5)
 
             yOff = yOff - (ROW_H2 + 2)
         end
