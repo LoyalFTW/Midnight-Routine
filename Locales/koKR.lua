@@ -48,6 +48,12 @@ L["Tooltip_ManualClick"] = "좌클릭: +1   우클릭: -1"
 L["Tooltip_ManualDot_Hint"] = "수동으로 완료로 표시하려면 클릭"
 L["Tooltip_ManualDot_Active"] = "|cffffe066수동으로 완료 표시됨|r - 클릭 시 해제"
 L["Tooltip_ExpandCollapse"] = "좌클릭: 펼치기/접기"
+L["Tooltip_WarbandHeader"] = "Warband: %d/%d done this week"
+L["Tooltip_WarbandDone"] = "Done"
+L["Tooltip_WarbandStale"] = "Needs login"
+L["Tooltip_WarbandNotDone"] = "Not done"
+L["Tooltip_WarbandHoldShift"] = "Hold Shift for full list"
+L["Config_ShowWarbandTooltips"] = "Show Warband Info in Tooltips"
 
 
 -- UI Config
@@ -476,6 +482,11 @@ L["Act_Stormarion_Note"] = "보이드스톰에서 30분마다 반복되는 이�
 L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
 L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
 L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
+L["CurseSurgeSite_MalformedLeviathan"] = "The Malformed Leviathan"
+L["CurseSurgeSite_BroodmothersNest"] = "The Broodmother's Nest"
+L["CurseSurgeSite_LoomingMutagenior"] = "The Looming Mutagenior"
+L["CurseSurgeSite_MlurkkrMassacre"] = "Mlurkkr Massacre"
+L["CurseSurgeSite_SiegeWhisperingMarsch"] = "Siege at the Whispering Marsch"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "주간 퀘스트"

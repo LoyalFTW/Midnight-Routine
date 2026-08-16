@@ -472,8 +472,29 @@ function MR:PopulateConfigFrame(f)
             end,
             0.55, 0.22, 0.82, 8, nil, cfgFs)
 
+        Gap(6)
+        yOff = OptionsSlider(body, yOff, L["BACKGROUND"], 0, 1, 0.05,
+            function() return MR.db.profile.frameAlpha or 1.0 end,
+            function(v)
+                MR.db.profile.frameAlpha = v
+                if MR.ApplyTheme then MR.ApplyTheme() end
+                MR:RefreshUI()
+            end,
+            0.40, 0.40, 0.40, 8, nil, cfgFs)
+
+        Gap(2)
+        yOff = OptionsCheckbox(body, yOff,
+            L["Config_ShowIcons"] or "Show Icons",
+            function() return MR.db.profile.keepIconsVisibleInTextMode ~= false end,
+            function(v)
+                MR.db.profile.keepIconsVisibleInTextMode = v
+                RefreshVisualSettings()
+                ScheduleSettingsGarbageCollect()
+            end,
+            0.40, 0.40, 0.40, 8, nil, cfgFs)
+
         Gap(4); Divider()
-        SectionLabel(L["Config_MainHeaderPosition"] or "Main Header Position")
+        SectionLabel(L["Config_MainHeaderPosition"] or "Header & Sections")
 
         local headerModeY = yOff - 4
         local headerModeBtnW = math.floor((contentW - 2) / 2)
@@ -554,7 +575,18 @@ function MR:PopulateConfigFrame(f)
             function(v)
                 SetWindowLayoutValue("animatedMinimize", v and true or false)
             end,
-            0.55, 0.22, 0.82, 8, nil, cfgFs)
+            0.16, 0.78, 0.75, 8, nil, cfgFs)
+
+        Gap(2)
+        yOff = OptionsCheckbox(body, yOff,
+            L["Config_ShowSectionHeaders"] or "Show Section Headers",
+            function() return MR.db.profile.keepHeadersVisibleInTextMode ~= false end,
+            function(v)
+                MR.db.profile.keepHeadersVisibleInTextMode = v
+                RefreshVisualSettings()
+                ScheduleSettingsGarbageCollect()
+            end,
+            0.16, 0.78, 0.75, 8, nil, cfgFs)
 
         Gap(4); Divider()
 
@@ -622,7 +654,7 @@ function MR:PopulateConfigFrame(f)
                 if v then MR:ApplyFontSizeToAll(GetFontSize()) end
                 MR:PopulateConfigFrame(f)
             end,
-            0.78, 0.55, 0.16, 8, nil, cfgFs)
+            0.55, 0.22, 0.82, 8, nil, cfgFs)
 
         Gap(4); Divider()
         SectionLabel(L["Config_SharedMedia"] or "Shared Media")
@@ -686,38 +718,6 @@ function MR:PopulateConfigFrame(f)
                 MR:ApplySharedMediaSettings()
             end)
 
-        Gap(4)
-        yOff = OptionsSlider(body, yOff, L["BACKGROUND"], 0, 1, 0.05,
-            function() return MR.db.profile.frameAlpha or 1.0 end,
-            function(v)
-                MR.db.profile.frameAlpha = v
-                if MR.ApplyTheme then MR.ApplyTheme() end
-                MR:RefreshUI()
-            end,
-            0.40, 0.40, 0.40, 8, nil, cfgFs)
-
-        Gap(2)
-        yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowIcons"] or "Show Icons",
-            function() return MR.db.profile.keepIconsVisibleInTextMode ~= false end,
-            function(v)
-                MR.db.profile.keepIconsVisibleInTextMode = v
-                RefreshVisualSettings()
-                ScheduleSettingsGarbageCollect()
-            end,
-            0.40, 0.40, 0.40, 8, nil, cfgFs)
-
-        Gap(2)
-        yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowSectionHeaders"] or "Show Section Headers",
-            function() return MR.db.profile.keepHeadersVisibleInTextMode ~= false end,
-            function(v)
-                MR.db.profile.keepHeadersVisibleInTextMode = v
-                RefreshVisualSettings()
-                ScheduleSettingsGarbageCollect()
-            end,
-            0.40, 0.40, 0.40, 8, nil, cfgFs)
-
         Gap(4); Divider()
         SectionLabel(L["Config_TooltipPosition"] or "Tooltip Position")
 
@@ -773,6 +773,13 @@ function MR:PopulateConfigFrame(f)
             CreateTooltipPositionButton(choice, index)
         end
         yOff = yOff - 30
+
+        Gap(4)
+        yOff = OptionsCheckbox(body, yOff,
+            L["Config_ShowWarbandTooltips"] or "Show Warband Info in Tooltips",
+            function() return MR.db.profile.showWarbandTooltips ~= false end,
+            function(v) MR.db.profile.showWarbandTooltips = v end,
+            0.24, 0.82, 0.70, 8, nil, cfgFs)
     end
 
     if activePage == "modules" then

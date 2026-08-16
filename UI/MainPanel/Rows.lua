@@ -230,6 +230,38 @@ local function MainRowOnEnter(selfRow)
             end
         end,
     })
+
+    if data.mod and ns.ShowWarbandTooltip and MR:IsWarbandTrackedRow(data.mod, row) then
+        local modKey, rowKey, rowMax = data.mod.key, row.key, row.max
+        ns.ShowWarbandTooltip(selfRow, function(tip)
+            local rows, done, total = MR:GetRowWarbandStatuses(modKey, rowKey, rowMax)
+            if not rows or total <= 0 then
+                return
+            end
+
+            local headerText = L["Tooltip_WarbandHeader"] or "Warband: %d/%d done this week"
+            tip:AddLine(string.format(headerText, done, total), 0.65, 0.90, 1)
+
+            local expanded = IsShiftKeyDown()
+            local shown = expanded and total or math.min(total, 4)
+            for i = 1, shown do
+                local charRow = rows[i]
+                if charRow.complete then
+                    tip:AddDoubleLine(charRow.name, L["Tooltip_WarbandDone"] or "Done", 0.90, 0.90, 0.90, 0.20, 0.85, 0.45)
+                elseif charRow.stale then
+                    tip:AddDoubleLine(charRow.name, L["Tooltip_WarbandStale"] or "Needs login", 0.65, 0.65, 0.65, 0.70, 0.70, 0.70)
+                else
+                    tip:AddDoubleLine(charRow.name, L["Tooltip_WarbandNotDone"] or "Not done", 0.90, 0.90, 0.90, 0.50, 0.50, 0.50)
+                end
+            end
+
+            if not expanded and total > shown then
+                tip:AddLine(L["Tooltip_WarbandHoldShift"] or "Hold Shift for full list", 0.55, 0.55, 0.60)
+            end
+        end)
+    elseif ns.HideWarbandTooltip then
+        ns.HideWarbandTooltip()
+    end
 end
 
 local function MainRowOnLeave(selfRow)
@@ -237,6 +269,9 @@ local function MainRowOnLeave(selfRow)
         selfRow._hover:SetColorTexture(1, 1, 1, 0)
     end
     HideTooltipIfOwned(selfRow)
+    if ns.HideWarbandTooltip then
+        ns.HideWarbandTooltip()
+    end
 end
 
 local function MainRowOnMouseDown(selfRow, button)

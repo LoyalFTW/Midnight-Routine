@@ -83,6 +83,78 @@ function ns.AddTooltipLines(owner, build)
     GameTooltip:Show()
 end
 
+local warbandTooltip
+local warbandShiftWatcher
+local warbandHoveredOwner
+local warbandHoveredBuild
+local warbandLastShiftState = false
+
+local function EnsureWarbandTooltip()
+    if warbandTooltip then
+        return warbandTooltip
+    end
+
+    warbandTooltip = CreateFrame("GameTooltip", "MidnightRoutineWarbandTooltip", UIParent, "GameTooltipTemplate")
+    warbandTooltip:SetFrameStrata("TOOLTIP")
+    return warbandTooltip
+end
+
+local function EnsureWarbandShiftWatcher()
+    if warbandShiftWatcher then
+        return
+    end
+
+    warbandShiftWatcher = CreateFrame("Frame")
+    warbandShiftWatcher:SetScript("OnUpdate", function()
+        if not warbandHoveredOwner then
+            return
+        end
+
+        local shiftDown = IsShiftKeyDown()
+        if shiftDown ~= warbandLastShiftState then
+            warbandLastShiftState = shiftDown
+            ns.ShowWarbandTooltip(warbandHoveredOwner, warbandHoveredBuild)
+        end
+    end)
+end
+
+function ns.ShowWarbandTooltip(owner, build)
+    if not owner or type(build) ~= "function" or not GameTooltip then
+        return
+    end
+
+    local addon = ns.MR
+    if not (addon and addon.db and addon.db.profile and addon.db.profile.showWarbandTooltips ~= false) then
+        return
+    end
+
+    EnsureWarbandShiftWatcher()
+    warbandHoveredOwner = owner
+    warbandHoveredBuild = build
+    warbandLastShiftState = IsShiftKeyDown()
+
+    local tip = EnsureWarbandTooltip()
+    tip:SetOwner(owner, "ANCHOR_NONE")
+    tip:ClearAllPoints()
+    tip:SetPoint("TOPLEFT", GameTooltip, "BOTTOMLEFT", 0, -2)
+    tip:ClearLines()
+    build(tip)
+
+    if tip:NumLines() > 0 then
+        tip:Show()
+    else
+        tip:Hide()
+    end
+end
+
+function ns.HideWarbandTooltip()
+    warbandHoveredOwner = nil
+    warbandHoveredBuild = nil
+    if warbandTooltip then
+        warbandTooltip:Hide()
+    end
+end
+
 function ns.BindTooltip(frame, opts)
     if not frame then
         return

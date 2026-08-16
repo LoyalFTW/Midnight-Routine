@@ -1,5 +1,6 @@
 local _, ns = ...
 local MR = ns.MR
+local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local DAY_SECONDS = 24 * 60 * 60
 
@@ -14,6 +15,65 @@ local function ParseCharacterKey(charKey)
     end
 
     return charKey, ""
+end
+
+local function GetRowWarbandCharacterName(charKey, charData, currentKey)
+    local name = ParseCharacterKey(charKey)
+    if charKey == currentKey then
+        name = string.format("%s (%s)", name, L["AltBoard_Current"] or "Current")
+    end
+
+    local classColor = charData and charData.classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[charData.classFile]
+    if classColor and classColor.colorStr then
+        return string.format("|c%s%s|r", classColor.colorStr, name)
+    end
+
+    return name
+end
+
+function MR:GetRowWarbandStatuses(modKey, rowKey, rowMax)
+    if not (self.db and self.db.sv and self.db.sv.char and modKey and rowKey) then
+        return nil, 0, 0
+    end
+
+    rowMax = tonumber(rowMax) or 0
+    local currentKey = self:GetCurrentCharacterKey()
+    local hiddenChars = (self.db.profile and self.db.profile.altBoardHiddenCharacters) or {}
+    local showHidden = self.db.profile and self.db.profile.altBoardShowHidden == true
+    local resetAt = self.GetLastResetTimestamp and self:GetLastResetTimestamp() or 0
+    local rows, done = {}, 0
+
+    for charKey, charData in pairs(self.db.sv.char) do
+        if type(charData) == "table" and type(charData.progress) == "table"
+            and (charKey == currentKey or showHidden or not hiddenChars[charKey]) then
+            local modProgress = charData.progress[modKey]
+            local value = modProgress and tonumber(modProgress[rowKey]) or 0
+            local complete = rowMax > 0 and value >= rowMax
+            local lastSyncAt = tonumber(charData.lastSyncAt) or 0
+            local stale = resetAt > 0 and lastSyncAt > 0 and lastSyncAt < resetAt
+
+            if complete then
+                done = done + 1
+            end
+
+            rows[#rows + 1] = {
+                key = charKey,
+                name = GetRowWarbandCharacterName(charKey, charData, currentKey),
+                complete = complete,
+                stale = stale,
+                current = charKey == currentKey,
+            }
+        end
+    end
+
+    table.sort(rows, function(a, b)
+        if a.current ~= b.current then return a.current end
+        if a.complete ~= b.complete then return a.complete end
+        if a.stale ~= b.stale then return not a.stale end
+        return (a.key or "") < (b.key or "")
+    end)
+
+    return rows, done, #rows
 end
 
 local function CleanAccountLabel(text)
@@ -108,6 +168,27 @@ local function IsAltBoardModule(mod)
     end
 
     return mod.key:match("^story_campaign_") ~= nil
+end
+
+function MR:IsWarbandTrackedRow(mod, row)
+    if not (mod and row and row.key) then
+        return false
+    end
+
+    if row.warbandTracked == false then
+        return false
+    end
+
+    if row.warbandTracked == true then
+        return true
+    end
+
+    if not IsAltBoardModule(mod) then
+        return false
+    end
+
+    local rowMax = tonumber(row.max)
+    return rowMax ~= nil and rowMax > 0
 end
 
 local function GetAltBoardModuleRows(mod, charData, globalData)

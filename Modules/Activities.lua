@@ -4,29 +4,54 @@ local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local CURSE_SURGE_INTERVAL = 2700
-local CURSE_SURGE_EPOCH = 1786843866
+local CURSE_SURGE_EPOCH_BASE = 1786843866
 local CURSE_SURGE_LIVE_DURATION = 300
 local CURSE_SURGE_SITES = {
-    { name = "The Malformed Leviathan",           zone = 2512, x = 46.7, y = 62.8 },
-    { name = "The Broodmother's Nest",             zone = 2512, x = 45.7, y = 29.6 },
-    { name = "The Looming Mutagenior",             zone = 2512, x = 26.4, y = 64.9 },
-    { name = "Mlurkkr Massacre",                   zone = 2512, x = 70.5, y = 32.7 },
-    { name = "Siege at the Whispering Marsch",     zone = 2512, x = 67.1, y = 77.5 },
+    { name = L["CurseSurgeSite_MalformedLeviathan"],       zone = 2512, x = 46.7, y = 62.8 },
+    { name = L["CurseSurgeSite_BroodmothersNest"],         zone = 2512, x = 45.7, y = 29.6 },
+    { name = L["CurseSurgeSite_LoomingMutagenior"],        zone = 2512, x = 26.4, y = 64.9 },
+    { name = L["CurseSurgeSite_MlurkkrMassacre"],          zone = 2512, x = 70.5, y = 32.7 },
+    { name = L["CurseSurgeSite_SiegeWhisperingMarsch"],    zone = 2512, x = 67.1, y = 77.5 },
+}
+
+local CURSE_SURGE_REGION_OFFSETS = {
+    CN = 1800,
+    EU = 900,
 }
 
 if MR.db and MR.db.global and MR.db.global.curseSurgeAnchor then
     MR.db.global.curseSurgeAnchor = nil
 end
+if MR.db and MR.db.global and MR.db.global.curseSurgeRegionOffsets then
+    MR.db.global.curseSurgeRegionOffsets = nil
+end
+
+local function GetCurseSurgeRegionKey()
+    local region = GetCurrentRegionName and GetCurrentRegionName()
+    if type(region) == "string" and region ~= "" then
+        return region
+    end
+    return "UNKNOWN"
+end
+
+local function GetCurseSurgeOffsetSeconds()
+    return CURSE_SURGE_REGION_OFFSETS[GetCurseSurgeRegionKey()] or 0
+end
+
+local function GetCurseSurgeEpoch()
+    return CURSE_SURGE_EPOCH_BASE + GetCurseSurgeOffsetSeconds()
+end
 
 local function GetCurseSurgeState()
-    local elapsed = GetServerTime() - CURSE_SURGE_EPOCH
+    local epoch = GetCurseSurgeEpoch()
+    local elapsed = GetServerTime() - epoch
     local offset = elapsed % CURSE_SURGE_INTERVAL
     local cycleIndex = math.floor(elapsed / CURSE_SURGE_INTERVAL)
     local isLive = offset < CURSE_SURGE_LIVE_DURATION
     local siteIndex = isLive and cycleIndex or (cycleIndex + 1)
     local site = CURSE_SURGE_SITES[(siteIndex % #CURSE_SURGE_SITES) + 1]
 
-    return site, isLive
+    return epoch, site
 end
 
 local curseSurgeBoundaryTimer
@@ -37,7 +62,8 @@ local function ScheduleCurseSurgeBoundaryRefresh()
         curseSurgeBoundaryTimer = nil
     end
 
-    local offset = (GetServerTime() - CURSE_SURGE_EPOCH) % CURSE_SURGE_INTERVAL
+    local epoch = GetCurseSurgeEpoch()
+    local offset = (GetServerTime() - epoch) % CURSE_SURGE_INTERVAL
     local wait = (offset < CURSE_SURGE_LIVE_DURATION)
         and (CURSE_SURGE_LIVE_DURATION - offset)
         or (CURSE_SURGE_INTERVAL - offset)
@@ -63,10 +89,11 @@ MR:RegisterModule({
     scanReturnsChanged = true,
 
     onScan = function(mod)
-        local site = GetCurseSurgeState()
+        local epoch, site = GetCurseSurgeState()
         local changed = false
         for _, row in ipairs(mod.rows) do
             if row.key == "curse_surge" then
+                row.timerEpoch = epoch
                 local note = site
                     and string.format(L["Act_CurseSurge_NoteSite"] or "%s\nSite: %s (%.1f, %.1f)", L["Act_CurseSurge_Note"], site.name, site.x, site.y)
                     or L["Act_CurseSurge_Note"]
@@ -102,7 +129,7 @@ MR:RegisterModule({
             max           = 1,
             note          = L["Act_CurseSurge_Note"],
             patchKey      = "12.1.0",
-            timerEpoch    = CURSE_SURGE_EPOCH,
+            timerEpoch    = GetCurseSurgeEpoch(),
             timerInterval = CURSE_SURGE_INTERVAL,
             timerDuration = CURSE_SURGE_LIVE_DURATION,
             autoTracked   = true,

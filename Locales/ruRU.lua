@@ -45,6 +45,12 @@ L["Tooltip_ManualClick"] = "ЛКМ: +1   ПКМ: -1"
 L["Tooltip_ManualDot_Hint"] = "Нажмите, чтобы отметить как выполненное"
 L["Tooltip_ManualDot_Active"] = "|cffffe066Отмечено вручную|r - нажмите, чтобы сбросить"
 L["Tooltip_ExpandCollapse"] = "ЛКМ: развернуть/свернуть"
+L["Tooltip_WarbandHeader"] = "Warband: %d/%d done this week"
+L["Tooltip_WarbandDone"] = "Done"
+L["Tooltip_WarbandStale"] = "Needs login"
+L["Tooltip_WarbandNotDone"] = "Not done"
+L["Tooltip_WarbandHoldShift"] = "Hold Shift for full list"
+L["Config_ShowWarbandTooltips"] = "Show Warband Info in Tooltips"
 
 -- UI Config
 L["Config_Title"] = "|cffff8000Настройки|r"
@@ -470,6 +476,11 @@ L["Act_Stormarion_Note"] = "Повторяющееся событие в Бур�
 L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
 L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
 L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
+L["CurseSurgeSite_MalformedLeviathan"] = "The Malformed Leviathan"
+L["CurseSurgeSite_BroodmothersNest"] = "The Broodmother's Nest"
+L["CurseSurgeSite_LoomingMutagenior"] = "The Looming Mutagenior"
+L["CurseSurgeSite_MlurkkrMassacre"] = "Mlurkkr Massacre"
+L["CurseSurgeSite_SiegeWhisperingMarsch"] = "Siege at the Whispering Marsch"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Еженедельники"

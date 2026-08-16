@@ -46,6 +46,12 @@ L["Tooltip_ManualClick"] = "左键：+1   右键：-1"
 L["Tooltip_ManualDot_Hint"] = "点击手动标记已完成"
 L["Tooltip_ManualDot_Active"] = "|cffffe066手动标记已完成|r — 点击清除"
 L["Tooltip_ExpandCollapse"] = "左键：展开/折叠"
+L["Tooltip_WarbandHeader"] = "Warband: %d/%d done this week"
+L["Tooltip_WarbandDone"] = "Done"
+L["Tooltip_WarbandStale"] = "Needs login"
+L["Tooltip_WarbandNotDone"] = "Not done"
+L["Tooltip_WarbandHoldShift"] = "Hold Shift for full list"
+L["Config_ShowWarbandTooltips"] = "Show Warband Info in Tooltips"
 
 -- UI Config
 L["Config_Title"] = "|cffff8000选项|r"
@@ -472,6 +478,11 @@ L["Act_Stormarion_Note"] = "虚影风暴每30分钟重复一次的事件活动�
 L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
 L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
 L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
+L["CurseSurgeSite_MalformedLeviathan"] = "The Malformed Leviathan"
+L["CurseSurgeSite_BroodmothersNest"] = "The Broodmother's Nest"
+L["CurseSurgeSite_LoomingMutagenior"] = "The Looming Mutagenior"
+L["CurseSurgeSite_MlurkkrMassacre"] = "Mlurkkr Massacre"
+L["CurseSurgeSite_SiegeWhisperingMarsch"] = "Siege at the Whispering Marsch"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "周常"
