@@ -483,8 +483,8 @@ L["CurseSurgeSite_LoomingMutagenior"] = "The Looming Mutagenior"
 L["CurseSurgeSite_MlurkkrMassacre"] = "Mlurkkr Massacre"
 L["CurseSurgeSite_SiegeWhisperingMarsch"] = "Siege at the Whispering Marsch"
 L["Act_CurseSurge_AnnounceHint"] = "Shift-right-click to announce this to zone chat."
-L["Chat_CurseSurgeAnnounceLive"] = "Routine: %s is LIVE on the Coiled Isle! (%.1f, %.1f)"
-L["Chat_CurseSurgeAnnounceNext"] = "Routine: %s next in %s on the Coiled Isle (%.1f, %.1f)"
+L["Chat_CurseSurgeAnnounceLive"] = "Routine: Curse Surge is LIVE at %s! (%.1f, %.1f)"
+L["Chat_CurseSurgeAnnounceNext"] = "Routine: Curse Surge next at %s in %s (%.1f, %.1f)"
 L["Chat_CurseSurgeNoSite"] = "|cff2ae7c6MidnightRoutine:|r Nothing to announce right now."
 
 -- WeeklyTasks
