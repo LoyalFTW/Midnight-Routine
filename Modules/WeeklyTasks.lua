@@ -989,6 +989,20 @@ MR:RegisterModule({
                 break
             end
         end
+        if C_QuestLog and C_QuestLog.GetQuestObjectives then
+            local fulfilled
+            if C_QuestLog.IsQuestFlaggedCompleted(96995) then
+                fulfilled = 3
+            else
+                local objectives = C_QuestLog.GetQuestObjectives(96995)
+                local objective = objectives and objectives[1]
+                fulfilled = objective and tonumber(objective.numFulfilled)
+            end
+            if fulfilled then
+                db[mod.key]["turn_back_surge"] = math.min(fulfilled, 3)
+            end
+        end
+
         for key, value in pairs(db[mod.key]) do
             if beforeProgress[key] ~= value then
                 return true
@@ -1489,7 +1503,7 @@ MR:RegisterModule({
         {
             key      = "turn_back_surge",
             label    = L["Weekly_TurnBackSurge_Label"] or "Turn Back the Surge:",
-            max      = 1,
+            max      = 3,
             note     = L["Weekly_TurnBackSurge_Note"] or "Defeat 3 Curse Surges on the Coiled Isle.",
             patchKey = "12.1.0",
             questIds = { 96995 },

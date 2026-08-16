@@ -468,6 +468,9 @@ L["Story_ChapterPrefix"] = "Chapitre "
 L["Activities_Title"] = "Activités"
 L["Act_Stormarion_Label"] = "|cffff9040Assaut de Fulgarion :|r"
 L["Act_Stormarion_Note"] = "Événement répétable dans la Tempête-du-Vide toutes les 30 min (actif pendant 15 min).\nÀ terminer une fois par semaine pour la récompense : Inébranlable."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Hebdomadaires"

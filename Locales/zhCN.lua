@@ -469,6 +469,9 @@ L["Story_ChapterPrefix"] = "章节 "
 L["Activities_Title"] = "事件活动"
 L["Act_Stormarion_Label"] = "|cffff9040斯托玛兰突袭战：|r"
 L["Act_Stormarion_Note"] = "虚影风暴每30分钟重复一次的事件活动（持续15分钟）。\n每周完成一次获得'坚守阵地'任务奖励。"
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "周常"

@@ -485,6 +485,9 @@ L["Story_ChapterPrefix"] = "Kapitel "
 L["Activities_Title"] = "Aktivitäten"
 L["Act_Stormarion_Label"] = "|cffff9040Angriff auf Sturmarion:|r"
 L["Act_Stormarion_Note"] = "Wiederkehrendes Ereignis im Leerensturm alle 30 Minuten (15 Minuten lang aktiv).\nEinmal pro Woche abschließen, um die Belohnung „Stand Your Ground“ zu erhalten."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Wochenaufgaben"

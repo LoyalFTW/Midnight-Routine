@@ -473,6 +473,9 @@ L["Story_ChapterPrefix"] = "챕터 "
 L["Activities_Title"] = "활동"
 L["Act_Stormarion_Label"] = "|cffff9040스토르마리온 공격:|r"
 L["Act_Stormarion_Note"] = "보이드스톰에서 30분마다 반복되는 이벤트 (15분간 활성).\n주간 1회 완료 시 'Stand Your Ground' 보상 획득."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "주간 퀘스트"

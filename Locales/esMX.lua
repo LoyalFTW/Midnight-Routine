@@ -468,6 +468,9 @@ L["Story_ChapterPrefix"] = "Capítulo "
 L["Activities_Title"] = "Actividades"
 L["Act_Stormarion_Label"] = "|cffff9040Asalto a Stormarion:|r"
 L["Act_Stormarion_Note"] = "Evento repetible en Tormenta del Vacío cada 30 min (activo durante 15 min).\nCompleta una vez a la semana para obtener la recompensa Defender el terreno."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Semanales"

@@ -487,6 +487,9 @@ L["Story_ChapterPrefix"] = "Chapter "
 L["Activities_Title"] = "Activities"
 L["Act_Stormarion_Label"] = "|cffff9040Stormarion Assault:|r"
 L["Act_Stormarion_Note"] = "Repeating event in Voidstorm every 30 min (active for 15 min).\nComplete once per week for the Stand Your Ground reward."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Weeklies"

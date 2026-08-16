@@ -467,6 +467,9 @@ L["Story_ChapterPrefix"] = "Глава "
 L["Activities_Title"] = "Активности"
 L["Act_Stormarion_Label"] = "|cffff9040Атака на Штормарион:|r"
 L["Act_Stormarion_Note"] = "Повторяющееся событие в Буре Бездне каждые 30 мин (активно 15 мин).\nВыполните раз в неделю для получения награды «Не отступать»."
+L["Act_CurseSurge_Label"] = "|cffff9040Curse Surge:|r"
+L["Act_CurseSurge_Note"] = "Rotates between 5 sites on the Coiled Isle every 45 min. Shows Live for the first 5 min of each site, then switches to the next upcoming one."
+L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "Еженедельники"
