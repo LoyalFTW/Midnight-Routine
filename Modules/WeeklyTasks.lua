@@ -504,6 +504,26 @@ local function FindActivityZoneFromAreaPois(variants, matchTerms)
     return nil, nil, nil
 end
 
+local pendingAreaPoiZones = {}
+
+local function DebouncedActivityZone(stateKey, variants, matchTerms)
+    local name, poiName, mapId = FindActivityZoneFromAreaPois(variants, matchTerms)
+    local reading = tostring(name) .. "\1" .. tostring(poiName) .. "\1" .. tostring(mapId)
+
+    local state = pendingAreaPoiZones[stateKey]
+    if not state then
+        state = {}
+        pendingAreaPoiZones[stateKey] = state
+    end
+
+    if state.reading == reading then
+        state.name, state.poiName, state.mapId = name, poiName, mapId
+    end
+    state.reading = reading
+
+    return state.name, state.poiName, state.mapId
+end
+
 MR:RegisterModule({
     key         = "s1_weekly",
     label       = L["Weekly_SeasonTitle"],
@@ -626,7 +646,8 @@ MR:RegisterModule({
         end
 
         local completedVoidAssaultWeeklies, activeVoidAssaultWeeklies = CollectQuestVariants(VOID_ASSAULT_WEEKLIES)
-        local activeVoidAssaultZone, activeVoidAssaultPoiName = FindActivityZoneFromAreaPois(
+        local activeVoidAssaultZone, activeVoidAssaultPoiName = DebouncedActivityZone(
+            "void_assault",
             VOID_ASSAULT_WEEKLIES,
             { "voidstrike", "voidincursion", "voidassault" }
         )
@@ -691,7 +712,8 @@ MR:RegisterModule({
         end
 
         local completedRitualSiteWeeklies, activeRitualSiteWeeklies = CollectQuestVariants(RITUAL_SITE_WEEKLIES)
-        local activeRitualSiteZone, activeRitualSitePoiName, activeRitualSiteMapId = FindActivityZoneFromAreaPois(
+        local activeRitualSiteZone, activeRitualSitePoiName, activeRitualSiteMapId = DebouncedActivityZone(
+            "ritual_site",
             RITUAL_SITE_WEEKLIES,
             { "ritualsite", "ritual" }
         )

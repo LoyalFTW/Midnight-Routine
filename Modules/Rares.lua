@@ -286,7 +286,7 @@ local function ResolveRareQuestIDs(zone)
         local ok, criteriaName, _, _, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
         if ok and criteriaName then
             local rare = rareByName[NormalizeRareName(criteriaName)]
-            if rare then
+            if rare and not rare[6] then
                 assetID = tonumber(assetID)
                 if assetID and assetID > 0 then
                     rare[6] = assetID
@@ -374,7 +374,7 @@ local function SyncNewAchievementCriteriaKills(zone)
             local rare = rareByName[NormalizeRareName(criteriaName)]
             if rare then
                 assetID = tonumber(assetID)
-                if assetID and assetID > 0 then
+                if assetID and assetID > 0 and not rare[6] then
                     rare[6] = assetID
                     RARE_BY_NPC_ID[assetID] = rare
                 end

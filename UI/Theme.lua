@@ -5,6 +5,7 @@ ns.MEDIA_DEFAULT_TOKEN = "__MIDNIGHT_DEFAULT__"
 local MEDIA_KIND_TO_LSM = {
     font = LSM and LSM.MediaType.FONT or "font",
     background = LSM and LSM.MediaType.BACKGROUND or "background",
+    sound = LSM and LSM.MediaType.SOUND or "sound",
 }
 
 local DEFAULT_FONT_FLAGS = "OUTLINE"

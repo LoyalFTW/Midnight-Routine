@@ -167,6 +167,9 @@ function MR:PopulateConfigFrame(f)
     end
     local function SetLayoutMode(enabled)
         MR.db.profile.characterWindowLayout = enabled
+        if ns.MigrateCompletionSoundsScope then
+            ns.MigrateCompletionSoundsScope(not enabled)
+        end
         if MR.ApplySharedMediaSettings then
             MR:ApplySharedMediaSettings()
         end
