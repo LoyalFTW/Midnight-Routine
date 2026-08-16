@@ -483,8 +483,16 @@ L["CurseSurgeSite_BroodmothersNest"] = "育母之巢"
 L["CurseSurgeSite_LoomingMutagenior"] = "逼近的突變巨獸"
 L["CurseSurgeSite_MlurkkrMassacre"] = "姆嚕咕大屠殺"
 L["CurseSurgeSite_SiegeWhisperingMarsch"] = "圍攻低語沼澤"
-L["Act_CurseSurge_NoteSite"] = "%s\n站點：%s (%.1f, %.1f)"
-
+L["Act_CurseSurge_NoteSite"] = "%s\n站點: %s (%.1f, %.1f)"
+L["CurseSurgeSite_MalformedLeviathan"] = "畸形巨神海蛇"
+L["CurseSurgeSite_BroodmothersNest"] = "育母之巢"
+L["CurseSurgeSite_LoomingMutagenior"] = "逼近的突變巨獸"
+L["CurseSurgeSite_MlurkkrMassacre"] = "姆嚕咕大屠殺"
+L["CurseSurgeSite_SiegeWhisperingMarsch"] = "圍攻低語沼澤"
+L["Act_CurseSurge_AnnounceHint"] = "Shift-right-click to announce this to zone chat."
+L["Chat_CurseSurgeAnnounceLive"] = "Routine: %s is LIVE on the Coiled Isle! (%.1f, %.1f)"
+L["Chat_CurseSurgeAnnounceNext"] = "Routine: %s next in %s on the Coiled Isle (%.1f, %.1f)"
+L["Chat_CurseSurgeNoSite"] = "|cff2ae7c6MidnightRoutine:|r Nothing to announce right now."
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "每週任務"
