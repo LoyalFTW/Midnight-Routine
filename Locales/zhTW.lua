@@ -476,15 +476,16 @@ L["Act_Stormarion_Label"] = "|cffff9040風瑪利昂襲擊：|r"
 L["Act_Stormarion_Note"] = "虛無風暴每30分鐘重復一次的事件活動（持續15分鐘）。\n每週完成一次獲得'堅守陣地'任務獎勵。"
 L["Act_CurseSurge_Label"] = "|cffff9040詛咒狂湧：|r"
 L["Act_CurseSurge_Note"] = "每45分鐘在盤蛇島上的5個站點之間輪換。每個點前5分鐘顯示為啟動，然後切換到下一個站點。"
-
 L["Act_CurseSurge_NoteSite"] = "%s\nSite: %s (%.1f, %.1f)"
 L["CurseSurgeSite_MalformedLeviathan"] = "The Malformed Leviathan"
 L["CurseSurgeSite_BroodmothersNest"] = "The Broodmother's Nest"
 L["CurseSurgeSite_LoomingMutagenior"] = "The Looming Mutagenior"
 L["CurseSurgeSite_MlurkkrMassacre"] = "Mlurkkr Massacre"
 L["CurseSurgeSite_SiegeWhisperingMarsch"] = "Siege at the Whispering Marsch"
-L["Act_CurseSurge_NoteSite"] = "%s\n站點：%s (%.1f, %.1f)"
-
+L["Act_CurseSurge_AnnounceHint"] = "Shift-right-click to announce this to zone chat."
+L["Chat_CurseSurgeAnnounceLive"] = "Routine: %s is LIVE on the Coiled Isle! (%.1f, %.1f)"
+L["Chat_CurseSurgeAnnounceNext"] = "Routine: %s next in %s on the Coiled Isle (%.1f, %.1f)"
+L["Chat_CurseSurgeNoSite"] = "|cff2ae7c6MidnightRoutine:|r Nothing to announce right now."
 
 -- WeeklyTasks
 L["Weekly_SeasonTitle"] = "每週任務"
