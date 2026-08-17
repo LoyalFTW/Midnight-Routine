@@ -343,12 +343,12 @@ function Config.CreateTaskControl(spec)
     swatch:SetSize(14, 14)
     swatch:SetPoint("RIGHT", visibility, "LEFT", -2, 0)
 
-    local canHaveCompletionSound = type(row.max) == "number" and row.max > 0 and not row.noMax
+    local canHaveCompletionSound = type(row.max) == "number" and row.max > 0 and not row.noMax and not row.currencyId
     if canHaveCompletionSound then
         local soundBtn = CreateFrame("Button", nil, frame)
         soundBtn:SetSize(14, 14)
         soundBtn:SetPoint("RIGHT", swatch, "LEFT", -4, 0)
-		
+
         local icon = soundBtn:CreateTexture(nil, "ARTWORK")
         icon:SetAllPoints()
         icon:SetAtlas("common-icon-sound", true)

@@ -367,7 +367,7 @@ function MR:IsRowEnabled(modKey, rowKey)
     local mod = self.moduleByKey and self.moduleByKey[modKey]
     if mod then
         for _, row in ipairs(mod.rows or {}) do
-            if row.key == rowKey and not self:IsPatchEnabled(self:GetRowPatchKey(mod, row)) then
+            if row.key == rowKey and not self:IsPatchEnabled(self:GetRowPatchKey(mod, row), modKey) then
                 return false
             end
         end

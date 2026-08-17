@@ -153,10 +153,10 @@ function Config.BuildModulesPage(ctx)
         return cleanLabel
     end
 
-    local function BuildPatchHeader(patchKey)
+    local function BuildPatchHeader(patchKey, modKey)
         local patchInfo = MR:GetPatchInfo(patchKey)
         local available = MR:IsPatchAvailable(patchKey)
-        local enabled = MR:IsPatchEnabled(patchKey)
+        local enabled = MR:IsPatchEnabled(patchKey, modKey)
         local ROW_H = moduleHeaderH
         local patchFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         patchFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
@@ -172,7 +172,7 @@ function Config.BuildModulesPage(ctx)
         cb:SetEnabled(available)
         cb:SetAlpha(available and 1 or 0.45)
         cb:SetScript("OnClick", function(s)
-            MR:SetPatchEnabled(patchKey, s:GetChecked(), true)
+            MR:SetPatchEnabled(patchKey, modKey, s:GetChecked(), true)
             if MR.RequestConfigRefresh then
                 MR:RequestConfigRefresh()
             else
@@ -211,10 +211,10 @@ function Config.BuildModulesPage(ctx)
         return rows
     end
 
-    local function BuildRowPatchHeader(patchKey)
+    local function BuildRowPatchHeader(patchKey, modKey)
         local patchInfo = MR:GetPatchInfo(patchKey)
         local available = MR:IsPatchAvailable(patchKey)
-        local enabled = MR:IsPatchEnabled(patchKey)
+        local enabled = MR:IsPatchEnabled(patchKey, modKey)
         local ROW_H = moduleRowH
         local patchFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         patchFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
@@ -230,7 +230,7 @@ function Config.BuildModulesPage(ctx)
         cb:SetEnabled(available)
         cb:SetAlpha(available and 1 or 0.45)
         cb:SetScript("OnClick", function(s)
-            MR:SetPatchEnabled(patchKey, s:GetChecked(), true)
+            MR:SetPatchEnabled(patchKey, modKey, s:GetChecked(), true)
             if MR.RequestConfigRefresh then
                 MR:RequestConfigRefresh()
             else
@@ -980,7 +980,7 @@ function Config.BuildModulesPage(ctx)
             local currentRow = row
             local rowPatchKey = MR:GetRowPatchKey(mod, row)
             if rowPatchKey and rowPatchKey ~= MR:GetModulePatchKey(mod) and rowPatchKey ~= lastRowPatchKey then
-                BuildRowPatchHeader(rowPatchKey)
+                BuildRowPatchHeader(rowPatchKey, mod.key)
                 lastRowPatchKey = rowPatchKey
             end
             if row.group and row.group ~= lastRowGroup and rowsByGroup[row.group] then
@@ -1049,7 +1049,7 @@ function Config.BuildModulesPage(ctx)
         elseif mod.profSkillLine then
             if not professionGroupRendered then
                 if ShouldShowModulePatchHeader(patchKey) and patchKey ~= lastPatchKey then
-                    BuildPatchHeader(patchKey)
+                    BuildPatchHeader(patchKey, key)
                     lastPatchKey = patchKey
                 end
                 BuildProfessionGroupHeader()
@@ -1061,7 +1061,7 @@ function Config.BuildModulesPage(ctx)
         end
 
         if optVisible and not isStoryConfigModule and ShouldShowModulePatchHeader(patchKey) and patchKey ~= lastPatchKey then
-            BuildPatchHeader(patchKey)
+            BuildPatchHeader(patchKey, key)
             lastPatchKey = patchKey
         end
 

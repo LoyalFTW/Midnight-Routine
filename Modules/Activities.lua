@@ -221,6 +221,7 @@ MR:RegisterModule({
             label         = L["Act_Stormarion_Label"],
             max           = 1,
             note          = L["Act_Stormarion_Note"],
+            patchKey      = "12.0.0",
             questIds      = { 90962 },
             timerEpoch    = 1772370083,
             timerInterval = 1800,

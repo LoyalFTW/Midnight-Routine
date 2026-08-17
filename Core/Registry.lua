@@ -767,10 +767,10 @@ function MR:IsModuleEnabled(key)
     if mod and mod.profSkillLine and self.HasProfessionForModule and not self:HasProfessionForModule(mod.profSkillLine, professionSource) then
         return false
     end
-    if mod and not self:IsPatchEnabled(mod.patchKey) then
+    if mod and not self:IsPatchEnabled(mod.patchKey, key) then
         local hasEnabledPatchRows = false
         for _, row in ipairs(mod.rows or {}) do
-            if self:GetRowPatchKey(mod, row) ~= mod.patchKey and self:IsPatchEnabled(self:GetRowPatchKey(mod, row)) then
+            if self:GetRowPatchKey(mod, row) ~= mod.patchKey and self:IsPatchEnabled(self:GetRowPatchKey(mod, row), key) then
                 hasEnabledPatchRows = true
                 break
             end
@@ -857,7 +857,7 @@ function MR:ShouldHideProfessionModuleInMain(mod)
     return type(mod) == "table" and mod.profSkillLine ~= nil
 end
 
-function MR:IsPatchEnabled(patchKey)
+function MR:IsPatchEnabled(patchKey, modKey)
     if not patchKey then
         return true
     end
@@ -866,7 +866,13 @@ function MR:IsPatchEnabled(patchKey)
     end
     local states = self.db and self.db.profile and self.db.profile.patchStates
     local state = states and states[patchKey]
-    return not (state and state.enabled == false)
+    if not state then
+        return true
+    end
+    if modKey and state.modules and state.modules[modKey] ~= nil then
+        return state.modules[modKey] ~= false
+    end
+    return state.enabled ~= false
 end
 
 function MR:IsPatchAvailable(patchKey)
@@ -891,8 +897,8 @@ function MR:IsModuleAvailable(modOrKey)
     return not mod or self:IsPatchAvailable(mod.patchKey)
 end
 
-function MR:SetPatchEnabled(patchKey, enabled, skipRefresh)
-    if not (self and self.db and self.db.profile and patchKey) then
+function MR:SetPatchEnabled(patchKey, modKey, enabled, skipRefresh)
+    if not (self and self.db and self.db.profile and patchKey and modKey) then
         return
     end
     if not self:IsPatchAvailable(patchKey) then
@@ -901,7 +907,8 @@ function MR:SetPatchEnabled(patchKey, enabled, skipRefresh)
 
     self.db.profile.patchStates = self.db.profile.patchStates or {}
     self.db.profile.patchStates[patchKey] = self.db.profile.patchStates[patchKey] or {}
-    self.db.profile.patchStates[patchKey].enabled = enabled and true or false
+    self.db.profile.patchStates[patchKey].modules = self.db.profile.patchStates[patchKey].modules or {}
+    self.db.profile.patchStates[patchKey].modules[modKey] = enabled and true or false
     if not skipRefresh then
         self:RefreshUI()
     end

@@ -60,7 +60,36 @@ local function MigrateCompletionSoundsScope(toShared)
 end
 ns.MigrateCompletionSoundsScope = MigrateCompletionSoundsScope
 
-local function PlaySoundByValue(value)
+local function SpeakRowName(modKey, rowKey)
+    if not (C_VoiceChat and C_VoiceChat.SpeakText and C_VoiceChat.GetTtsVoices) then return end
+
+    local voices = C_VoiceChat.GetTtsVoices()
+    local voice = voices and voices[1]
+    if not (voice and voice.voiceID) then return end
+
+    local mod = MR.moduleByKey and MR.moduleByKey[modKey]
+    local row
+    if mod then
+        for _, r in ipairs(mod.rows) do
+            if r.key == rowKey then row = r break end
+        end
+    end
+
+    local text = tostring((row and (row.label or row.key)) or rowKey)
+    text = text:gsub("|c%x%x%x%x%x%x%x%x(.-)%|r", "%1"):gsub("|[cCrR]%x*", "")
+    text = text:gsub("^%s+", ""):gsub("%s+$", ""):gsub(":%s*$", "")
+    if text == "" then return end
+
+    local rate = (C_TTSSettings and C_TTSSettings.GetSpeechRate and C_TTSSettings.GetSpeechRate()) or 0
+    local volume = (C_TTSSettings and C_TTSSettings.GetSpeechVolume and C_TTSSettings.GetSpeechVolume()) or 100
+    C_VoiceChat.SpeakText(voice.voiceID, text, rate, volume, true)
+end
+
+local function PlaySoundByValue(value, modKey, rowKey)
+    if value == "tts" then
+        SpeakRowName(modKey, rowKey)
+        return
+    end
     if type(value) ~= "string" then return end
     local kind, rest = value:match("^(%a+):(.+)$")
     if kind == "lsm" then
@@ -129,7 +158,7 @@ local function OpenCompletionSoundMenu(modKey, rowKey, anchor)
 
     local function SetSelected(value)
         SetChosenSoundValue(modKey, rowKey, value)
-        PlaySoundByValue(value)
+        PlaySoundByValue(value, modKey, rowKey)
         if MR.RequestUIRefresh then MR:RequestUIRefresh(0.05) end
     end
 
@@ -139,6 +168,7 @@ local function OpenCompletionSoundMenu(modKey, rowKey, anchor)
             rootDescription:CreateTitle(L["CompletionSound_PickerTitle"] or "Completion Sound")
             rootDescription:CreateRadio(L["CompletionSound_None"] or "Off (no sound)", IsSelected, SetSelected, nil)
             BuildCooldownViewerCategories(rootDescription, IsSelected, SetSelected)
+            rootDescription:CreateRadio(L["CompletionSound_TextToSpeech"] or "Text to Speech", IsSelected, SetSelected, "tts")
             BuildCustomCategory(rootDescription, IsSelected, SetSelected)
         end)
     end)
@@ -182,7 +212,7 @@ local function CheckCompletionSounds()
                 if row then
                     local done = (MR:GetProgress(modKey, rowKey) or 0) >= (row.max or 1)
                     if done and lastKnownDone[key] == false then
-                        PlaySoundByValue(soundValue)
+                        PlaySoundByValue(soundValue, modKey, rowKey)
                     end
                     lastKnownDone[key] = done
                 end

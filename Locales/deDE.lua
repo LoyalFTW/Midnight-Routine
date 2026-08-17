@@ -906,6 +906,7 @@ L["CustomTasks_Delete"] = "Löschen"
 -- CompletionSounds (test)
 L["CompletionSound_PickerTitle"] = "Sound bei Fertigstellung"
 L["CompletionSound_None"] = "Off (Kein Ton)"
+L["CompletionSound_TextToSpeech"] = "Text to Speech"
 L["CompletionSound_Custom"] = "Benutzerdefiniert"
 L["CompletionSound_MenuUnavailable"] = "|cff2ae7c6MidnightRoutine:|r Das Sound-Menü ist auf diesem Client nicht verfügbar."
 L["CompletionSound_MenuError"] = "|cff2ae7c6MidnightRoutine:|r Das Sound-Menü konnte nicht geöffnet werden (%s)."
