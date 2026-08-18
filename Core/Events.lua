@@ -199,13 +199,11 @@ function MR:OnAreaPoisUpdated()
 end
 
 function MR:OnRareProgressChanged()
-    if not (self.raresFrame and self.raresFrame.IsShown and self.raresFrame:IsShown()) then
-        return
-    end
+    local raresVisible = self.raresFrame and self.raresFrame.IsShown and self.raresFrame:IsShown()
     if self.SyncAllRareKills then
         self:SyncAllRareKills()
     end
-    if self.RefreshRares then
+    if raresVisible and self.RefreshRares then
         self:RefreshRares()
     end
 end

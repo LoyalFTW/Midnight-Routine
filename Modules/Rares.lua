@@ -1793,32 +1793,6 @@ function MR:SyncAllRareKills()
     end
 end
 
-function MR:OnRareCombatLog()
-    if not (raresFrame and raresFrame:IsShown()) or not CombatLogGetCurrentEventInfo then
-        return
-    end
-    local _, subevent, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
-    if subevent ~= "PARTY_KILL" or not destGUID then
-        return
-    end
-    local unitType, _, _, _, _, npcID = strsplit("-", destGUID)
-    if unitType ~= "Creature" and unitType ~= "Vehicle" then
-        return
-    end
-    npcID = tonumber(npcID)
-    local rare = npcID and RARE_BY_NPC_ID[npcID]
-    if not rare then
-        for _, zone in ipairs(ZONES) do
-            ResolveRareQuestIDs(zone)
-        end
-        rare = npcID and RARE_BY_NPC_ID[npcID]
-    end
-    if not rare then
-        return
-    end
-    SyncRareKillRecord("npc:" .. tostring(npcID))
-    self:RefreshRares()
-end
 
 function MR:RefreshRares()
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
