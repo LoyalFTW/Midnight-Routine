@@ -506,7 +506,7 @@ L["CurseSurgeSite_MlurkkrMassacre"] = "姆嚕咕大屠殺"
 L["CurseSurgeSite_SiegeWhisperingMarsch"] = "圍攻低語沼澤"
 L["Act_CurseSurge_AnnounceHint"] = "Shift-右鍵點擊 在區域聊天中通告。"
 L["Chat_CurseSurgeAnnounceLive"] = "例行公事: 詛咒狂湧已啟動位於 %s！(%.1f, %.1f)"
-L["Chat_CurseSurgeAnnounceNext"] = "例行公事: 詛咒狂湧下次 %s 在 %s (%.1f, %.1f)"
+L["Chat_CurseSurgeAnnounceNext"] = "例行公事: 詛咒狂湧下次 %s 還有 %s (%.1f, %.1f)"
 L["Chat_CurseSurgeNoSite"] = "|cff2ae7c6至暗之夜例行公事:|r 現在沒有什麼可通告的。"
 
 -- WeeklyTasks
@@ -907,7 +907,7 @@ L["CustomTasks_Delete"] = "刪除"
 -- CompletionSounds (test)
 L["CompletionSound_PickerTitle"] = "完成聲音"
 L["CompletionSound_None"] = "關閉 (無聲音)"
-L["CompletionSound_TextToSpeech"] = "Text to Speech"
+L["CompletionSound_TextToSpeech"] = "文字轉語音"
 L["CompletionSound_Custom"] = "自訂"
 L["CompletionSound_MenuUnavailable"] = "|cff2ae7c6至暗之夜例行公事:|r 此客戶端聲音選單不可用。"
 L["CompletionSound_MenuError"] = "|cff2ae7c6至暗之夜例行公事:|r 聲音選單開啟失敗 (%s)。"
