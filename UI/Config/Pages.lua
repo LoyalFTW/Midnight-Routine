@@ -374,6 +374,7 @@ function MR:PopulateConfigFrame(f)
                     MR:RefreshPanelHeaderVisibility(MR.renownFrame)
                     MR:RefreshPanelHeaderVisibility(MR.raresFrame)
                     MR:RefreshPanelHeaderVisibility(MR.gatheringLocationsFrame)
+                    MR:RefreshPanelHeaderVisibility(MR.concentrationTrackerFrame)
                 end
             end)
         Gap(4); Divider()

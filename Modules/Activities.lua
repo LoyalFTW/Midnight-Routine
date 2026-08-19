@@ -98,9 +98,10 @@ end
 
 local function GetCurseSurgeZoneChannelIndex()
     local list = { GetChannelList() }
+    local generalLabel = GENERAL or "General"
     for i = 1, #list, 3 do
         local id, name = list[i], list[i + 1]
-        if id and type(name) == "string" and name:find("General", 1, true) then
+        if id and type(name) == "string" and name:find(generalLabel, 1, true) then
             return id
         end
     end

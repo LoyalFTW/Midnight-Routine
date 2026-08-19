@@ -852,8 +852,7 @@ local function PopulateConcentrationCards(frame, data, opts)
                 card._topAccent:Show()
                 card._leftAccent:Hide()
             else
-                card._leftAccent:SetColorTexture(cr, cg, cb, 1)
-                card._leftAccent:Show()
+                card._leftAccent:Hide()
                 card._topAccent:Hide()
                 card:SetBackdropBorderColor(0.08, 0.16, 0.24, 0.80 * (opts.alpha or 1))
             end
@@ -862,7 +861,11 @@ local function PopulateConcentrationCards(frame, data, opts)
             card._name:SetPoint("TOPRIGHT", card, "TOPRIGHT", -110, -10)
             card._name:SetFont(ns.FONT_HEADERS, opts.compact and math.max(9, GetFontSize()) or math.max(10, GetFontSize() + 1), GetFontFlags())
             card._name:SetText(charEntry.isCurrent and (charEntry.name .. "  |cff7ce7d8" .. (L["AltBoard_Current"] or "Current") .. "|r") or charEntry.name)
-            card._name:SetTextColor(0.94, 0.98, 1)
+            if opts.mode == "overview" then
+                card._name:SetTextColor(0.94, 0.98, 1)
+            else
+                card._name:SetTextColor(cr, cg, cb)
+            end
             card._meta:ClearAllPoints()
             card._meta:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, opts.mode == "overview" and -10 or -11)
             card._meta:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
@@ -1234,7 +1237,9 @@ local function WBPopulateConcentrationTracker(frame, data)
     if not frame or not frame.content then return end
 
     data = data or MR:GetWarbandWeeklyData()
-    local contentWidth = math.max((frame.scroll and frame.scroll:GetWidth() or frame:GetWidth() or 430) - 8, 300)
+    local frameWidth = frame:GetWidth()
+    if not frameWidth or frameWidth <= 0 then frameWidth = 440 end
+    local contentWidth = math.max(frameWidth - 40, 300)
     local compact = WBIsConcentrationTrackerCompact()
     local alpha = WBGetConcentrationTrackerAlpha()
     local totalCharacters, totalProfessions, hiddenCount, yOff = PopulateConcentrationCards(frame, data, {
@@ -1250,17 +1255,26 @@ local function WBPopulateConcentrationTracker(frame, data)
     })
 
     if frame.summary then
-        if totalProfessions > 0 then
-            local summaryText = string.format(L["AltBoard_ConcentrationOverviewSub"] or "%d professions across %d characters", totalProfessions, totalCharacters)
-            if hiddenCount > 0 then
-                summaryText = summaryText .. string.format("  |  " .. (L["AltBoard_ConcentrationHiddenCount"] or "%d hidden"), hiddenCount)
-            end
-            frame.summary:SetText(summaryText)
-        elseif hiddenCount > 0 then
-            frame.summary:SetText(string.format(L["AltBoard_ConcentrationHiddenCount"] or "%d hidden", hiddenCount))
+        if compact then
+            frame.summary:Hide()
         else
-            frame.summary:SetText(L["AltBoard_ConcentrationNone"] or "No concentration data on tracked characters yet.")
+            frame.summary:Show()
+            if totalProfessions > 0 then
+                local summaryText = string.format(L["AltBoard_ConcentrationOverviewSub"] or "%d professions across %d characters", totalProfessions, totalCharacters)
+                if hiddenCount > 0 then
+                    summaryText = summaryText .. string.format("  |  " .. (L["AltBoard_ConcentrationHiddenCount"] or "%d hidden"), hiddenCount)
+                end
+                frame.summary:SetText(summaryText)
+            elseif hiddenCount > 0 then
+                frame.summary:SetText(string.format(L["AltBoard_ConcentrationHiddenCount"] or "%d hidden", hiddenCount))
+            else
+                frame.summary:SetText(L["AltBoard_ConcentrationNone"] or "No concentration data on tracked characters yet.")
+            end
         end
+    end
+
+    if frame.scroll then
+        frame.scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, compact and -32 or -54)
     end
 
     if totalProfessions == 0 then
@@ -1275,6 +1289,12 @@ local function WBPopulateConcentrationTracker(frame, data)
         if frame.emptyLabel then frame.emptyLabel:Hide() end
         frame.content:SetHeight(math.max(yOff, 1))
     end
+
+    if GetWindowLayoutValue("concentrationTrackerMinimized") ~= true then
+        local neededHeight = math.min(800, math.max(150, (compact and 32 or 54) + (frame.content:GetHeight() or 0) + 14))
+        frame:SetHeight(neededHeight)
+    end
+
     if frame.scrollUpdate then frame.scrollUpdate() end
 end
 

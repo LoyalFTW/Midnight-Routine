@@ -102,8 +102,7 @@ local function WBApplyConcentrationTrackerLayout(frame)
         frame.titleBar:SetHeight(headerHeight)
     end
     if frame.body then frame.body:SetShown(not minimized) end
-    if frame.summary then frame.summary:SetShown(not minimized) end
-    if frame.refreshBtn then frame.refreshBtn:SetShown(not minimized) end
+    if frame.summary then frame.summary:SetShown(not minimized and not WBIsConcentrationTrackerCompact()) end
     if frame.scroll then frame.scroll:SetShown(not minimized) end
     if frame.scrollTrack then frame.scrollTrack:SetShown(not minimized) end
     if frame.dragger then frame.dragger:SetShown(not minimized) end
@@ -122,7 +121,9 @@ local function WBApplyConcentrationTrackerLayout(frame)
     end
 
     if frame.content then
-        frame.content:SetWidth(math.max((frame.scroll and frame.scroll:GetWidth() or frame:GetWidth() or 430) - 8, 300))
+        local fw = frame:GetWidth()
+        if not fw or fw <= 0 then fw = 440 end
+        frame.content:SetWidth(math.max(fw - 40, 300))
     end
     if frame.scrollUpdate then
         frame.scrollUpdate()
@@ -222,47 +223,37 @@ function MR:ToggleConcentrationTracker()
         )
         cfgBtn:SetPoint("RIGHT", minBtn, "LEFT", -4, 0)
 
+        if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(frame, titleBar) end
+
+        local refreshBtn = WBCreateHeaderButton(
+            titleBar,
+            { tex = "Interface\\Buttons\\UI-RefreshButton", size = 18 },
+            {0.70, 0.88, 0.85},
+            {0.06, 0.18, 0.16},
+            {0.25, 0.85, 0.72},
+            L["CurrencyBrowser_Refresh"] or "Refresh",
+            function()
+                if MR.RefreshPlayerProfessions then
+                    MR:RefreshPlayerProfessions()
+                end
+                if MR.RefreshProfessionConcentration then
+                    MR:RefreshProfessionConcentration()
+                end
+                WBPopulateConcentrationTracker(frame)
+            end
+        )
+        refreshBtn:SetPoint("RIGHT", cfgBtn, "LEFT", -4, 0)
+
         local summary = frame:CreateFontString(nil, "OVERLAY")
         summary:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        summary:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -36)
-        summary:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -100, -36)
+        summary:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
+        summary:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, -30)
         summary:SetJustifyH("LEFT")
         summary:SetTextColor(0.64, 0.74, 0.84)
 
-        local refreshBtn = CreateFrame("Button", nil, frame, "BackdropTemplate")
-        refreshBtn:SetSize(78, 20)
-        refreshBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, -32)
-        refreshBtn:SetBackdrop(MakeBackdrop())
-        refreshBtn:SetBackdropColor(0.05, 0.10, 0.18, 0.95)
-        refreshBtn:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
-        refreshBtn._label = refreshBtn:CreateFontString(nil, "OVERLAY")
-        refreshBtn._label:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
-        refreshBtn._label:SetPoint("CENTER", refreshBtn, "CENTER", 0, 0)
-        refreshBtn._label:SetText(L["CurrencyBrowser_Refresh"] or "Refresh")
-        refreshBtn._label:SetTextColor(0.70, 0.88, 0.85)
-        refreshBtn:SetScript("OnClick", function()
-            if MR.RefreshPlayerProfessions then
-                MR:RefreshPlayerProfessions()
-            end
-            if MR.RefreshProfessionConcentration then
-                MR:RefreshProfessionConcentration()
-            end
-            WBPopulateConcentrationTracker(frame)
-        end)
-        refreshBtn:SetScript("OnEnter", function(selfBtn)
-            selfBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
-            selfBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
-            selfBtn._label:SetTextColor(1, 1, 1)
-        end)
-        refreshBtn:SetScript("OnLeave", function(selfBtn)
-            selfBtn:SetBackdropColor(0.05, 0.10, 0.18, 0.95)
-            selfBtn:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
-            selfBtn._label:SetTextColor(0.70, 0.88, 0.85)
-        end)
-
         local scroll, content, scrollUpdate, scrollTrack = WBCreateScrollArea(
             frame,
-            { "TOPLEFT", frame, "TOPLEFT", 14, -62 },
+            { "TOPLEFT", frame, "TOPLEFT", 14, -54 },
             { "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 14 }
         )
         content:SetSize(400, 1)
@@ -321,12 +312,13 @@ function MR:ToggleConcentrationTracker()
             cy = cy / scale
             local dx = cx - dragStartX
             local dy = dragStartY - cy
+            local newFrameWidth = math.max(320, math.min(700, dragStartW + dx))
             frame:SetSize(
-                math.max(320, math.min(700, dragStartW + dx)),
+                newFrameWidth,
                 math.max(260, math.min(800, dragStartH + dy))
             )
             if frame.content then
-                frame.content:SetWidth(math.max((frame.scroll and frame.scroll:GetWidth() or frame:GetWidth() or 430) - 8, 300))
+                frame.content:SetWidth(math.max(newFrameWidth - 40, 300))
             end
             if frame.scrollUpdate then
                 frame.scrollUpdate()
