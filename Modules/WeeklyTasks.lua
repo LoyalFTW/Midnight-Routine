@@ -1558,16 +1558,5 @@ MR:RegisterModule({
             y = 66.3,
             waypointTitle = L["Weekly_Nymrissa_Waypoint"] or "The Tidebound Grotto Lair Entrance",
         },
-        {
-            key      = "vaults_weekly_reward",
-            label    = L["Weekly_VaultsReward_Label"] or "Vaults Weekly Reward:",
-            max      = 1,
-            note     = L["Weekly_VaultsReward_Note"] or "Use the weekly Vaults opportunity for a chance at improved gear.",
-            patchKey = "12.1.0",
-            zone = 2512,
-            x = 45.72,
-            y = 64.94,
-            waypointTitle = L["Weekly_VaultsReward_Waypoint"] or "Vaults of Atal'Utek Entrance",
-        },
     },
 })

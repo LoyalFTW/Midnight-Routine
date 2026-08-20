@@ -389,7 +389,7 @@ defaultCrestRows = {
         itemId = 274476,
         noMax = true,
         patchKey = "12.1.0",
-        fallbackLabel = "Spark of Tides",
+        fallbackLabel = PlainLabel(L["Currency_SparkTides_Label"], "Spark of Tides"),
         labelColorHex = "58c9d4",
     },
     {
@@ -423,7 +423,7 @@ defaultCrestRows = {
         itemId = 273000,
         noMax = true,
         patchKey = "12.1.0",
-        fallbackLabel = "Corrosive Soul",
+        fallbackLabel = PlainLabel(L["Currency_CorrosiveSoul_Label"], "Corrosive Soul"),
         labelColorHex = "58c9d4",
     },
 }
