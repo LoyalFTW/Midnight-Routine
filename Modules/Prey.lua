@@ -31,6 +31,9 @@ local function BuildPreyNightmareQuestIds()
     for qid = 91256, 91269 do
         ids[#ids + 1] = qid
     end
+    for qid = 95021, 95024 do
+        ids[#ids + 1] = qid
+    end
     return ids
 end
 
