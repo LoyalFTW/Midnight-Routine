@@ -250,48 +250,61 @@ local function GetCurrentDayKey()
     return math.floor(GetServerTime() / 86400)
 end
 
-local function NormalizeRareName(text)
-    return tostring(text or ""):lower():gsub("[%s%p%c]", "")
-end
-
 local RARE_BY_NPC_ID = {}
 local RARE_CRITERIA_COMPLETION = {}
+
+local function GetRareQuestCacheKey(zone, index, rare)
+    if rare and rare[6] then
+        return "npc:" .. tostring(rare[6])
+    end
+    return "zone:" .. tostring(zone.key) .. ":" .. tostring(index)
+end
+
+for _, zone in ipairs(ZONES) do
+    for _, rare in ipairs(zone.rares) do
+        if rare[6] then
+            RARE_BY_NPC_ID[rare[6]] = rare
+        end
+    end
+end
 
 local function ResolveRareQuestIDs(zone)
     if not zone then
         return
     end
 
-    local profile = MR.db and MR.db.profile
-    if profile then
-        profile.rareQuestIDs = profile.rareQuestIDs or {}
-        for _, rare in ipairs(zone.rares) do
-            if not rare[2] then
-                rare[2] = profile.rareQuestIDs[NormalizeRareName(rare[1])]
-            end
-        end
-    end
-
     local mapIDs = zone.mapIDs or { zone.rares[1] and zone.rares[1][3] }
-    local rareByName = {}
+    local rareByNPC = {}
     for _, rare in ipairs(zone.rares) do
-        rareByName[NormalizeRareName(rare[1])] = rare
         if rare[6] then
+            rareByNPC[rare[6]] = rare
             RARE_BY_NPC_ID[rare[6]] = rare
         end
     end
 
     local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
     for index = 1, (criteriaCount or 0) do
-        local ok, criteriaName, _, _, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
-        if ok and criteriaName then
-            local rare = rareByName[NormalizeRareName(criteriaName)]
-            if rare and not rare[6] then
-                assetID = tonumber(assetID)
-                if assetID and assetID > 0 then
+        local ok, _, _, _, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
+        if ok then
+            assetID = tonumber(assetID)
+            local rare = (assetID and rareByNPC[assetID]) or zone.rares[index]
+            if rare then
+                if assetID and assetID > 0 and not rare[6] then
                     rare[6] = assetID
+                    rareByNPC[assetID] = rare
                     RARE_BY_NPC_ID[assetID] = rare
                 end
+            end
+        end
+    end
+
+    local profile = MR.db and MR.db.profile
+    if profile then
+        profile.rareQuestIDs = profile.rareQuestIDs or {}
+        for index, rare in ipairs(zone.rares) do
+            if not rare[2] then
+                local cacheKey = GetRareQuestCacheKey(zone, index, rare)
+                rare[2] = profile.rareQuestIDs[cacheKey]
             end
         end
     end
@@ -304,14 +317,33 @@ local function ResolveRareQuestIDs(zone)
         if mapID then
             for _, info in ipairs(C_TaskQuest.GetQuestsForPlayerByMapID(mapID) or {}) do
                 local questID = info.questId or info.questID
-                local title = questID and MR:GetQuestName(questID)
-                local normalizedTitle = NormalizeRareName(title)
-                if normalizedTitle ~= "" then
-                    local rare = rareByName[normalizedTitle]
-                    if rare then
+                local rare
+                if info.x and info.y then
+                    local nearestDistance
+                    for _, candidate in ipairs(zone.rares) do
+                        if not candidate[2] and candidate[3] == mapID and candidate[4] and candidate[5] then
+                            local dx = candidate[4] - info.x * 100
+                            local dy = candidate[5] - info.y * 100
+                            local distance = dx * dx + dy * dy
+                            if distance <= 6.25 and (not nearestDistance or distance < nearestDistance) then
+                                rare = candidate
+                                nearestDistance = distance
+                            end
+                        end
+                    end
+                end
+                if rare then
+                    local rareIndex
+                    for index, candidate in ipairs(zone.rares) do
+                        if candidate == rare then
+                            rareIndex = index
+                            break
+                        end
+                    end
+                    if rareIndex then
                         rare[2] = questID
                         if profile then
-                            profile.rareQuestIDs[NormalizeRareName(rare[1])] = questID
+                            profile.rareQuestIDs[GetRareQuestCacheKey(zone, rareIndex, rare)] = questID
                         end
                         if not rare[4] and info.x and info.y then
                             rare[3] = mapID
@@ -362,20 +394,23 @@ local function SyncNewAchievementCriteriaKills(zone)
     if not zone or type(GetAchievementCriteriaInfo) ~= "function" then
         return
     end
-    local rareByName = {}
+    local rareByNPC = {}
     for _, rare in ipairs(zone.rares or {}) do
-        rareByName[NormalizeRareName(rare[1])] = rare
+        if rare[6] then
+            rareByNPC[rare[6]] = rare
+        end
     end
 
     local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
     for index = 1, (criteriaCount or 0) do
-        local ok, criteriaName, _, completed, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
-        if ok and criteriaName then
-            local rare = rareByName[NormalizeRareName(criteriaName)]
+        local ok, _, _, completed, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, zone.achievId, index)
+        if ok then
+            assetID = tonumber(assetID)
+            local rare = (assetID and rareByNPC[assetID]) or zone.rares[index]
             if rare then
-                assetID = tonumber(assetID)
                 if assetID and assetID > 0 and not rare[6] then
                     rare[6] = assetID
+                    rareByNPC[assetID] = rare
                     RARE_BY_NPC_ID[assetID] = rare
                 end
                 local key = tostring(zone.achievId) .. ":" .. tostring(index)
@@ -386,6 +421,33 @@ local function SyncNewAchievementCriteriaKills(zone)
             end
         end
     end
+end
+
+local function GetRareNPCIDFromGUID(guid)
+    if not guid or (issecretvalue and issecretvalue(guid)) then return nil end
+    if C_CreatureInfo and C_CreatureInfo.GetCreatureID then
+        local ok, npcID = pcall(C_CreatureInfo.GetCreatureID, guid)
+        if ok and npcID then return tonumber(npcID) end
+    end
+    if type(guid) ~= "string" then return nil end
+    local unitType, npcID = guid:match("(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")
+    if unitType ~= "Creature" and unitType ~= "Vehicle" then return nil end
+    return tonumber(npcID)
+end
+
+function MR:OnRareUnitDied(_, unitGUID)
+    local npcID = GetRareNPCIDFromGUID(unitGUID)
+    local rare = npcID and RARE_BY_NPC_ID[npcID]
+    if not rare then return end
+    SyncRareKillRecord("npc:" .. tostring(npcID))
+    if self.RefreshRares then self:RefreshRares() end
+end
+
+function MR:OnRareCombatLogEvent()
+    if type(CombatLogGetCurrentEventInfo) ~= "function" then return end
+    local _, subevent, _, _, _, _, _, destGUID = CombatLogGetCurrentEventInfo()
+    if subevent ~= "UNIT_DIED" then return end
+    self:OnRareUnitDied("UNIT_DIED", destGUID)
 end
 
 local function GetStoredRareKillStatus(charData, key, weekKey, dayKey)
@@ -532,21 +594,21 @@ local function ResetZoneColor(zone)
     if db.raresColors then db.raresColors[zone.key] = nil end
 end
 
-local function IsAchievementCriteriaCompleted(achievementId, criteriaIndex, criteriaName)
+local function IsAchievementCriteriaCompleted(achievementId, criteriaIndex, rare)
     if not achievementId or not criteriaIndex then
         return false
     end
 
-    local normalizedName = NormalizeRareName(criteriaName)
+    local npcID = rare and rare[6]
     if type(GetAchievementNumCriteria) == "function" then
         local numCriteria = GetAchievementNumCriteria(achievementId)
         if not numCriteria or criteriaIndex > numCriteria then
             criteriaIndex = nil
         end
-        if normalizedName ~= "" then
+        if npcID then
             for index = 1, numCriteria or 0 do
-                local ok, name, _, completed = pcall(GetAchievementCriteriaInfo, achievementId, index)
-                if ok and NormalizeRareName(name) == normalizedName then
+                local ok, _, _, completed, _, _, _, _, assetID = pcall(GetAchievementCriteriaInfo, achievementId, index)
+                if ok and tonumber(assetID) == npcID then
                     return completed == true
                 end
             end
@@ -577,7 +639,7 @@ local function GetZoneStatus(zone)
                            or (flagged and "today")
                            or nil
         local weekly = killStatus ~= nil
-        local ever = IsAchievementCriteriaCompleted(zone.achievId, i, name)
+        local ever = IsAchievementCriteriaCompleted(zone.achievId, i, rare)
         if weekly then numDone = numDone + 1 end
         status[i] = { name = name, weekly = weekly, ever = ever, killStatus = killStatus }
     end
@@ -1075,7 +1137,7 @@ BuildRaresFrame = function()
             if flagged then SyncRareKillRecord(questId) end
             local killStat = GetRareTrackedKillStatus(rare)
                              or (flagged and "today") or nil
-            local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare[1])
+            local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare)
             SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, false)
 
             hit:SetScript("OnEnter", function()
@@ -1087,7 +1149,7 @@ BuildRaresFrame = function()
                 if flagged then SyncRareKillRecord(questId) end
                 local killStat = GetRareTrackedKillStatus(rare)
                                  or (flagged and "today") or nil
-                local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare[1])
+                local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare)
                 SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, true)
                 ns.ShowTooltip(hit, {
                     build = function(tooltip)
@@ -1117,7 +1179,7 @@ BuildRaresFrame = function()
                 if flagged then SyncRareKillRecord(questId) end
                 local killStat = GetRareTrackedKillStatus(rare)
                                  or (flagged and "today") or nil
-                local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare[1])
+                local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare)
                 SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, false)
                 ns.HideTooltip(hit)
             end)
@@ -1289,7 +1351,7 @@ RefreshRaresFrame = function()
                         if flagged then SyncRareKillRecord(questId) end
                         local killStat = GetRareTrackedKillStatus(rare)
                                          or (flagged and "today") or nil
-                        local ever = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare[1])
+                        local ever = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare)
                         SetRareRowVisual(rowBtn, dot, lbl, killStat, ever, cr, cg, cb, db.raresAlpha or 1.0, rowBtn and rowBtn._mrHover)
                     end
                 end

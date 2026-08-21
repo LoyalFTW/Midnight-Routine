@@ -777,6 +777,11 @@ function MR:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
     self:RegisterEvent("PLAYER_REGEN_DISABLED",    "OnCombatStarted")
     self:RegisterEvent("PLAYER_REGEN_ENABLED",     "OnCombatEnded")
+    if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid("UNIT_DIED") then
+        self:RegisterEvent("UNIT_DIED", "OnRareUnitDied")
+    else
+        self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnRareCombatLogEvent")
+    end
 
     self:ScheduleRepeatingTimer("CheckScheduledResets", 60)
 
