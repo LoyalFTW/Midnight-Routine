@@ -66,6 +66,7 @@ L["Config_HideCurrenciesWhenCompleted"] = "Скрывать валюту при 
 L["Config_LockFrame"] = "Закрепить окно"
 L["Config_HideMinimap"] = "Скрыть кнопку у миникарты"
 L["Config_HideInInstances"] = "Скрывать в подземельях"
+L["Config_HideAdventureGuideBossIDs"] = "Hide Boss IDs in Adventure Guide"
 L["Config_DisabledInCombat"] = "Disabled in Combat"
 L["Combat_Disabled"] = "Disabled during combat"
 L["Config_RememberManagedWindowsVisibility"] = "Помнить скрыть всё (миникарта)"

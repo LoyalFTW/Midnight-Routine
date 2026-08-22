@@ -1,6 +1,7 @@
 local _, ns = ...
 
 local FONT_ROWS = ns.FONT_ROWS
+local MR = ns.MR
 
 do
     local OVERLAY_KEY = "MR_DungeonIDLabel"
@@ -31,6 +32,10 @@ do
 
     local function ApplyOverlayToButton(btn)
         if not btn then return end
+        if MR.db and MR.db.profile and MR.db.profile.hideAdventureGuideBossIDs then
+            HideOverlay(btn)
+            return
+        end
         if not btn.encounterID or btn.encounterID <= 0 then
             HideOverlay(btn)
             return
@@ -93,6 +98,10 @@ do
     local function RefreshEJOverlays()
         if not EncounterJournal or not EncounterJournal:IsShown() then return end
         ScanFrameTree(EncounterJournal, 0)
+    end
+
+    function MR:RefreshEncounterJournalOverlays()
+        RefreshEJOverlays()
     end
 
     local function HookScrollBoxIfFound(root, depth)

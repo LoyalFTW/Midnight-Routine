@@ -91,6 +91,7 @@ local HIDDEN_SURFACE_TIMER_FIELDS = {
     "_scanThrottleTimer",
     "_refreshUITimer",
     "_delvesLiveProgressTimer",
+    "_areaWeeklyScanTimer",
 }
 
 function MR:SuspendHiddenSurfaceWork()
@@ -106,7 +107,8 @@ function MR:SuspendHiddenSurfaceWork()
     for _, field in ipairs(HIDDEN_SURFACE_TIMER_FIELDS) do
         local timer = self[field]
         if timer then
-            if field == "_requestedScanTimer" or field == "_scanThrottleTimer" or field == "_delvesLiveProgressTimer" then
+            if field == "_requestedScanTimer" or field == "_scanThrottleTimer" or field == "_delvesLiveProgressTimer"
+                or field == "_areaWeeklyScanTimer" then
                 dataCanceled = true
             else
                 uiCanceled = true
