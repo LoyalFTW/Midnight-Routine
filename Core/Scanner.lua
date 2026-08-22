@@ -79,7 +79,7 @@ local function UpdateCurrencyProgressForRow(self, progress, mod, row)
     local dynamicCap = nil
     local raw = wallet
 
-    if info.maxQuantity and info.maxQuantity > 0 then
+    if not row.noMax and info.maxQuantity and info.maxQuantity > 0 then
         dynamicCap = info.maxQuantity
         if info.useTotalEarnedForMaxQty and info.totalEarned ~= nil then
             raw = info.totalEarned
@@ -440,7 +440,6 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
 
     self._moduleScanPassCount = (self._moduleScanPassCount or 0) + 1
     local dirty = false
-    local scannedModules = {}
     for _, moduleKey in ipairs(moduleKeys) do
         local mod = self.moduleByKey and self.moduleByKey[moduleKey]
         if mod and mod.onScan and self:IsModuleEnabled(moduleKey) then
@@ -448,18 +447,17 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
             if not self.db.char.progress[moduleKey] then
                 self.db.char.progress[moduleKey] = {}
             end
-            local scanState = {
-                key = moduleKey,
-                mod = mod,
-                beforeProgress = DeepCopy(self.db.char.progress[moduleKey]),
-                beforeRows = {},
-            }
-            for _, row in ipairs(mod.rows or {}) do
-                scanState.beforeRows[row.key] = RowScanSignature(row)
+            local beforeProgress
+            local beforeRows
+            if not mod.scanReturnsChanged then
+                beforeProgress = DeepCopy(self.db.char.progress[moduleKey])
+                beforeRows = {}
+                for _, row in ipairs(mod.rows or {}) do
+                    beforeRows[row.key] = RowScanSignature(row)
+                end
             end
-            scannedModules[#scannedModules + 1] = scanState
 
-            mod.onScan(mod)
+            local moduleChanged = mod.onScan(mod) == true
 
             self.db.char.rowVisibility = self.db.char.rowVisibility or {}
             self.db.char.rowVisibility[moduleKey] = self.db.char.rowVisibility[moduleKey] or {}
@@ -467,35 +465,36 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
             for _, row in ipairs(mod.rows or {}) do
                 local currentVisible = row.isVisible and row.isVisible() == true or nil
                 if visibilityBucket[row.key] ~= currentVisible then
-                    scanState.visibilityChanged = true
+                    moduleChanged = true
                 end
                 visibilityBucket[row.key] = currentVisible
             end
+
+            if not mod.scanReturnsChanged then
+                local afterProgress = self.db.char.progress[moduleKey]
+                if not ValuesEqual(beforeProgress, afterProgress) then
+                    moduleChanged = true
+                end
+                if not moduleChanged then
+                    for _, row in ipairs(mod.rows or {}) do
+                        if beforeRows[row.key] ~= RowScanSignature(row) then
+                            moduleChanged = true
+                            break
+                        end
+                    end
+                end
+            end
+
+            if moduleChanged and self.NoteRefreshSource then
+                self:NoteRefreshSource("ModuleScanChanged:" .. moduleKey)
+            end
+            dirty = dirty or moduleChanged
         end
     end
 
     PruneProgressStore(self.db.char.progress)
     if self.db.global then
         PruneProgressStore(self.db.global.customTaskProgress)
-    end
-
-    local emptyProgress = {}
-    for _, scanState in ipairs(scannedModules) do
-        local moduleChanged = scanState.visibilityChanged == true
-        local afterProgress = self.db.char.progress[scanState.key] or emptyProgress
-        if not ValuesEqual(scanState.beforeProgress, afterProgress) then
-            moduleChanged = true
-        end
-        for _, row in ipairs(scanState.mod.rows or {}) do
-            if scanState.beforeRows[row.key] ~= RowScanSignature(row) then
-                moduleChanged = true
-                break
-            end
-        end
-        if moduleChanged and self.NoteRefreshSource then
-            self:NoteRefreshSource("ModuleScanChanged:" .. scanState.key)
-        end
-        dirty = dirty or moduleChanged
     end
 
     if dirty then

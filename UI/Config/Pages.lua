@@ -341,6 +341,14 @@ function MR:PopulateConfigFrame(f)
                     MR:UpdateInstanceFrameVisibility()
                 end
             end)
+        Checkbox(L["Config_HideAdventureGuideBossIDs"],
+            function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
+            function(v)
+                MR.db.profile.hideAdventureGuideBossIDs = v and true or false
+                if MR.RefreshEncounterJournalOverlays then
+                    MR:RefreshEncounterJournalOverlays()
+                end
+            end)
         Checkbox(L["Config_DisabledInCombat"] or "Disabled in Combat",
             function() return MR.db.profile.disabledInCombat == true end,
             function(v)

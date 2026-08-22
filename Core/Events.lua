@@ -7,6 +7,12 @@ local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
+local SCAN_S1 = { "s1_weekly" }
+local SCAN_S1_PVP = { "s1_weekly", "pvp_weeklies" }
+local SCAN_DELVES = { "delves" }
+local SCAN_VAULT_DELVES = { "great_vault", "delves" }
+local SCAN_ENCOUNTER = { "great_vault", "delves", "world_bosses", "s1_weekly" }
+local SCAN_BOSS = { "world_bosses", "great_vault", "s1_weekly" }
 
 local TURN_IN_COMPLETIONS = assert(Core.turnInCompletions, "Core lifecycle must load first")
 
@@ -147,7 +153,7 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
 
     local dirty = self:RefreshCurrencyProgress(currencyID, false)
 
-    if self:RefreshModuleScans({ "s1_weekly" }, false) then
+    if self:RefreshModuleScans(SCAN_S1, false) then
         dirty = true
     end
 
@@ -183,7 +189,7 @@ function MR:OnQuestDataChanged()
     if self:RefreshQuestProgress(nil, false) then
         dirty = true
     end
-    if self:RefreshModuleScans({ "s1_weekly", "pvp_weeklies" }, false) then
+    if self:RefreshModuleScans(SCAN_S1_PVP, false) then
         dirty = true
     end
     if dirty then
@@ -195,7 +201,18 @@ function MR:OnQuestDataChanged()
 end
 
 function MR:OnAreaPoisUpdated()
-    self:RefreshModuleScans({ "delves", "s1_weekly" }, true)
+    if not self:HasVisibleMainTrackingSurface() then
+        self:MarkBackgroundDataDirty()
+        return
+    end
+    self:RefreshModuleScans(SCAN_DELVES, true)
+    if self._areaWeeklyScanTimer then
+        return
+    end
+    self._areaWeeklyScanTimer = self:ScheduleTimer(function()
+        self._areaWeeklyScanTimer = nil
+        self:RefreshModuleScans(SCAN_S1, true)
+    end, 0.05)
 end
 
 function MR:OnRareProgressChanged()
@@ -217,7 +234,7 @@ function MR:OnQuestTurnedIn(_, questID)
     if self:RefreshQuestProgress(questID, false) then
         dirty = true
     end
-    if self:RefreshModuleScans({ "s1_weekly", "pvp_weeklies" }, false) then
+    if self:RefreshModuleScans(SCAN_S1_PVP, false) then
         dirty = true
     end
     if dirty then
@@ -244,7 +261,7 @@ function MR:OnQuestAccepted(_, questID)
     if self:RefreshQuestProgress(questID, false) then
         dirty = true
     end
-    if self:RefreshModuleScans({ "s1_weekly", "pvp_weeklies" }, false) then
+    if self:RefreshModuleScans(SCAN_S1_PVP, false) then
         dirty = true
     end
     if dirty then
@@ -269,7 +286,7 @@ function MR:OnQuestRemoved(_, questID)
     if self:RefreshQuestProgress(questID, false) then
         dirty = true
     end
-    if self:RefreshModuleScans({ "s1_weekly", "pvp_weeklies" }, false) then
+    if self:RefreshModuleScans(SCAN_S1_PVP, false) then
         dirty = true
     end
     if dirty then
@@ -287,7 +304,7 @@ function MR:OnBagUpdateDelayed()
     end
     local dirty = self:RefreshItemProgress(nil, false)
 
-    if self:RefreshModuleScans({ "s1_weekly" }, false) then
+    if self:RefreshModuleScans(SCAN_S1, false) then
         dirty = true
     end
 
@@ -318,13 +335,13 @@ function MR:OnProfessionChange()
 end
 
 function MR:OnVaultEvent()
-    self:RefreshModuleScans({ "great_vault", "delves" }, true)
+    self:RefreshModuleScans(SCAN_VAULT_DELVES, true)
 end
 
 function MR:OnZoneChanged()
     self:UpdateInstanceFrameVisibility()
     local darkmoonChanged = self.RefreshDarkmoonVisibility and self:RefreshDarkmoonVisibility()
-    self:RefreshModuleScans({ "delves", "s1_weekly" }, true)
+    self:RefreshModuleScans(SCAN_DELVES, true)
     if darkmoonChanged then
         if self:HasVisibleMainTrackingSurface() then
             self:RequestDataRefresh()
@@ -365,7 +382,7 @@ function MR:OnEncounterEnd(_, encounterId, encounterName, difficultyID, _, succe
         end
         local dirty = self.RefreshEncounterProgress
             and self:RefreshEncounterProgress(tonumber(encounterId), false, tonumber(difficultyID))
-        if self:RefreshModuleScans({ "great_vault", "delves", "world_bosses", "s1_weekly" }, false) then
+        if self:RefreshModuleScans(SCAN_ENCOUNTER, false) then
             dirty = true
         end
         if dirty then
@@ -387,7 +404,7 @@ function MR:OnBossKill(_, bossId, bossName)
     end
     local dirty = self.RefreshEncounterProgress
         and self:RefreshEncounterProgress(tonumber(bossId), false)
-    if self:RefreshModuleScans({ "world_bosses", "great_vault", "s1_weekly" }, false) then
+    if self:RefreshModuleScans(SCAN_BOSS, false) then
         dirty = true
     end
     if dirty then

@@ -1684,20 +1684,26 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     end
 
     if row.timerEpoch and not isComplete and not collapsed then
-        local function FormatMMSS(s)
-            return string.format("%d:%02d", math.floor(s / 60), s % 60)
-        end
+        local liveFormat = L["Timer_Live"] .. "%d:%02d"
+        local nextFormat = L["Timer_Next"] .. "%d:%02d"
+        local timerPhase
         local function UpdateTimer()
             local now = GetServerTime()
             local offset = (now - row.timerEpoch) % row.timerInterval
             if offset < row.timerDuration then
                 local rem = row.timerDuration - offset
-                rowFrame._count:SetText(L["Timer_Live"] .. FormatMMSS(rem))
-                rowFrame._count:SetTextColor(0.25, 0.88, 0.50, 1)
+                rowFrame._count:SetFormattedText(liveFormat, math.floor(rem / 60), rem % 60)
+                if timerPhase ~= "live" then
+                    timerPhase = "live"
+                    rowFrame._count:SetTextColor(0.25, 0.88, 0.50, 1)
+                end
             else
                 local rem = row.timerInterval - offset
-                rowFrame._count:SetText(L["Timer_Next"] .. FormatMMSS(rem))
-                rowFrame._count:SetTextColor(0.55, 0.55, 0.55, 1)
+                rowFrame._count:SetFormattedText(nextFormat, math.floor(rem / 60), rem % 60)
+                if timerPhase ~= "next" then
+                    timerPhase = "next"
+                    rowFrame._count:SetTextColor(0.55, 0.55, 0.55, 1)
+                end
             end
         end
         UpdateTimer()

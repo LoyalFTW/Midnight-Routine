@@ -251,6 +251,7 @@ local function GetCurrentDayKey()
 end
 
 local RARE_BY_NPC_ID = {}
+local RARES_BY_ZONE_AND_NPC = {}
 local RARE_CRITERIA_COMPLETION = {}
 
 local function GetRareQuestCacheKey(zone, index, rare)
@@ -261,8 +262,11 @@ local function GetRareQuestCacheKey(zone, index, rare)
 end
 
 for _, zone in ipairs(ZONES) do
+    local raresByNPC = {}
+    RARES_BY_ZONE_AND_NPC[zone] = raresByNPC
     for _, rare in ipairs(zone.rares) do
         if rare[6] then
+            raresByNPC[rare[6]] = rare
             RARE_BY_NPC_ID[rare[6]] = rare
         end
     end
@@ -274,7 +278,7 @@ local function ResolveRareQuestIDs(zone)
     end
 
     local mapIDs = zone.mapIDs or { zone.rares[1] and zone.rares[1][3] }
-    local rareByNPC = {}
+    local rareByNPC = RARES_BY_ZONE_AND_NPC[zone]
     for _, rare in ipairs(zone.rares) do
         if rare[6] then
             rareByNPC[rare[6]] = rare
@@ -394,12 +398,7 @@ local function SyncNewAchievementCriteriaKills(zone)
     if not zone or type(GetAchievementCriteriaInfo) ~= "function" then
         return
     end
-    local rareByNPC = {}
-    for _, rare in ipairs(zone.rares or {}) do
-        if rare[6] then
-            rareByNPC[rare[6]] = rare
-        end
-    end
+    local rareByNPC = RARES_BY_ZONE_AND_NPC[zone]
 
     local criteriaCount = type(GetAchievementNumCriteria) == "function" and GetAchievementNumCriteria(zone.achievId) or 0
     for index = 1, (criteriaCount or 0) do
@@ -1794,7 +1793,7 @@ function MR:ToggleRares()
         raresFrame:SetScale((MR.db and MR.db.profile.raresScale) or 1.0)
         lastZoneKey = GetCurrentZoneKey()
         lastVisibleZoneMode = (MR.db and MR.db.profile and MR.db.profile.raresShowAllZones) and "all" or lastZoneKey
-        self:SyncAllRareKills()
+        self:SyncAllRareKills(true)
         RefreshRaresFrame()
     end
 end
@@ -1823,7 +1822,7 @@ function MR:EnsureRaresShown()
     raresFrame:SetScale((MR.db and MR.db.profile.raresScale) or 1.0)
     lastZoneKey = GetCurrentZoneKey()
     lastVisibleZoneMode = (MR.db and MR.db.profile and MR.db.profile.raresShowAllZones) and "all" or lastZoneKey
-    self:SyncAllRareKills()
+    self:SyncAllRareKills(true)
     RefreshRaresFrame()
     if self.SetManagedWindowOpen then self:SetManagedWindowOpen("raresOpen", true) end
 end
@@ -1842,9 +1841,14 @@ function MR:OnRaresZoneChanged()
     RebuildRaresFrame()
 end
 
-function MR:SyncAllRareKills()
+function MR:SyncAllRareKills(resolveQuestIDs)
+    if resolveQuestIDs == nil then
+        resolveQuestIDs = raresFrame and raresFrame:IsShown() or false
+    end
     for _, zone in ipairs(ZONES) do
-        ResolveRareQuestIDs(zone)
+        if resolveQuestIDs then
+            ResolveRareQuestIDs(zone)
+        end
         SyncNewAchievementCriteriaKills(zone)
         for _, rare in ipairs(zone.rares) do
             local questId = rare[2]
@@ -1857,6 +1861,10 @@ end
 
 
 function MR:RefreshRares()
+    if not raresFrame or not raresFrame:IsShown() then
+        return
+    end
+
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         return
     end

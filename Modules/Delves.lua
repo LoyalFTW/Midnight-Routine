@@ -112,6 +112,8 @@ local bountifulRow
 local bountyRow
 local gildedStashRow
 local lastScan = 0
+local pendingScanTimer
+local DELVES_SCAN_KEYS = { "delves" }
 
 local function IsBountyRowComplete(done)
     return (tonumber(done) or 0) >= 1
@@ -203,6 +205,20 @@ MR:RegisterModule({
 
     onScan = function(mod)
         local now = GetTime()
+        if (now - lastScan) < SCAN_THROTTLE then
+            if not pendingScanTimer and MR.ScheduleTimer then
+                pendingScanTimer = MR:ScheduleTimer(function()
+                    pendingScanTimer = nil
+                    MR:RefreshModuleScans(DELVES_SCAN_KEYS, true)
+                end, SCAN_THROTTLE - (now - lastScan))
+            end
+            return false
+        end
+        if pendingScanTimer and MR.CancelTimer then
+            MR:CancelTimer(pendingScanTimer)
+            pendingScanTimer = nil
+        end
+        lastScan = now
         local db  = MR.db.char.progress
         if not db[mod.key] then db[mod.key] = {} end
         local mdb = db[mod.key]
@@ -284,9 +300,6 @@ MR:RegisterModule({
             bountifulRow.countText = nil
             bountifulRow.countColor = nil
         end
-
-        if (now - lastScan) < SCAN_THROTTLE then return HasChanges() end
-        lastScan = now
 
         local buckets = MR.GetWeeklyRewardActivityBuckets and MR:GetWeeklyRewardActivityBuckets() or nil
         if buckets and buckets.world and buckets.world[1] then

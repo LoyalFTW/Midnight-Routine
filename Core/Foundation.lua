@@ -28,6 +28,7 @@ local DEFAULTS = {
         minimized       = false,
         frameAlpha      = 1.0,
         hideFramesInInstances = false,
+        hideAdventureGuideBossIDs = false,
         disabledInCombat = true,
         rememberManagedWindowsVisibility = false,
         managedWindowsBundleHidden       = false,
