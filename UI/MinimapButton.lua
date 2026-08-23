@@ -97,9 +97,13 @@ mmLoader:SetScript("OnEvent", function(self)
     end
 
     MR.db.profile.minimap = MR.db.profile.minimap or { hide = false }
+    MR.db.profile.minimap.showInCompartment = true
 
     if not LDBIcon:IsRegistered(LDB_NAME) then
         LDBIcon:Register(LDB_NAME, minimapObject, MR.db.profile.minimap)
+    end
+    if LDBIcon.IsButtonCompartmentAvailable and LDBIcon:IsButtonCompartmentAvailable() then
+        LDBIcon:AddButtonToCompartment(LDB_NAME, MINIMAP_ICON)
     end
     StyleMinimapButton()
 

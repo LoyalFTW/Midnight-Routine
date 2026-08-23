@@ -42,7 +42,7 @@ local DEFAULTS = {
         fontMedia       = nil,
         fontFlags       = "OUTLINE",
         backgroundMedia = nil,
-        minimap         = { hide = false },
+        minimap         = { hide = false, showInCompartment = true },
         managedWindowRestoreState = nil,
         firstSeen       = false,
         welcomeSuppressed = false,
