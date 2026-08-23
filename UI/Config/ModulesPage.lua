@@ -9,6 +9,7 @@ local OptionsGap = ns.OptionsGap
 local OptionsDivider = ns.OptionsDivider
 local OptionsSectionLabel = ns.OptionsSectionLabel
 local OptionsCheckbox = ns.OptionsCheckbox
+local OptionsColorSwatch = ns.OptionsColorSwatch
 local hex = ns.Hex
 local GetFontFlags = Config.GetFontFlags
 
@@ -203,7 +204,7 @@ function Config.BuildModulesPage(ctx)
         local rows = {}
         for _, row in ipairs(orderedRows) do
             local visible = not row.isVisible or row.isVisible()
-            if not row.control and visible then
+            if (not row.control or (mod.key == "custom_tasks" and row.configGroup)) and visible then
                 rows[#rows + 1] = row
             end
         end
@@ -284,6 +285,148 @@ function Config.BuildModulesPage(ctx)
         lbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
 
         yOff = yOff - ROW_H
+    end
+
+    local function BuildCustomTaskGroupHeader(modKey, resetType, configGroup)
+        local groupRows = configGroup.rows
+        local headerRow
+        for _, row in ipairs(groupRows) do
+            if row.sectionHeader then
+                headerRow = row
+                break
+            end
+        end
+        local enabled = MR:IsRowGroupEnabled(modKey, groupRows)
+        local expandedKey = "__custom_task_group:" .. resetType
+        local expanded = MR._cfgExpanded[expandedKey] ~= false
+        local styleKey = headerRow and headerRow.headerBackgroundKey or ("custom_tasks_section_" .. resetType)
+        local defaultColor = headerRow and headerRow.labelColor or "#a987d9"
+        local ROW_H = moduleHeaderH
+        local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
+        groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 18, yOff)
+        groupFr:SetSize(contentW - 20, ROW_H)
+        groupFr:SetBackdrop(MakeBackdrop())
+
+        local function ApplyBackdrop()
+            local background = MR:GetHeaderBackgroundColor(styleKey)
+            if background then
+                local br, bg, bb = hex(background)
+                groupFr:SetBackdropColor(br, bg, bb, enabled and 0.88 or 0.52)
+            else
+                groupFr:SetBackdropColor(enabled and 0.035 or 0.055, enabled and 0.085 or 0.045, enabled and 0.095 or 0.050, 0.88)
+            end
+            local cr, cg, cb = hex(MR:GetRowColor(modKey, headerRow.key) or defaultColor)
+            groupFr:SetBackdropBorderColor(cr * 0.42, cg * 0.42, cb * 0.42, enabled and 0.90 or 0.48)
+        end
+
+        local checkbox = CreateFrame("CheckButton", nil, groupFr, "UICheckButtonTemplate")
+        checkbox:SetSize(20, 20)
+        checkbox:SetPoint("LEFT", groupFr, "LEFT", 1, 0)
+        checkbox:SetChecked(enabled)
+        checkbox:SetScript("OnClick", function(s)
+            MR:SetRowGroupEnabled(modKey, groupRows, s:GetChecked())
+            RebuildExpandedState()
+        end)
+
+        local expandBtn = CreateFrame("Button", nil, groupFr, "BackdropTemplate")
+        expandBtn:SetSize(16, 16)
+        expandBtn:SetPoint("RIGHT", groupFr, "RIGHT", -1, 0)
+        expandBtn:SetBackdrop(MakeBackdrop())
+        expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
+        expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
+        local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")
+        expandLbl:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
+        expandLbl:SetPoint("CENTER", expandBtn, "CENTER", 0, 1)
+        expandLbl:SetText(expanded and "v" or ">")
+        expandLbl:SetTextColor(0.45, 0.75, 0.70)
+        expandBtn:SetScript("OnClick", function()
+            MR._cfgExpanded[expandedKey] = not expanded
+            RebuildExpandedState()
+        end)
+        expandBtn:SetScript("OnEnter", function()
+            expandBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
+            expandBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
+            expandLbl:SetTextColor(1, 1, 1)
+            ns.ShowTooltip(expandBtn, { text = L["Config_ExpandCollapseRows"] })
+        end)
+        expandBtn:SetScript("OnLeave", function()
+            expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
+            expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
+            expandLbl:SetTextColor(0.45, 0.75, 0.70)
+            ns.HideTooltip(expandBtn)
+        end)
+
+        local hideBtn = CreateFrame("Button", nil, groupFr, "BackdropTemplate")
+        hideBtn:SetSize(16, 16)
+        hideBtn:SetPoint("RIGHT", expandBtn, "LEFT", -2, 0)
+        hideBtn:SetBackdrop(MakeBackdrop())
+        local hideLbl = hideBtn:CreateFontString(nil, "OVERLAY")
+        hideLbl:SetFont(ns.FONT_ROWS, 8, GetFontFlags())
+        hideLbl:SetPoint("CENTER")
+        local function ApplyHideState(hovered)
+            local active = MR:IsCustomTaskGroupHideComplete(resetType)
+            hideBtn:SetBackdropColor(hovered and 0.08 or 0.05, hovered and 0.22 or 0.10, hovered and 0.32 or 0.18, 1)
+            hideBtn:SetBackdropBorderColor(hovered and 0.25 or (active and 0.15 or 0.35), hovered and 0.85 or (active and 0.32 or 0.12), hovered and 0.72 or (active and 0.38 or 0.12), 1)
+            hideLbl:SetText(active and "H" or "S")
+            hideLbl:SetTextColor(hovered and 1 or (active and 0.45 or 0.55), hovered and 1 or (active and 0.75 or 0.25), hovered and 1 or (active and 0.70 or 0.25))
+        end
+        ApplyHideState(false)
+        hideBtn:SetScript("OnClick", function()
+            MR:SetCustomTaskGroupHideComplete(resetType, not MR:IsCustomTaskGroupHideComplete(resetType))
+            RebuildExpandedState()
+        end)
+        hideBtn:SetScript("OnEnter", function()
+            ApplyHideState(true)
+            ns.ShowTooltip(hideBtn, { text = MR:IsCustomTaskGroupHideComplete(resetType) and L["Config_RowsCollapsed"] or L["Config_RowsShown"] })
+        end)
+        hideBtn:SetScript("OnLeave", function()
+            ApplyHideState(false)
+            ns.HideTooltip(hideBtn)
+        end)
+
+        local lbl
+        local background = MR:GetHeaderBackgroundColor(styleKey)
+        local br, bg, bb = 0.06, 0.08, 0.13
+        if background then
+            br, bg, bb = hex(background)
+        end
+        local backgroundSwatch = OptionsColorSwatch(groupFr, br, bg, bb, function(r, g, b)
+            MR:SetHeaderBackgroundColor(styleKey, string.format("#%02x%02x%02x", r * 255, g * 255, b * 255))
+            ApplyBackdrop()
+        end, function()
+            MR:ResetHeaderBackgroundColor(styleKey)
+            ApplyBackdrop()
+            return 0.06, 0.08, 0.13
+        end, L["Config_HeaderBackgroundColor"] or "Header Background")
+        backgroundSwatch:SetSize(14, 14)
+        backgroundSwatch:SetPoint("RIGHT", hideBtn, "LEFT", -2, 0)
+
+        local tr, tg, tb = hex(MR:GetRowColor(modKey, headerRow.key) or defaultColor)
+        local colorSwatch = OptionsColorSwatch(groupFr, tr, tg, tb, function(r, g, b)
+            MR:SetRowColor(modKey, headerRow.key, string.format("#%02x%02x%02x", r * 255, g * 255, b * 255))
+            if lbl then lbl:SetTextColor(r, g, b) end
+            ApplyBackdrop()
+        end, function()
+            MR:ResetRowColor(modKey, headerRow.key)
+            if lbl then lbl:SetTextColor(hex(defaultColor)) end
+            ApplyBackdrop()
+            return hex(defaultColor)
+        end, L["Config_HeaderColor"])
+        colorSwatch:SetSize(14, 14)
+        colorSwatch:SetPoint("RIGHT", backgroundSwatch, "LEFT", -2, 0)
+
+        lbl = groupFr:CreateFontString(nil, "OVERLAY")
+        lbl:SetFont(ns.FONT_ROWS, moduleRowFs, GetFontFlags())
+        lbl:SetPoint("LEFT", checkbox, "RIGHT", 2, 0)
+        lbl:SetPoint("RIGHT", colorSwatch, "LEFT", -2, 0)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetText(configGroup.label or resetType)
+        local lr, lg, lb = hex(MR:GetRowColor(modKey, headerRow.key) or defaultColor)
+        lbl:SetTextColor(enabled and lr or 0.42, enabled and lg or 0.46, enabled and lb or 0.48)
+
+        ApplyBackdrop()
+        yOff = yOff - ROW_H
+        return expanded
     end
 
     local CommitDrag
@@ -604,7 +747,8 @@ function Config.BuildModulesPage(ctx)
         lbl:SetPoint("TOPLEFT", badge, "TOPRIGHT", 8, -1)
         lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText("Profession Knowledge")
+        local professionTitle = (L["ProfKnowledge_Title"] or "Profession Knowledge"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        lbl:SetText(professionTitle)
         lbl:SetTextColor(0.88, 1.00, 0.94)
 
         local sub = headerFr:CreateFontString(nil, "OVERLAY")
@@ -612,7 +756,7 @@ function Config.BuildModulesPage(ctx)
         sub:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -1)
         sub:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
         sub:SetJustifyH("LEFT")
-        sub:SetText(string.format("Learned professions %d/%d", professionKnown, professionTotal))
+        sub:SetText(string.format(L["ProfKnowledge_LearnedProfessions"] or "Learned professions %d/%d", professionKnown, professionTotal))
         sub:SetTextColor(0.58, 0.80, 0.78, 0.95)
 
         local function ToggleProfessionGroup()
@@ -967,15 +1111,29 @@ function Config.BuildModulesPage(ctx)
 
         local rows = GetConfigRowsForModule(mod)
         local rowsByGroup = {}
+        local rowsByConfigGroup = {}
         for _, row in ipairs(rows) do
             if row.group then
                 rowsByGroup[row.group] = rowsByGroup[row.group] or {}
                 rowsByGroup[row.group][#rowsByGroup[row.group] + 1] = row
             end
+            if row.configGroup then
+                local configGroup = rowsByConfigGroup[row.configGroup]
+                if not configGroup then
+                    configGroup = { rows = {} }
+                    rowsByConfigGroup[row.configGroup] = configGroup
+                end
+                configGroup.rows[#configGroup.rows + 1] = row
+                if row.sectionHeader then
+                    configGroup.label = row.label
+                end
+            end
         end
 
         local lastRowPatchKey
         local lastRowGroup
+        local lastConfigGroup
+        local configGroupExpanded = true
         for _, row in ipairs(rows) do
             local currentRow = row
             local rowPatchKey = MR:GetRowPatchKey(mod, row)
@@ -988,31 +1146,39 @@ function Config.BuildModulesPage(ctx)
             end
             lastRowGroup = row.group
 
-            local rowAvailable = moduleAvailable and MR:IsPatchAvailable(rowPatchKey)
-            local rowFrame = Config.CreateTaskControl({
-                parent = body,
-                configFrame = f,
-                module = mod,
-                row = currentRow,
-                x = 18,
-                y = yOff,
-                width = contentW - 20,
-                height = moduleRowH,
-                fontSize = moduleRowFs,
-                label = FormatRowConfigLabel(mod, currentRow),
-                available = rowAvailable,
-                onDragStart = function()
-                    StartRowDrag(mod, currentRow)
-                end,
-                onDragCommit = function()
-                    if drag.active and drag.mode == "row" and drag.moduleKey == key then
-                        CommitDrag()
-                    end
-                end,
-            })
-            _cfgRowRows[key] = _cfgRowRows[key] or {}
-            _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = currentRow.key, frame = rowFrame, label = currentRow.label }
-            yOff = yOff - moduleRowH - 1
+            if row.configGroup and row.configGroup ~= lastConfigGroup then
+                local configGroup = rowsByConfigGroup[row.configGroup]
+                configGroupExpanded = BuildCustomTaskGroupHeader(key, row.configGroup, configGroup)
+            end
+            lastConfigGroup = row.configGroup
+
+            if not row.control and (not row.configGroup or configGroupExpanded) then
+                local rowAvailable = moduleAvailable and MR:IsPatchAvailable(rowPatchKey)
+                local rowFrame = Config.CreateTaskControl({
+                    parent = body,
+                    configFrame = f,
+                    module = mod,
+                    row = currentRow,
+                    x = 18,
+                    y = yOff,
+                    width = contentW - 20,
+                    height = moduleRowH,
+                    fontSize = moduleRowFs,
+                    label = FormatRowConfigLabel(mod, currentRow),
+                    available = rowAvailable,
+                    onDragStart = function()
+                        StartRowDrag(mod, currentRow)
+                    end,
+                    onDragCommit = function()
+                        if drag.active and drag.mode == "row" and drag.moduleKey == key then
+                            CommitDrag()
+                        end
+                    end,
+                })
+                _cfgRowRows[key] = _cfgRowRows[key] or {}
+                _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = currentRow.key, frame = rowFrame, label = currentRow.label }
+                yOff = yOff - moduleRowH - 1
+            end
         end
 
         if yOff == guideTopY then

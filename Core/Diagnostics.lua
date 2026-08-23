@@ -323,7 +323,7 @@ function MR:RunSelfTest()
 
     run("Main UI frame", function()
         if not self.frame then
-            return "warn", "main frame not built yet (open with /r show)"
+            return "warn", "main frame not built yet (open with /routine show)"
         end
         return true
     end)
@@ -336,8 +336,8 @@ function MR:RunSelfTest()
     ))
 end
 
-SLASH_MIDROUTE1 = "/mr"
-SLASH_MIDROUTE2 = "/r"
+SLASH_MIDROUTE1 = "/routine"
+SLASH_MIDROUTE2 = "/mr"
 SlashCmdList["MIDROUTE"] = function(msg)
     msg = (msg or ""):lower():trim()
     local function ApplyMainScale(value)

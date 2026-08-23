@@ -14,6 +14,9 @@ local function CanImportLegacyCustomTaskProgress(self, rowKey)
     if not task then
         return false
     end
+    if task.resetType == "none" then
+        return true
+    end
 
     local region = (GetCurrentRegion and GetCurrentRegion()) or 1
     local stampPrefix = task.resetType == "daily" and "lastCustomTaskDailyResetAt_" or "lastCustomTaskWeeklyResetAt_"

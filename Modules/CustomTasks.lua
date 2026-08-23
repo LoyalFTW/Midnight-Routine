@@ -6,10 +6,17 @@ local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 local CUSTOM_MODULE_KEY = "custom_tasks"
 local DAILY_HEADER_KEY = "__custom_task_daily_header"
 local WEEKLY_HEADER_KEY = "__custom_task_weekly_header"
+local NO_RESET_HEADER_KEY = "__custom_task_no_reset_header"
 local DAILY_ADD_ROW_KEY = "__custom_task_add_daily"
 local WEEKLY_ADD_ROW_KEY = "__custom_task_add_weekly"
+local NO_RESET_ADD_ROW_KEY = "__custom_task_add_no_reset"
 local TASK_SCOPE_CHARACTER = "character"
 local TASK_SCOPE_SHARED = "shared"
+local RESET_TYPE_COLORS = {
+    daily = "#58c9d4",
+    weekly = "#c9853f",
+    none = "#a987d9",
+}
 
 local function TrimText(value)
     value = tostring(value or "")
@@ -53,7 +60,9 @@ local function GetTaskProgressKey(taskId, scope)
 end
 
 local function NormalizeResetType(resetType)
-    return resetType == "daily" and "daily" or "weekly"
+    if resetType == "daily" then return "daily" end
+    if resetType == "none" then return "none" end
+    return "weekly"
 end
 
 local function NormalizeTaskMax(maxValue)
@@ -256,8 +265,12 @@ local function GetQuestFrequencyResetType(questId)
 end
 
 local function ResolveQuestResetType(questIds, fallbackResetType)
+    fallbackResetType = NormalizeResetType(fallbackResetType)
+    if fallbackResetType == "none" then
+        return "none"
+    end
     if type(questIds) ~= "table" then
-        return NormalizeResetType(fallbackResetType)
+        return fallbackResetType
     end
 
     for _, questId in ipairs(questIds) do
@@ -267,7 +280,7 @@ local function ResolveQuestResetType(questIds, fallbackResetType)
         end
     end
 
-    return NormalizeResetType(fallbackResetType)
+    return fallbackResetType
 end
 
 local function BuildQuestIdsText(questIds)
@@ -423,6 +436,24 @@ end
 
 local RefreshCustomTaskViews
 
+function MR:IsCustomTaskGroupHideComplete(resetType)
+    resetType = NormalizeResetType(resetType)
+    local storage = self:GetActiveModuleStorage()
+    local settings = storage and storage[CUSTOM_MODULE_KEY]
+    local groups = settings and settings.hideCompleteGroups
+    return groups and groups[resetType] == true or false
+end
+
+function MR:SetCustomTaskGroupHideComplete(resetType, value)
+    resetType = NormalizeResetType(resetType)
+    local storage = self:GetActiveModuleStorage()
+    storage[CUSTOM_MODULE_KEY] = storage[CUSTOM_MODULE_KEY] or {}
+    storage[CUSTOM_MODULE_KEY].hideCompleteGroups = storage[CUSTOM_MODULE_KEY].hideCompleteGroups or {}
+    storage[CUSTOM_MODULE_KEY].hideCompleteGroups[resetType] = value and true or false
+    self:RefreshCustomTasksModule()
+    self:RefreshUI()
+end
+
 local function SortTasks(tasks)
     table.sort(tasks, function(a, b)
         local aOrder = tonumber(a and a.order) or 0
@@ -562,6 +593,9 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
         sectionHeader = true,
         hideStatus = true,
         noDefaultTooltipHint = true,
+        configGroup = resetType,
+        labelColor = RESET_TYPE_COLORS[resetType],
+        headerBackgroundKey = "custom_tasks_section_" .. resetType,
         countText = string.format("%d / %d", doneCount, #tasks),
         countColor = { 0.74, 0.80, 0.88 },
         headerActionStyle = "visibility",
@@ -581,9 +615,11 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
             if taskId then
                 local taskScope = NormalizeTaskScope(task.scope)
                 local rowKey = GetTaskRowKey(taskId, taskScope)
-                local resetLabel = (resetType == "daily")
+                local resetLabel = resetType == "daily"
                     and (L["CustomTasks_ResetDaily"] or "Daily reset")
-                    or (L["CustomTasks_ResetWeekly"] or "Weekly reset")
+                    or resetType == "none"
+                        and (L["CustomTasks_ResetNone"] or "No reset")
+                        or (L["CustomTasks_ResetWeekly"] or "Weekly reset")
                 local scopeLabel = (taskScope == TASK_SCOPE_SHARED)
                     and Text("CustomTasks_SharedScope", "Shows on all alts")
                     or Text("CustomTasks_CharacterScope", "Shows on this character")
@@ -650,6 +686,9 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
                     taskId = task.id,
                     taskScope = taskScope,
                     accountWideComplete = task.accountWideComplete,
+                    preserveCompletion = resetType == "none",
+                    configGroup = resetType,
+                    hideComplete = MR:IsCustomTaskGroupHideComplete(resetType),
                     noDefaultTooltipHint = true,
                     tooltipFunc = function(tip)
                         tip:AddLine(" ")
@@ -715,6 +754,7 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
         control = true,
         hideStatus = true,
         noDefaultTooltipHint = true,
+        configGroup = resetType,
         countText = L["CustomTasks_AddButton"] or "[ + ]",
         countColor = { 0.92, 0.78, 0.24 },
         onLeftClick = function()
@@ -925,6 +965,9 @@ end
 
 function MR:ResetCustomTasksByType(resetType)
     resetType = NormalizeResetType(resetType)
+    if resetType == "none" then
+        return
+    end
     local tasks = self:GetCustomTasks()
     local progress = self.db and self.db.char and self.db.char.progress and self.db.char.progress[CUSTOM_MODULE_KEY]
     local overrides = self.db and self.db.char and self.db.char.manualOverrides and self.db.char.manualOverrides[CUSTOM_MODULE_KEY]
@@ -1054,9 +1097,13 @@ function MR:RefreshCustomTasksModule()
     local tasks = self:GetCustomTasks()
     local dailyTasks = {}
     local weeklyTasks = {}
+    local noResetTasks = {}
     for _, task in ipairs(tasks) do
-        if NormalizeResetType(task.resetType) == "daily" then
+        local resetType = NormalizeResetType(task.resetType)
+        if resetType == "daily" then
             dailyTasks[#dailyTasks + 1] = task
+        elseif resetType == "none" then
+            noResetTasks[#noResetTasks + 1] = task
         else
             weeklyTasks[#weeklyTasks + 1] = task
         end
@@ -1081,6 +1128,16 @@ function MR:RefreshCustomTasksModule()
         L["CustomTasks_WeeklyHeader"] or "Weekly",
         L["CustomTasks_WeeklyNote"] or "Resets automatically at the weekly reset.",
         L["CustomTasks_AddWeeklyLabel"] or "Add weekly task"
+    )
+    BuildSectionRows(
+        rows,
+        noResetTasks,
+        "none",
+        NO_RESET_HEADER_KEY,
+        NO_RESET_ADD_ROW_KEY,
+        L["CustomTasks_NoResetHeader"] or "No Reset",
+        L["CustomTasks_NoResetNote"] or "Does not reset automatically.",
+        L["CustomTasks_AddNoResetLabel"] or "Add no-reset task"
     )
 
     mod.rows = rows

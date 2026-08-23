@@ -348,8 +348,10 @@ local function MainStatusButtonOnClick(selfBtn)
 
     if row.encounterIds then return end
 
-    local cur = MR:GetManualOverride(mod.key, row.key)
-    MR:SetManualOverride(mod.key, row.key, cur >= row.max and 0 or row.max, row.max)
+    local max = tonumber(row.max)
+    if not max then return end
+    local cur = tonumber(MR:GetManualOverride(mod.key, row.key)) or 0
+    MR:SetManualOverride(mod.key, row.key, cur >= max and 0 or max, max)
 end
 
 local function MainStatusButtonOnEnter(selfBtn)
@@ -373,7 +375,8 @@ local function MainStatusButtonOnEnter(selfBtn)
         return
     end
 
-    local mo = row.toggleStatus and MR:GetProgress(data.mod.key, row.key) or MR:GetManualOverride(data.mod.key, row.key)
+    local mo = tonumber(row.toggleStatus and MR:GetProgress(data.mod.key, row.key) or MR:GetManualOverride(data.mod.key, row.key)) or 0
+    local max = tonumber(row.max)
     ns.ShowTooltip(selfBtn, {
         build = function(tooltip)
             tooltip:SetText(row.label, 1, 1, 1, 1, true)
@@ -381,7 +384,7 @@ local function MainStatusButtonOnEnter(selfBtn)
                 tooltip:AddLine(row.note, 0.7, 0.7, 0.7, true)
             end
             tooltip:AddLine(" ")
-            if mo >= row.max then
+            if max and mo >= max then
                 tooltip:AddLine(L["Tooltip_ManualDot_Active"], 1, 0.85, 0.1, true)
             else
                 tooltip:AddLine(L["Tooltip_ManualDot_Hint"], 0.7, 0.7, 0.7, true)
@@ -588,7 +591,7 @@ local function ShouldRenderMainRow(row, rowComplete, hideComplete)
     if row.control then
         return not (hideComplete and row.hideWhenComplete and rowComplete)
     end
-    return not (hideComplete and rowComplete)
+    return not ((hideComplete or row.hideComplete) and rowComplete)
 end
 
 local function ShouldRenderMainRowGroupHeader(self, mod, rows, group, hideComplete)
@@ -1273,7 +1276,13 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         if transparent then
             rowFrame._headerBg:SetColorTexture(1, 1, 1, 0)
         else
-            rowFrame._headerBg:SetColorTexture(0.06, 0.08, 0.13, 0.92 * frameAlpha)
+            local headerBackground = row.headerBackgroundKey and MR:GetHeaderBackgroundColor(row.headerBackgroundKey)
+            if headerBackground then
+                local br, bg, bb = hex(headerBackground)
+                rowFrame._headerBg:SetColorTexture(br, bg, bb, 0.92 * frameAlpha)
+            else
+                rowFrame._headerBg:SetColorTexture(0.06, 0.08, 0.13, 0.92 * frameAlpha)
+            end
         end
 
         SetFontForText(rowFrame._headerText, row.label, math.max(8, GetFontSize() - 1), GetFontFlags())
@@ -1282,7 +1291,13 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
             "RIGHT", rowFrame, "RIGHT", -84, 0)
         rowFrame._headerText:SetJustifyH("LEFT")
         rowFrame._headerText:SetText(row.label)
-        rowFrame._headerText:SetTextColor(0.84, 0.70, 0.95, 0.95)
+        local headerColor = MR:GetRowColor(mod.key, row.key) or row.labelColor
+        if headerColor then
+            local hr, hg, hb = hex(headerColor)
+            rowFrame._headerText:SetTextColor(hr, hg, hb, 0.95)
+        else
+            rowFrame._headerText:SetTextColor(0.84, 0.70, 0.95, 0.95)
+        end
         rowFrame._headerText:Show()
 
         local headerActionButton = nil
@@ -1358,9 +1373,10 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     rowFrame._separator:SetColorTexture(1, 1, 1, transparent and 0 or (0.06 * frameAlpha))
     rowFrame._separator:Show()
 
-    local mo = MR:GetManualOverride(mod.key, row.key)
-    local forcedComplete = row.max and mo >= row.max
-    local activeDone = forcedComplete and row.max or done
+    local mo = tonumber(MR:GetManualOverride(mod.key, row.key)) or 0
+    local max = tonumber(row.max)
+    local forcedComplete = max and mo >= max
+    local activeDone = forcedComplete and max or done
     if transparent then
         rowFrame._statusBtn:SetBackdropColor(0, 0, 0, 0)
     else

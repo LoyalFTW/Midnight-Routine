@@ -51,7 +51,7 @@ local function ApplyCustomTaskDialogTheme(frame)
     local editFont  = math.max(9,  fontSize)
 
 
-    frame:SetSize(400, 512)
+    frame:SetSize(400, 536)
 
     local function sf(fs, size) if fs then fs:SetFont(ns.FONT_ROWS, size, GetFontFlags()) end end
     sf(frame.title,           math.max(10, fontSize + 1))
@@ -67,7 +67,7 @@ local function ApplyCustomTaskDialogTheme(frame)
 
     if frame.title then frame.title:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
 
-    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
+    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
     for _, cb in ipairs(checks) do
         if cb and cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
     end
@@ -362,11 +362,13 @@ local function EnsureCustomTaskDialog()
     dailyCheck:SetPoint("LEFT", weeklyCheck._text, "RIGHT", 14, 0)
     frame.weeklyCheck = weeklyCheck
     frame.dailyCheck  = dailyCheck
+    local noResetCheck = CreateResetCheckbox(weeklyCheck, "BOTTOMLEFT", 0, -2, L["CustomTasks_ResetNone"] or "No reset", "none")
+    frame.noResetCheck = noResetCheck
 
 
     local manualQuestCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     manualQuestCheck:SetSize(20, 20)
-    manualQuestCheck:SetPoint("TOPLEFT", weeklyCheck, "BOTTOMLEFT", 0, -GAP)
+    manualQuestCheck:SetPoint("TOPLEFT", noResetCheck, "BOTTOMLEFT", 0, -GAP)
     local manualQuestText = frame:CreateFontString(nil, "OVERLAY")
     manualQuestText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     manualQuestText:SetPoint("LEFT", manualQuestCheck, "RIGHT", 2, 0)
@@ -550,8 +552,10 @@ local function EnsureCustomTaskDialog()
 
     function frame:RefreshResetChecks()
         local isDaily = self.resetType == "daily"
-        if self.weeklyCheck then self.weeklyCheck:SetChecked(not isDaily) end
+        local isNone = self.resetType == "none"
+        if self.weeklyCheck then self.weeklyCheck:SetChecked(not isDaily and not isNone) end
         if self.dailyCheck  then self.dailyCheck:SetChecked(isDaily) end
+        if self.noResetCheck then self.noResetCheck:SetChecked(isNone) end
     end
 
 
