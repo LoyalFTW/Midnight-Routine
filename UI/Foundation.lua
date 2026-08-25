@@ -472,27 +472,27 @@ local function CurrencyBrowserButtonOnClick()
 end
 
 local function CurrencyBrowserButtonOnEnter(selfBtn)
-    selfBtn:SetBackdropColor(0.07, 0.18, 0.24, 1)
-    selfBtn:SetBackdropBorderColor(0.30, 0.80, 0.78, 1)
+    selfBtn:SetBackdropColor(0.04, 0.24, 0.27, 1)
+    selfBtn:SetBackdropBorderColor(0.20, 0.95, 0.82, 1)
     if selfBtn._label then
-        selfBtn._label:SetTextColor(0.65, 1.00, 0.92, 1)
+        selfBtn._label:SetTextColor(0.76, 1.00, 0.94, 1)
     end
     ns.ShowTooltip(selfBtn, {
-        text = "Show all Blizzard currencies",
+        text = "Browse all currencies",
         build = function(tooltip)
-            tooltip:SetText("Show all Blizzard currencies", 1, 1, 1)
-            tooltip:AddLine("Opens a side window populated from the currency API.", 0.55, 0.82, 1, true)
+            tooltip:SetText("Browse all currencies", 1, 1, 1)
+            tooltip:AddLine("Find and add currencies that are not currently shown here.", 0.55, 0.82, 1, true)
         end,
     })
 end
 
 local function CurrencyBrowserButtonOnLeave(selfBtn)
-    local alpha = selfBtn._mrTransparent and 0 or (0.90 * (selfBtn._mrFrameAlpha or 1))
-    local borderAlpha = selfBtn._mrTransparent and 0 or (0.70 * (selfBtn._mrFrameAlpha or 1))
-    selfBtn:SetBackdropColor(0.04, 0.09, 0.14, alpha)
-    selfBtn:SetBackdropBorderColor(0.14, 0.34, 0.42, borderAlpha)
+    local alpha = selfBtn._mrTransparent and 0 or (0.94 * (selfBtn._mrFrameAlpha or 1))
+    local borderAlpha = selfBtn._mrTransparent and 0 or (0.88 * (selfBtn._mrFrameAlpha or 1))
+    selfBtn:SetBackdropColor(0.025, 0.12, 0.15, alpha)
+    selfBtn:SetBackdropBorderColor(0.10, 0.72, 0.66, borderAlpha)
     if selfBtn._label then
-        selfBtn._label:SetTextColor(0.42, 0.82, 0.82, selfBtn._mrTransparent and 0.75 or 1)
+        selfBtn._label:SetTextColor(0.42, 0.92, 0.84, selfBtn._mrTransparent and 0.75 or 1)
     end
     HideTooltipIfOwned(selfBtn)
 end
@@ -550,15 +550,18 @@ local function StyleCurrencyBrowserButton(button, transparent, frameAlpha)
     button._mrTransparent = transparent
     button._mrFrameAlpha = frameAlpha
     if not button._mrBaseLayoutApplied then
-        button:SetSize(24, 14)
+        button:SetHeight(20)
         button._mrBaseLayoutApplied = true
     end
-    button:SetBackdropColor(0.04, 0.09, 0.14, transparent and 0 or (0.90 * frameAlpha))
-    button:SetBackdropBorderColor(0.14, 0.34, 0.42, transparent and 0 or (0.70 * frameAlpha))
+    button:SetBackdropColor(0.025, 0.12, 0.15, transparent and 0 or (0.94 * frameAlpha))
+    button:SetBackdropBorderColor(0.10, 0.72, 0.66, transparent and 0 or (0.88 * frameAlpha))
     if button._label then
-        SetFontIfChanged(button._label, FONT_ROWS, math.max(7, GetFontSize() - 3), GetFontFlags())
-        button._label:SetText(L["CurrencyBrowser_All"] or "ALL")
-        button._label:SetTextColor(0.42, 0.82, 0.82, transparent and 0.75 or 1)
+        SetFontIfChanged(button._label, FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        button._label:SetText(L["CurrencyBrowser_All"] or "Browse all currencies")
+        button._label:SetTextColor(0.42, 0.92, 0.84, transparent and 0.75 or 1)
+    end
+    if button._icon then
+        button._icon:SetVertexColor(0.34, 0.94, 0.84, transparent and 0.75 or 1)
     end
 end
 

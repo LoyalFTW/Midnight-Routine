@@ -35,6 +35,7 @@ local ROW_HEIGHT = UI.ROW_HEIGHT
 local HEADER_HEIGHT = UI.HEADER_HEIGHT
 local PADDING = UI.PADDING
 local SECTION_GAP = UI.SECTION_GAP
+local CURRENCY_BROWSER_HEIGHT = 26
 local BuildModuleStatsCache = UI.BuildModuleStatsCache
 local GetModuleStats = UI.GetModuleStats
 local IsMainTextOnlyMode = UI.IsMainTextOnlyMode
@@ -342,10 +343,13 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     local currencyBrowserButton = card._hdrFrame._currencyBrowserButton
     local showCurrencyBrowserButton = mod.key == "currencies" and MR.ToggleCurrencyBrowserFrame
     if showCurrencyBrowserButton then
-        SetOneAnchor(currencyBrowserButton, "RIGHT", card._hdrFrame, "RIGHT", -23, 0)
+        SetTwoAnchors(currencyBrowserButton,
+            "TOPLEFT", card, "TOPLEFT", 4, -(expansionHeaderH + HEADER_HEIGHT + 3),
+            "TOPRIGHT", card, "TOPRIGHT", -4, -(expansionHeaderH + HEADER_HEIGHT + 3))
+        currencyBrowserButton:SetHeight(20)
         StyleCurrencyBrowserButton(currencyBrowserButton, transparent, frameAlpha)
         currencyBrowserButton:Show()
-        SetOneAnchor(card._hdrFrame._count, "RIGHT", currencyBrowserButton, "LEFT", -8, 0)
+        SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", -22, 0)
     else
         currencyBrowserButton:Hide()
         SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", -22, 0)
@@ -362,7 +366,7 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
 
     StyleSectionCollapseIndicator(card._hdrFrame._arrow, isOpen)
 
-    local localY = expansionHeaderH + HEADER_HEIGHT
+    local localY = expansionHeaderH + HEADER_HEIGHT + (showCurrencyBrowserButton and CURRENCY_BROWSER_HEIGHT or 0)
     SetTwoAnchors(card._divider,
         "TOPLEFT", card, "TOPLEFT", 0, -localY,
         "TOPRIGHT", card, "TOPRIGHT", 0, -localY)
@@ -746,7 +750,7 @@ function MR:FastToggleMainSection(modKey)
     local newOpen = not MR:IsModuleOpen(modKey)
     MR:SetModuleOpen(modKey, newOpen)
     stats.isOpen = newOpen
-    stats.height = stats.shownRows == 0 and 0 or (HEADER_HEIGHT + 1 + SECTION_GAP + (newOpen and (stats.shownRows * ROW_HEIGHT) or 0))
+    stats.height = stats.shownRows == 0 and 0 or (HEADER_HEIGHT + 1 + SECTION_GAP + (mod.key == "currencies" and CURRENCY_BROWSER_HEIGHT or 0) + (newOpen and (stats.shownRows * ROW_HEIGHT) or 0))
 
     local colW = math.floor(usableW / numCols)
     local xOff = ((registryEntry.col or 1) - 1) * colW

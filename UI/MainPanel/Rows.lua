@@ -35,6 +35,7 @@ local ROW_HEIGHT = UI.ROW_HEIGHT
 local HEADER_HEIGHT = UI.HEADER_HEIGHT
 local PADDING = UI.PADDING
 local SECTION_GAP = UI.SECTION_GAP
+local CURRENCY_BROWSER_HEIGHT = 26
 local BuildModuleStatsCache = UI.BuildModuleStatsCache
 local GetModuleStats = UI.GetModuleStats
 local IsMainTextOnlyMode = UI.IsMainTextOnlyMode
@@ -773,8 +774,8 @@ local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     card._hdrFrame._icon = card._hdrFrame:CreateTexture(nil, "ARTWORK")
     card._hdrFrame._label = card._hdrFrame:CreateFontString(nil, "OVERLAY")
     card._hdrFrame._count = card._hdrFrame:CreateFontString(nil, "OVERLAY")
-    card._hdrFrame._currencyBrowserButton = CreateFrame("Button", nil, card._hdrFrame, "BackdropTemplate")
-    card._hdrFrame._currencyBrowserButton:SetSize(18, 18)
+    card._hdrFrame._currencyBrowserButton = CreateFrame("Button", nil, card, "BackdropTemplate")
+    card._hdrFrame._currencyBrowserButton:SetHeight(20)
     card._hdrFrame._currencyBrowserButton:SetBackdrop(MakeBackdrop())
     card._hdrFrame._currencyBrowserButton:SetScript("OnClick", CurrencyBrowserButtonOnClick)
     card._hdrFrame._currencyBrowserButton:SetScript("OnEnter", CurrencyBrowserButtonOnEnter)
@@ -782,8 +783,12 @@ local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     card._hdrFrame._currencyBrowserText = card._hdrFrame._currencyBrowserButton:CreateFontString(nil, "OVERLAY")
     card._hdrFrame._currencyBrowserButton._label = card._hdrFrame._currencyBrowserText
     card._hdrFrame._currencyBrowserText:SetFont(ns.FONT_ROWS, 12, GetFontFlags())
-    card._hdrFrame._currencyBrowserText:SetPoint("CENTER", card._hdrFrame._currencyBrowserButton, "CENTER", 0, 0)
-    card._hdrFrame._currencyBrowserText:SetText(L["CurrencyBrowser_All"] or "ALL")
+    card._hdrFrame._currencyBrowserText:SetPoint("CENTER", card._hdrFrame._currencyBrowserButton, "CENTER", 7, 0)
+    card._hdrFrame._currencyBrowserText:SetText(L["CurrencyBrowser_All"] or "Browse all currencies")
+    card._hdrFrame._currencyBrowserButton._icon = card._hdrFrame._currencyBrowserButton:CreateTexture(nil, "OVERLAY")
+    card._hdrFrame._currencyBrowserButton._icon:SetSize(13, 13)
+    card._hdrFrame._currencyBrowserButton._icon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    card._hdrFrame._currencyBrowserButton._icon:SetPoint("RIGHT", card._hdrFrame._currencyBrowserText, "LEFT", -5, 0)
     card._hdrFrame._arrow = CreateFrame("Frame", nil, card._hdrFrame)
     card._hdrFrame:SetScript("OnMouseDown", MainSectionHeaderOnMouseDown)
     card._hdrFrame:SetScript("OnMouseUp", MainSectionHeaderOnMouseUp)
@@ -949,10 +954,11 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     local showCurrencyBrowserButton = mod.key == "currencies" and MR.ToggleCurrencyBrowserFrame
     if showCurrencyBrowserButton then
         currencyBrowserButton:ClearAllPoints()
-        currencyBrowserButton:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -23, 0)
+        currencyBrowserButton:SetPoint("TOPLEFT", card, "TOPLEFT", 4, -(HEADER_HEIGHT + 3))
+        currencyBrowserButton:SetPoint("TOPRIGHT", card, "TOPRIGHT", -4, -(HEADER_HEIGHT + 3))
         StyleCurrencyBrowserButton(currencyBrowserButton, transparent, frameAlpha)
         currencyBrowserButton:Show()
-        card._hdrFrame._count:SetPoint("RIGHT", currencyBrowserButton, "LEFT", -8, 0)
+        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
     else
         currencyBrowserButton:Hide()
         card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
@@ -966,7 +972,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
 
     StyleSectionCollapseIndicator(card._hdrFrame._arrow, isOpen)
 
-    local localY = HEADER_HEIGHT
+    local localY = HEADER_HEIGHT + (showCurrencyBrowserButton and CURRENCY_BROWSER_HEIGHT or 0)
     card._divider:ClearAllPoints()
     card._divider:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -localY)
     card._divider:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -localY)
@@ -1753,7 +1759,7 @@ BuildModuleStatsCache = function(self)
         local hideComplete = MR:IsModuleHideComplete(mod.key)
         local isOpen = MR:IsModuleOpen(mod.key)
         local totalRows, doneRows, shownRows = 0, 0, 0
-        local height = HEADER_HEIGHT + 1 + SECTION_GAP
+        local height = HEADER_HEIGHT + 1 + SECTION_GAP + (mod.key == "currencies" and CURRENCY_BROWSER_HEIGHT or 0)
 
         local rows = MR.GetOrderedRows and MR:GetOrderedRows(mod) or mod.rows
         for _, row in ipairs(rows) do
