@@ -341,6 +341,9 @@ function MR:PopulateConfigFrame(f)
                     MR:UpdateInstanceFrameVisibility()
                 end
             end)
+        Checkbox(L["Config_AutoHideOnLogin"] or "Auto-Hide on Login",
+            function() return MR.db.profile.autoHideOnLogin == true end,
+            function(v) MR.db.profile.autoHideOnLogin = v and true or false end)
         Checkbox(L["Config_HideAdventureGuideBossIDs"],
             function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
             function(v)

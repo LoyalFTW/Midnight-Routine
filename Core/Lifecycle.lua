@@ -608,11 +608,27 @@ function MR:HideManagedWindows(persistState)
     if self.HideCurrencyBrowserFrame then self:HideCurrencyBrowserFrame() end
     if self.HideDetachedModules then self:HideDetachedModules() end
     if self.HideConfig then self:HideConfig() end
+    if self.welcomeFrame then self.welcomeFrame:Hide() end
     if self.HideRenown then self:HideRenown(false) end
     if self.HideRares then self:HideRares(false) end
     if self.HideGatheringLocations then self:HideGatheringLocations(false) end
     if self.HideConcentrationTracker then self:HideConcentrationTracker(false) end
     if self.SuspendHiddenSurfaceWork then self:SuspendHiddenSurfaceWork() end
+end
+
+function MR:AutoHideManagedWindowsOnLogin()
+    if not self.db then return end
+    local state = self:CaptureManagedWindowState()
+    state.panel = self:GetMainPanelOpen()
+    state.renown = self:GetManagedWindowOpen("renownOpen")
+    state.rares = self:GetManagedWindowOpen("raresOpen")
+    state.gathering = self:GetManagedWindowOpen("gatheringLocOpen")
+    state.concentration = self:GetManagedWindowOpen("concentrationTrackerOpen")
+    if self:ManagedWindowStateHasVisibleFrames(state) then
+        self._toggleRestoreState = state
+        self:SetManagedWindowRestoreState(state)
+    end
+    self:HideManagedWindows(false)
 end
 
 function MR:RestoreManagedWindows(state, persistState)

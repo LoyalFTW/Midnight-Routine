@@ -30,6 +30,7 @@ local DEFAULTS = {
         hideFramesInInstances = false,
         hideAdventureGuideBossIDs = false,
         disabledInCombat = true,
+        autoHideOnLogin = false,
         rememberManagedWindowsVisibility = false,
         managedWindowsBundleHidden       = false,
         transparentMode = false,

@@ -478,10 +478,10 @@ local function CurrencyBrowserButtonOnEnter(selfBtn)
         selfBtn._label:SetTextColor(0.76, 1.00, 0.94, 1)
     end
     ns.ShowTooltip(selfBtn, {
-        text = "Browse all currencies",
+        text = L["CurrencyBrowser_BrowseTooltipTitle"] or "Browse all currencies",
         build = function(tooltip)
-            tooltip:SetText("Browse all currencies", 1, 1, 1)
-            tooltip:AddLine("Find and add currencies that are not currently shown here.", 0.55, 0.82, 1, true)
+            tooltip:SetText(L["CurrencyBrowser_BrowseTooltipTitle"] or "Browse all currencies", 1, 1, 1)
+            tooltip:AddLine(L["CurrencyBrowser_BrowseTooltipText"] or "Find and add currencies that are not currently shown here.", 0.55, 0.82, 1, true)
         end,
     })
 end

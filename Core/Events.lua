@@ -90,7 +90,9 @@ function MR:OnEnteringWorld()
         return
     end
 
-    self:MaybeShowWelcomeScreen()
+    if not self._autoHideOnLoginPending then
+        self:MaybeShowWelcomeScreen()
+    end
     if self.OnRenownUpdate and not self._renownUpdateBucketHandle then
         self._renownUpdateBucketHandle = self:RegisterBucketEvent({
             "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
@@ -140,7 +142,11 @@ function MR:OnEnteringWorld()
         elseif self.RefreshGatheringLocationsFrame then
             self:RefreshGatheringLocationsFrame()
         end
-        self:RestoreSavedManagedWindows()
+        if self._autoHideOnLoginPending then
+            self._autoHideOnLoginPending = nil
+        else
+            self:RestoreSavedManagedWindows()
+        end
     end, 0.5)
     self:RequestScan(1.0)
 end
@@ -416,8 +422,13 @@ local managedWindowRestoreFrame = CreateFrame("Frame")
 managedWindowRestoreFrame:RegisterEvent("PLAYER_LOGIN")
 managedWindowRestoreFrame:SetScript("OnEvent", function(self)
     self:UnregisterEvent("PLAYER_LOGIN")
+    MR._autoHideOnLoginPending = MR.db and MR.db.profile.autoHideOnLogin == true
     C_Timer.After(0, function()
-        MR:RestoreSavedManagedWindows()
+        if MR._autoHideOnLoginPending then
+            MR:AutoHideManagedWindowsOnLogin()
+        else
+            MR:RestoreSavedManagedWindows()
+        end
     end)
 end)
 
