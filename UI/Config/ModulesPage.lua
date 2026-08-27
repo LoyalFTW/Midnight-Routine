@@ -57,7 +57,7 @@ function Config.BuildModulesPage(ctx)
         end
     end
 
-    local drag = { active = false, srcKey = nil, targetIdx = nil, mode = "module", moduleKey = nil }
+    local drag = { active = false, srcKey = nil, targetIdx = nil, mode = "module", moduleKey = nil, configGroup = nil }
 
     local dragGhost = CreateFrame("Frame", nil, body, "BackdropTemplate")
     dragGhost:SetHeight(20)
@@ -433,7 +433,17 @@ function Config.BuildModulesPage(ctx)
 
     local function GetActiveDragRows()
         if drag.mode == "row" and drag.moduleKey then
-            return _cfgRowRows[drag.moduleKey] or {}
+            local rows = _cfgRowRows[drag.moduleKey] or {}
+            if drag.configGroup then
+                local filtered = {}
+                for _, row in ipairs(rows) do
+                    if row.configGroup == drag.configGroup then
+                        filtered[#filtered + 1] = row
+                    end
+                end
+                return filtered
+            end
+            return rows
         end
         if drag.mode == "profession_group" then
             return _cfgRows
@@ -530,6 +540,7 @@ function Config.BuildModulesPage(ctx)
             drag.targetIdx = nil
             drag.mode = "module"
             drag.moduleKey = nil
+            drag.configGroup = nil
             MR:PopulateConfigFrame(f)
             return
         end
@@ -554,6 +565,7 @@ function Config.BuildModulesPage(ctx)
             drag.targetIdx = nil
             drag.mode = "module"
             drag.moduleKey = nil
+            drag.configGroup = nil
             MR:PopulateConfigFrame(f)
             return
         end
@@ -604,6 +616,7 @@ function Config.BuildModulesPage(ctx)
             drag.targetIdx = nil
             drag.mode = "module"
             drag.moduleKey = nil
+            drag.configGroup = nil
             MR:PopulateConfigFrame(f)
             return
         end
@@ -642,7 +655,7 @@ function Config.BuildModulesPage(ctx)
             MR:SetModuleOrder(newOrder, "all")
             MR:RefreshUI()
         end
-        drag.srcKey = nil; drag.targetIdx = nil; drag.mode = "module"; drag.moduleKey = nil
+        drag.srcKey = nil; drag.targetIdx = nil; drag.mode = "module"; drag.moduleKey = nil; drag.configGroup = nil
         MR:PopulateConfigFrame(f)
     end
 
@@ -663,6 +676,7 @@ function Config.BuildModulesPage(ctx)
         f:SetScript("OnUpdate", DragOnUpdate)
         drag.mode = "profession_group"
         drag.moduleKey = nil
+        drag.configGroup = nil
         drag.srcKey = PROFESSION_GROUP_KEY
         drag.targetIdx = nil
         dragGhostLbl:SetText(L["ProfKnowledge_Title"] or "Profession Knowledge")
@@ -1034,6 +1048,7 @@ function Config.BuildModulesPage(ctx)
         f:SetScript("OnUpdate", DragOnUpdate)
         drag.mode = "module"
         drag.moduleKey = nil
+        drag.configGroup = nil
         drag.srcKey = key
         drag.targetIdx = nil
         dragGhostLbl:SetText(mod.label)
@@ -1045,6 +1060,7 @@ function Config.BuildModulesPage(ctx)
         f:SetScript("OnUpdate", DragOnUpdate)
         drag.mode = "row"
         drag.moduleKey = mod.key
+        drag.configGroup = row.configGroup
         drag.srcKey = row.key
         drag.targetIdx = nil
         dragGhostLbl:SetText(FormatRowConfigLabel(mod, row))
@@ -1176,7 +1192,7 @@ function Config.BuildModulesPage(ctx)
                     end,
                 })
                 _cfgRowRows[key] = _cfgRowRows[key] or {}
-                _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = currentRow.key, frame = rowFrame, label = currentRow.label }
+                _cfgRowRows[key][#_cfgRowRows[key] + 1] = { key = currentRow.key, frame = rowFrame, label = currentRow.label, configGroup = currentRow.configGroup }
                 yOff = yOff - moduleRowH - 1
             end
         end

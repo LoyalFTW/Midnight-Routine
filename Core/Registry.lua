@@ -476,10 +476,58 @@ function MR:GetOrderedRows(mod)
     end
 
     local byKey, used, reorderedRows, rows = {}, {}, {}, {}
+    local hasConfigGroups = false
     for _, row in ipairs(baseRows) do
         if row and row.key and not row.control then
             byKey[row.key] = row
+            if row.configGroup then
+                hasConfigGroups = true
+            end
         end
+    end
+    if hasConfigGroups then
+        local savedPositions = {}
+        local groupedRows = {}
+        local groupedIndexes = {}
+        for index, rowKey in ipairs(savedOrder) do
+            savedPositions[rowKey] = index
+        end
+        for index, row in ipairs(baseRows) do
+            if row and not row.control then
+                local groupKey = row.configGroup or false
+                groupedRows[groupKey] = groupedRows[groupKey] or {}
+                groupedRows[groupKey][#groupedRows[groupKey] + 1] = { row = row, index = index }
+            end
+        end
+        for groupKey, group in pairs(groupedRows) do
+            table.sort(group, function(a, b)
+                local aPosition = savedPositions[a.row.key]
+                local bPosition = savedPositions[b.row.key]
+                if aPosition and bPosition then
+                    return aPosition < bPosition
+                end
+                if aPosition then
+                    return true
+                end
+                if bPosition then
+                    return false
+                end
+                return a.index < b.index
+            end)
+            groupedIndexes[groupKey] = 1
+        end
+        for _, row in ipairs(baseRows) do
+            if row and row.control then
+                rows[#rows + 1] = row
+            else
+                local groupKey = row.configGroup or false
+                local group = groupedRows[groupKey]
+                local groupIndex = groupedIndexes[groupKey]
+                rows[#rows + 1] = group[groupIndex].row
+                groupedIndexes[groupKey] = groupIndex + 1
+            end
+        end
+        return CacheOrderedRows(mod, mod.rows, savedOrder, rows)
     end
     for _, rowKey in ipairs(savedOrder) do
         local row = byKey[rowKey]

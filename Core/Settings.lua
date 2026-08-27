@@ -465,6 +465,19 @@ function MR:SetModuleRowPosition(modKey, rowKey, targetRowKey, afterTarget)
         return false
     end
 
+    local sourceRow
+    local targetRow
+    for _, row in ipairs(mod.rows or {}) do
+        if row.key == rowKey then
+            sourceRow = row
+        elseif row.key == targetRowKey then
+            targetRow = row
+        end
+    end
+    if sourceRow and targetRow and sourceRow.configGroup ~= targetRow.configGroup then
+        return false
+    end
+
     local rows = self:GetOrderedRows(mod)
     local order, seen = {}, {}
     for _, row in ipairs(rows or {}) do
