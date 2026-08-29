@@ -133,9 +133,18 @@ end
 local function UpdateQuestProgressForRow(self, progress, mod, row)
     local done = 0
     if row.questIds then
-        for _, qid in ipairs(row.questIds) do
-            if C_QuestLog.IsQuestFlaggedCompleted(qid) then
+        if row.orderedQuestSequence then
+            for _, qid in ipairs(row.questIds) do
+                if not C_QuestLog.IsQuestFlaggedCompleted(qid) then
+                    break
+                end
                 done = done + 1
+            end
+        else
+            for _, qid in ipairs(row.questIds) do
+                if C_QuestLog.IsQuestFlaggedCompleted(qid) then
+                    done = done + 1
+                end
             end
         end
     end

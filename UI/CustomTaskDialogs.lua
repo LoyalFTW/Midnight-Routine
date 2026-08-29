@@ -51,10 +51,13 @@ local function ApplyCustomTaskDialogTheme(frame)
     local editFont  = math.max(9,  fontSize)
 
 
-    frame:SetSize(400, 536)
+    frame:SetSize(420, 620)
 
     local function sf(fs, size) if fs then fs:SetFont(ns.FONT_ROWS, size, GetFontFlags()) end end
     sf(frame.title,           math.max(10, fontSize + 1))
+    sf(frame.trackingHeader,  rowFont)
+    sf(frame.progressHeader,  rowFont)
+    sf(frame.behaviorHeader,  rowFont)
     sf(frame.nameLabel,       rowFont)
     sf(frame.questLabel,      rowFont)
     sf(frame.encounterLabel,  rowFont)
@@ -67,7 +70,7 @@ local function ApplyCustomTaskDialogTheme(frame)
 
     if frame.title then frame.title:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
 
-    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
+    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.orderedQuestCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
     for _, cb in ipairs(checks) do
         if cb and cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
     end
@@ -156,6 +159,15 @@ local function EnsureCustomTaskDialog()
     frame:SetBackdropBorderColor(0.20, 0.44, 0.48, 1)
     frame:Hide()
 
+    local function BindHelp(control, key, fallback)
+        if control and ns.BindTooltip then
+            ns.BindTooltip(control, {
+                text = Text(key, fallback),
+                wrap = true,
+            })
+        end
+    end
+
     local dragRegion = CreateFrame("Frame", nil, frame)
     dragRegion:SetPoint("TOPLEFT",  frame, "TOPLEFT",  8, -8)
     dragRegion:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
@@ -191,6 +203,21 @@ local function EnsureCustomTaskDialog()
         lbl:SetText(text)
         lbl:SetTextColor(0.55, 0.70, 0.82)
         return lbl
+    end
+
+    local function MakeSectionHeader(anchorFrame, yOff, text)
+        local line = frame:CreateTexture(nil, "ARTWORK")
+        line:SetHeight(1)
+        line:SetWidth(392)
+        line:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, yOff)
+        line:SetColorTexture(0.20, 0.44, 0.48, 0.34)
+        local header = frame:CreateFontString(nil, "OVERLAY")
+        header:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        header:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -6)
+        header:SetJustifyH("LEFT")
+        header:SetText(text)
+        header:SetTextColor(0.38, 0.78, 0.86)
+        return header
     end
 
 
@@ -229,7 +256,11 @@ local function EnsureCustomTaskDialog()
     end
 
 
-    local nameLabel = MakeLabel(sep, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_NameLabel"] or "Task name")
+    local trackingHeader = MakeLabel(sep, "BOTTOMLEFT", 0, -8, Text("CustomTasks_TrackingHeader", "Tracking"))
+    trackingHeader:SetTextColor(0.38, 0.78, 0.86)
+    frame.trackingHeader = trackingHeader
+
+    local nameLabel = MakeLabel(trackingHeader, "BOTTOMLEFT", 0, -8, L["CustomTasks_NameLabel"] or "Task name")
     nameLabel:SetTextColor(0.74, 0.84, 0.92)
     local nameBg    = MakeInputBg(nameLabel, "BOTTOMLEFT", 0, -IGAP)
     local input     = MakeEditBox(nameBg, 120)
@@ -237,6 +268,7 @@ local function EnsureCustomTaskDialog()
     frame.nameLabel = nameLabel
     frame.inputBg   = nameBg
     frame.input     = input
+    BindHelp(input, "CustomTasks_TaskNameTooltip", "The name shown for this custom task.")
 
 
     local COL2W = 170
@@ -247,6 +279,7 @@ local function EnsureCustomTaskDialog()
     frame.questLabel = questLabel
     frame.questBg    = questBg
     frame.questInput = questInput
+    BindHelp(questInput, "CustomTasks_QuestIdsTooltip", "Enter one or more quest IDs separated by commas or spaces. Target 1 completes when any listed quest is done; increase Target to require more.")
 
     local encounterLabel = MakeLabel(nameBg, "BOTTOMLEFT", COL2W + GAP, -GAP, L["CustomTasks_EncounterIdsLabel"] or "Encounter ID(s)")
     local encounterBg    = MakeInputBg(encounterLabel, "BOTTOMLEFT", 0, -IGAP, COL2W, IH)
@@ -254,6 +287,7 @@ local function EnsureCustomTaskDialog()
     frame.encounterLabel  = encounterLabel
     frame.encounterBg     = encounterBg
     frame.encounterInput  = encounterInput
+    BindHelp(encounterInput, "CustomTasks_EncounterIdsTooltip", "Enter one or more encounter IDs for automatic boss-kill tracking. Quest IDs and encounter IDs cannot be combined in one task.")
 
 
     local idHint = frame:CreateFontString(nil, "OVERLAY")
@@ -272,7 +306,7 @@ local function EnsureCustomTaskDialog()
         { id = 15, label = "Heroic" },
         { id = 16, label = "Mythic" },
     }
-    local difficultyLabel = MakeLabel(idHint, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_DifficultyLabel"] or "Difficulties")
+    local difficultyLabel = MakeLabel(idHint, "BOTTOMLEFT", 0, -GAP, Text("CustomTasks_EncounterDifficultyHeader", "Encounter difficulties"))
     difficultyLabel:SetTextColor(0.74, 0.84, 0.92)
     frame.difficultyLabel = difficultyLabel
 
@@ -295,6 +329,7 @@ local function EnsureCustomTaskDialog()
         cb._text  = cbText
         cb._diffId = opt.id
         frame.difficultyChecks[i] = cb
+        BindHelp(cb, "CustomTasks_DifficultyTooltip", "Choose which raid difficulties are tracked. Each selected difficulty can contribute once.")
         prevDiffCheck = cb
     end
 
@@ -303,7 +338,7 @@ local function EnsureCustomTaskDialog()
     diffHint:SetPoint("TOPLEFT", difficultyLabel, "BOTTOMLEFT", 0, -24)
     diffHint:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, 0)
     diffHint:SetJustifyH("LEFT")
-    diffHint:SetText(Text("CustomTasks_DifficultyHint", "Leave all checked for any difficulty."))
+    diffHint:SetText(Text("CustomTasks_DifficultyHint", "Each selected difficulty is tracked once."))
     diffHint:SetTextColor(0.40, 0.52, 0.62)
     frame.diffHint = diffHint
 
@@ -312,7 +347,10 @@ local function EnsureCustomTaskDialog()
 
 
 
-    local targetLabel = MakeLabel(diffHint, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_TargetLabel"] or "Target")
+    local progressHeader = MakeSectionHeader(diffHint, -12, Text("CustomTasks_ProgressHeader", "Progress"))
+    frame.progressHeader = progressHeader
+
+    local targetLabel = MakeLabel(progressHeader, "BOTTOMLEFT", 0, -8, L["CustomTasks_TargetLabel"] or "Target")
     targetLabel:SetTextColor(0.74, 0.84, 0.92)
     local targetBg    = MakeInputBg(targetLabel, "BOTTOMLEFT", 0, -IGAP, 60, IH)
     local targetInput = MakeEditBox(targetBg, 3, true)
@@ -330,10 +368,25 @@ local function EnsureCustomTaskDialog()
     frame.targetBg    = targetBg
     frame.targetInput = targetInput
     frame.targetHint  = targetHint
+    BindHelp(targetInput, "CustomTasks_TargetTooltip", "The number of listed quests required to complete this task. Use 1 for any quest, or the total number of IDs to require them all.")
 
+    local orderedQuestCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+    orderedQuestCheck:SetSize(20, 20)
+    orderedQuestCheck:SetPoint("TOPLEFT", targetBg, "BOTTOMLEFT", 0, -4)
+    local orderedQuestText = frame:CreateFontString(nil, "OVERLAY")
+    orderedQuestText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    orderedQuestText:SetPoint("LEFT", orderedQuestCheck, "RIGHT", 2, 0)
+    orderedQuestText:SetText(Text("CustomTasks_OrderedQuestSequence", "Track quest IDs in entered order"))
+    orderedQuestText:SetTextColor(0.84, 0.90, 0.96)
+    orderedQuestCheck._text = orderedQuestText
+    orderedQuestCheck:SetScript("OnClick", function(selfBtn)
+        frame.orderedQuestSequence = selfBtn:GetChecked() and true or false
+        if frame.RefreshSmartState then frame:RefreshSmartState() end
+    end)
+    frame.orderedQuestCheck = orderedQuestCheck
+    BindHelp(orderedQuestCheck, "CustomTasks_OrderedQuestSequenceTooltip", "Preserves the entered quest-ID order and counts only consecutive completed steps. Target is set automatically to the number of unique IDs.")
 
-    local resetLabel = MakeLabel(targetBg, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_ResetType"] or "Resets")
-    resetLabel:SetTextColor(0.74, 0.84, 0.92)
+    local resetLabel = MakeSectionHeader(orderedQuestCheck, -12, Text("CustomTasks_ResetScheduleHeader", "Reset schedule"))
     frame.resetLabel = resetLabel
 
     local function CreateResetCheckbox(anchorTo, anchorPt, xOff, yOff, labelText, value)
@@ -356,19 +409,27 @@ local function EnsureCustomTaskDialog()
     end
 
 
-    local weeklyCheck = CreateResetCheckbox(resetLabel, "BOTTOMLEFT", 0, -4, L["CustomTasks_ResetWeekly"] or "Weekly", "weekly")
+    local weeklyCheck = CreateResetCheckbox(resetLabel, "BOTTOMLEFT", 0, -6, L["CustomTasks_ResetWeekly"] or "Weekly", "weekly")
     local dailyCheck  = CreateResetCheckbox(weeklyCheck, "TOPLEFT", 0, 0, L["CustomTasks_ResetDaily"] or "Daily", "daily")
     dailyCheck:ClearAllPoints()
     dailyCheck:SetPoint("LEFT", weeklyCheck._text, "RIGHT", 14, 0)
     frame.weeklyCheck = weeklyCheck
     frame.dailyCheck  = dailyCheck
-    local noResetCheck = CreateResetCheckbox(weeklyCheck, "BOTTOMLEFT", 0, -2, L["CustomTasks_ResetNone"] or "No reset", "none")
+    local noResetCheck = CreateResetCheckbox(dailyCheck, "TOPLEFT", 0, 0, L["CustomTasks_ResetNone"] or "No reset", "none")
+    noResetCheck:ClearAllPoints()
+    noResetCheck:SetPoint("LEFT", dailyCheck._text, "RIGHT", 14, 0)
     frame.noResetCheck = noResetCheck
+    BindHelp(weeklyCheck, "CustomTasks_ResetWeeklyTooltip", "Clears this task at the regional weekly reset.")
+    BindHelp(dailyCheck, "CustomTasks_ResetDailyTooltip", "Clears this task at the regional daily reset.")
+    BindHelp(noResetCheck, "CustomTasks_ResetNoneTooltip", "Keeps this task completed until you manually change or delete it.")
 
+
+    local behaviorHeader = MakeSectionHeader(weeklyCheck, -12, Text("CustomTasks_BehaviorHeader", "Behavior & sharing"))
+    frame.behaviorHeader = behaviorHeader
 
     local manualQuestCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     manualQuestCheck:SetSize(20, 20)
-    manualQuestCheck:SetPoint("TOPLEFT", noResetCheck, "BOTTOMLEFT", 0, -GAP)
+    manualQuestCheck:SetPoint("TOPLEFT", behaviorHeader, "BOTTOMLEFT", 0, -6)
     local manualQuestText = frame:CreateFontString(nil, "OVERLAY")
     manualQuestText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
     manualQuestText:SetPoint("LEFT", manualQuestCheck, "RIGHT", 2, 0)
@@ -381,6 +442,7 @@ local function EnsureCustomTaskDialog()
     end)
     frame.manualQuestCheck = manualQuestCheck
     frame.manualQuestHint  = frame:CreateFontString(nil, "OVERLAY")
+    BindHelp(manualQuestCheck, "CustomTasks_ManualQuestClicksTooltip", "Allows a single-target quest task to be checked or unchecked manually when automatic quest detection is not enough.")
 
     local autoUpdateCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     autoUpdateCheck:SetSize(20, 20)
@@ -396,6 +458,7 @@ local function EnsureCustomTaskDialog()
     end)
     frame.autoUpdateCheck = autoUpdateCheck
     frame.autoUpdateHint  = frame:CreateFontString(nil, "OVERLAY")
+    BindHelp(autoUpdateCheck, "CustomTasks_AutoUpdateInstancesTooltip", "Updates this task while inside dungeons, raids, scenarios, and other instances.")
 
     local sharedTaskCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     sharedTaskCheck:SetSize(20, 20)
@@ -427,6 +490,7 @@ local function EnsureCustomTaskDialog()
         end
     end)
     frame.sharedTaskCheck = sharedTaskCheck
+    BindHelp(sharedTaskCheck, "CustomTasks_SharedTaskTooltip", "Shows this task on every character. Completion remains separate for each character unless Complete on all alts is enabled.")
 
     local accountCompleteCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     accountCompleteCheck:SetSize(20, 20)
@@ -441,6 +505,7 @@ local function EnsureCustomTaskDialog()
         frame.accountWideComplete = selfBtn:GetChecked() and true or false
     end)
     frame.accountCompleteCheck = accountCompleteCheck
+    BindHelp(accountCompleteCheck, "CustomTasks_AccountCompleteTooltip", "Shares this task's completion across all characters. This is available only when Show on all alts is enabled.")
 
 
     local function CreateDialogButton(width, label, color, borderColor)
@@ -482,25 +547,45 @@ local function EnsureCustomTaskDialog()
     frame.saveBtn   = saveBtn
     frame.cancelBtn = cancelBtn
     frame.deleteBtn = deleteBtn
+    BindHelp(saveBtn, "CustomTasks_SaveTooltip", "Save this custom task.")
+    BindHelp(cancelBtn, "CustomTasks_CancelTooltip", "Close without saving changes.")
+    BindHelp(deleteBtn, "CustomTasks_DeleteTooltip", "Permanently delete this custom task.")
 
 
     function frame:RefreshSmartState()
         local hasQuestIds    = self.questInput    and (self.questInput:GetText()    or ""):match("%d") ~= nil
         local hasEncounterIds = self.encounterInput and (self.encounterInput:GetText() or ""):match("%d") ~= nil
+        local questIdCount = 0
+        local seenQuestIds = {}
+        if hasQuestIds then
+            for token in (self.questInput:GetText() or ""):gmatch("%d+") do
+                local questId = tonumber(token)
+                if questId and questId > 0 and not seenQuestIds[questId] then
+                    seenQuestIds[questId] = true
+                    questIdCount = questIdCount + 1
+                end
+            end
+        end
 
 
         if self.manualQuestCheck then
-            self.manualQuestCheck:EnableMouse(hasQuestIds)
-            self.manualQuestCheck:SetChecked(hasQuestIds and self.allowManualQuestClicks == true or false)
+            local manualQuestEnabled = hasQuestIds and not (self.orderedQuestSequence and questIdCount > 1)
+            if not manualQuestEnabled then
+                self.allowManualQuestClicks = false
+            end
+            if manualQuestEnabled then self.manualQuestCheck:Enable() else self.manualQuestCheck:Disable() end
+            self.manualQuestCheck:EnableMouse(true)
+            self.manualQuestCheck:SetChecked(manualQuestEnabled and self.allowManualQuestClicks == true or false)
             if self.manualQuestCheck._text then
-                self.manualQuestCheck._text:SetAlpha(hasQuestIds and 1 or 0.50)
+                self.manualQuestCheck._text:SetAlpha(manualQuestEnabled and 1 or 0.50)
             end
         end
 
 
         if self.encounterInput then
             local disableEncounter = hasQuestIds
-            self.encounterInput:EnableMouse(not disableEncounter)
+            self.encounterInput:SetEnabled(not disableEncounter)
+            self.encounterInput:EnableMouse(true)
             self.encounterInput:SetAlpha(disableEncounter and 0.40 or 1)
             if disableEncounter then self.encounterInput:SetText("") end
         end
@@ -509,29 +594,50 @@ local function EnsureCustomTaskDialog()
 
         if self.questInput then
             local disableQuest = hasEncounterIds and not hasQuestIds
-            self.questInput:EnableMouse(not disableQuest)
+            self.questInput:SetEnabled(not disableQuest)
+            self.questInput:EnableMouse(true)
             self.questInput:SetAlpha(disableQuest and 0.40 or 1)
         end
         if self.questLabel then self.questLabel:SetAlpha(hasEncounterIds and not hasQuestIds and 0.40 or 1) end
 
 
-        local enableTarget = hasQuestIds
+        local orderedEnabled = hasQuestIds and questIdCount > 1
+        if self.orderedQuestCheck then
+            if orderedEnabled then self.orderedQuestCheck:Enable() else self.orderedQuestCheck:Disable() end
+            self.orderedQuestCheck:EnableMouse(true)
+            if not orderedEnabled then
+                self.orderedQuestSequence = false
+            end
+            self.orderedQuestCheck:SetChecked(orderedEnabled and self.orderedQuestSequence == true or false)
+            self.orderedQuestCheck:SetAlpha(orderedEnabled and 1 or 0.40)
+            if self.orderedQuestCheck._text then
+                self.orderedQuestCheck._text:SetAlpha(orderedEnabled and 1 or 0.40)
+            end
+        end
+
+        local enableTarget = hasQuestIds and not self.orderedQuestSequence
         if self.targetInput then
-            self.targetInput:EnableMouse(enableTarget)
+            self.targetInput:SetEnabled(enableTarget)
+            self.targetInput:EnableMouse(true)
             self.targetInput:SetAlpha(enableTarget and 1 or 0.40)
+            if self.orderedQuestSequence and questIdCount > 0 then
+                self.targetInput:SetText(tostring(questIdCount))
+            end
         end
         if self.targetBg    then self.targetBg:SetAlpha(enableTarget and 1 or 0.40) end
         if self.targetLabel then self.targetLabel:SetAlpha(enableTarget and 1 or 0.40) end
         if self.targetHint  then self.targetHint:SetAlpha(enableTarget and 1 or 0.40) end
 
 
-        local showDiff = hasEncounterIds and not hasQuestIds
-        if self.difficultyLabel then self.difficultyLabel:SetShown(showDiff) end
-        if self.diffHint        then self.diffHint:SetShown(showDiff) end
+        local enableDiff = hasEncounterIds and not hasQuestIds
+        if self.difficultyLabel then self.difficultyLabel:SetAlpha(enableDiff and 1 or 0.40) end
+        if self.diffHint        then self.diffHint:SetAlpha(enableDiff and 1 or 0.40) end
         if self.difficultyChecks then
             for _, cb in ipairs(self.difficultyChecks) do
-                cb:SetShown(showDiff)
-                if cb._text then cb._text:SetShown(showDiff) end
+                if enableDiff then cb:Enable() else cb:Disable() end
+                cb:EnableMouse(true)
+                cb:SetAlpha(enableDiff and 1 or 0.40)
+                if cb._text then cb._text:SetAlpha(enableDiff and 1 or 0.40) end
             end
         end
 
@@ -544,6 +650,7 @@ local function EnsureCustomTaskDialog()
                 self.accountCompleteCheck:SetChecked(false)
                 self.accountCompleteCheck:Disable()
             end
+            self.accountCompleteCheck:EnableMouse(true)
             if self.accountCompleteCheck._text then
                 self.accountCompleteCheck._text:SetAlpha(isShared and 1 or 0.40)
             end
@@ -588,9 +695,9 @@ local function EnsureCustomTaskDialog()
         end
 
         if self.taskId then
-            MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete)
+            MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete, self.orderedQuestSequence)
         else
-            MR:AddCustomTask(text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete)
+            MR:AddCustomTask(text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete, self.orderedQuestSequence)
         end
         self:Hide()
     end
@@ -623,10 +730,14 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
     dialog.encounterInput:SetText((task and task.encounterIds and table.concat(task.encounterIds, ", ")) or "")
     dialog.targetInput:SetText(tostring((task and task.max) or 1))
     dialog.allowManualQuestClicks = task and task.allowManualQuestClicks or false
+    dialog.orderedQuestSequence = task and task.orderedQuestSequence or false
     dialog.autoUpdateInstances = task and task.autoUpdateInstances or false
     dialog.accountWideComplete = task and task.accountWideComplete or false
     if dialog.autoUpdateCheck then
         dialog.autoUpdateCheck:SetChecked(dialog.autoUpdateInstances)
+    end
+    if dialog.orderedQuestCheck then
+        dialog.orderedQuestCheck:SetChecked(dialog.orderedQuestSequence)
     end
     if dialog.sharedTaskCheck then
         dialog.sharedTaskCheck:SetChecked(dialog.taskScope == "shared")

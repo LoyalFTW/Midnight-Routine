@@ -190,7 +190,7 @@ local function NormalizeEncounterDifficulties(value)
     return count > 0 and result or nil
 end
 
-local function NormalizeQuestIds(value)
+local function NormalizeQuestIds(value, preserveOrder)
     if value == nil or value == "" then
         return nil
     end
@@ -229,7 +229,9 @@ local function NormalizeQuestIds(value)
         return nil
     end
 
-    table.sort(ids)
+    if not preserveOrder then
+        table.sort(ids)
+    end
     return ids
 end
 
@@ -501,7 +503,11 @@ function MR:GetCustomTasks()
         task.label = TrimText(task.label ~= "" and task.label or (L["CustomTasks_Untitled"] or "Untitled Task"))
         task.max = NormalizeTaskMax(task.max)
         task.order = tonumber(task.order) or index
-        task.questIds = NormalizeQuestIds(task.questIds or task.questId)
+        task.orderedQuestSequence = NormalizeBoolean(task.orderedQuestSequence)
+        task.questIds = NormalizeQuestIds(task.questIds or task.questId, task.orderedQuestSequence)
+        if task.orderedQuestSequence and task.questIds then
+            task.max = #task.questIds
+        end
         task.encounterIds = NormalizeEncounterIds(task.encounterIds)
         task.resetType = ResolveQuestResetType(task.questIds, task.resetType)
         task.scope = NormalizeTaskScope(task.scope)
@@ -626,7 +632,7 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
                 local completionScopeLabel = task.accountWideComplete
                     and Text("CustomTasks_AccountCompleteScope", "Completion shared by all alts")
                     or Text("CustomTasks_CharacterCompleteScope", "Completion tracked per character")
-                local questIds = NormalizeQuestIds(task.questIds)
+                local questIds = NormalizeQuestIds(task.questIds, task.orderedQuestSequence)
                 local questIdText = BuildQuestIdsText(questIds)
                 local rewardCopper = GetQuestRewardSummary(questIds)
                 local rewardText = rewardCopper and rewardCopper > 0 and FormatQuestMoneyReward(rewardCopper) or nil
@@ -652,6 +658,9 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
                     if rewardText then
                         questNote = string.format("%s\nGold reward: %s", questNote, rewardText)
                     end
+                    if task.orderedQuestSequence then
+                        questNote = string.format("%s\n%s", questNote, Text("CustomTasks_OrderedQuestNote", "Completes quests in the entered order."))
+                    end
                     noteText = string.format(
                         "%s\n%s",
                         resetLabel,
@@ -675,10 +684,11 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
                     label = rewardText and ("|cffffd36a" .. task.label .. "|r") or task.label,
                     max = effectiveMax,
                     note = noteText,
-                    countText = rewardText,
+                    countText = task.orderedQuestSequence and nil or rewardText,
                     countColor = rewardText and { 1.00, 0.82, 0.30 } or nil,
                     toggleStatus = (task.max <= 1) and ((not questIds) or task.allowManualQuestClicks) and (not encounterIds),
                     questIds = questIds,
+                    orderedQuestSequence = task.orderedQuestSequence,
                     encounterIds = encounterIds,
                     allowManualQuestClicks = task.allowManualQuestClicks,
                     autoUpdateInstances = task.autoUpdateInstances,
@@ -715,6 +725,21 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
                             )
                             if rewardText then
                                 tip:AddLine("Gold reward: " .. rewardText, 1.00, 0.82, 0.30, true)
+                            end
+                            if task.orderedQuestSequence then
+                                local sequenceProgress = tonumber(MR:GetProgress(CUSTOM_MODULE_KEY, rowKey)) or 0
+                                tip:AddLine(Text("CustomTasks_OrderedQuestTooltip", "Ordered quest sequence"), 0.45, 0.85, 1.00, true)
+                                for index, questId in ipairs(questIds) do
+                                    local questTitle = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questId)
+                                    local label = string.format("%d. %s", index, questTitle or ("Quest " .. tostring(questId)))
+                                    if index <= sequenceProgress then
+                                        tip:AddLine(label, 0.32, 0.80, 0.50, true)
+                                    elseif index == sequenceProgress + 1 then
+                                        tip:AddLine(label, 1.00, 0.82, 0.30, true)
+                                    else
+                                        tip:AddLine(label, 0.48, 0.54, 0.62, true)
+                                    end
+                                end
                             end
                             if task.allowManualQuestClicks then
                                 tip:AddLine(L["CustomTasks_QuestManualHint"] or "Manual clicking is enabled for this quest task.", 0.95, 0.82, 0.50, true)
@@ -772,7 +797,7 @@ local function BuildSectionRows(rows, tasks, resetType, headerKey, addKey, heade
     }
 end
 
-function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, accountWideComplete)
+function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, accountWideComplete, orderedQuestSequence)
     scope = NormalizeTaskScope(scope)
     local tasks = GetTaskStorage(scope)
     local cleanLabel = TrimText(label)
@@ -780,7 +805,11 @@ function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuest
         return nil
     end
 
-    questIds = NormalizeQuestIds(questIds)
+    orderedQuestSequence = NormalizeBoolean(orderedQuestSequence)
+    questIds = NormalizeQuestIds(questIds, orderedQuestSequence)
+    if orderedQuestSequence and questIds then
+        maxValue = #questIds
+    end
     encounterIds = NormalizeEncounterIds(encounterIds)
     resetType = ResolveQuestResetType(questIds, resetType)
     allowManualQuestClicks = NormalizeBoolean(allowManualQuestClicks)
@@ -809,6 +838,7 @@ function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuest
         allowManualQuestClicks = allowManualQuestClicks,
         autoUpdateInstances = autoUpdateInstances,
         accountWideComplete = accountWideComplete,
+        orderedQuestSequence = orderedQuestSequence,
         encounterDifficulties = encounterDifficulties,
     }
 
@@ -822,7 +852,7 @@ function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuest
     return taskId
 end
 
-function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, originalScope, accountWideComplete)
+function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, originalScope, accountWideComplete, orderedQuestSequence)
     scope = NormalizeTaskScope(scope)
     originalScope = NormalizeTaskScope(originalScope or scope)
     local task = self:GetCustomTaskById(taskId, originalScope)
@@ -888,7 +918,11 @@ function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allow
         end
     end
 
-    questIds = NormalizeQuestIds(questIds)
+    orderedQuestSequence = NormalizeBoolean(orderedQuestSequence)
+    questIds = NormalizeQuestIds(questIds, orderedQuestSequence)
+    if orderedQuestSequence and questIds then
+        maxValue = #questIds
+    end
     encounterIds = NormalizeEncounterIds(encounterIds)
     resetType = ResolveQuestResetType(questIds, resetType)
     allowManualQuestClicks = NormalizeBoolean(allowManualQuestClicks)
@@ -917,6 +951,7 @@ function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allow
     task.allowManualQuestClicks = allowManualQuestClicks
     task.autoUpdateInstances = autoUpdateInstances
     task.accountWideComplete = accountWideComplete
+    task.orderedQuestSequence = orderedQuestSequence
     task.encounterDifficulties = NormalizeEncounterDifficulties(encounterDifficulties)
     if accountWideComplete then
         WriteCustomTaskValue(GetAccountWideProgressStorage(), newRowKey, existingProgressValue)
