@@ -45,6 +45,8 @@ function ns.ShowTooltip(owner, opts)
         return
     end
 
+    local addon = ns.MR
+    local started = addon and addon._scrollProfileArmed and debugprofilestop and debugprofilestop() or nil
     opts = opts or {}
     ns.ApplyTooltipPosition(GameTooltip, owner, opts)
     if GameTooltip.ClearLines then
@@ -59,6 +61,13 @@ function ns.ShowTooltip(owner, opts)
     end
 
     GameTooltip:Show()
+    if started and addon.CaptureScrollProfile then
+        local data = owner._mrData or (owner._mrOwner and owner._mrOwner._mrData)
+        local mod = data and data.mod
+        local row = data and data.row
+        local detail = string.format("module=%s row=%s", tostring(mod and mod.key or "unknown"), tostring(row and (row.key or row.label) or "unknown"))
+        addon:CaptureScrollProfile("tooltip", debugprofilestop() - started, detail)
+    end
 end
 
 function ns.HideTooltip(owner)

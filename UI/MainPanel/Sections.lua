@@ -388,7 +388,12 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
             if not IsMainRangeVisible(self, absoluteTop, absoluteBottom) then
                 return nil, rowY + ROW_HEIGHT, row.key or tostring(row.label or rowY)
             end
-            return UpdateMainRowWidget(self, card, mod, row, done, rowY, card:GetWidth())
+            local rowStarted = self._scrollProfileRowSink and debugprofilestop and debugprofilestop() or nil
+            local rowFrame, nextY, rowId = UpdateMainRowWidget(self, card, mod, row, done, rowY, card:GetWidth())
+            if rowStarted and self._scrollProfileRowSink then
+                self._scrollProfileRowSink(rowId or row.key or row.label or "unknown", debugprofilestop() - rowStarted)
+            end
+            return rowFrame, nextY, rowId
         end)
     end
 
@@ -423,6 +428,20 @@ function MR:RefreshMainPanelViewport()
         return false
     end
 
+    local profiling = self._scrollProfileArmed and debugprofilestop
+    if profiling and self._scrollProfileDeadline and GetTime and GetTime() > self._scrollProfileDeadline then
+        self._scrollProfileArmed = nil
+        self._scrollProfileDeadline = nil
+        profiling = nil
+    end
+    local profileStarted = profiling and debugprofilestop() or nil
+    local poolStarted
+    local poolElapsed = 0
+    local worstSectionElapsed = 0
+    local worstSectionKey = "none"
+    local worstRowElapsed = 0
+    local worstRowKey = "none"
+
     local scrollTop = self.scroll:GetVerticalScroll() or 0
     local viewHeight = self.scroll:GetHeight() or 0
     local viewBottom = scrollTop + viewHeight
@@ -433,6 +452,7 @@ function MR:RefreshMainPanelViewport()
     end
 
     self._mainViewportRefreshInProgress = true
+    if profiling then poolStarted = debugprofilestop() end
     local timerRows = self._timerRows
     if timerRows then
         for i = #timerRows, 1, -1 do
@@ -457,11 +477,27 @@ function MR:RefreshMainPanelViewport()
             PoolOutOfRangeMainRows(self, card)
         end
     end
+    if profiling then poolElapsed = debugprofilestop() - poolStarted end
     for i = 1, count do
         local assign = assignments[i]
         if assign and assign.mod then
             local xOff = ((assign.col or 1) - 1) * colW
+            local sectionStarted = profiling and debugprofilestop() or nil
+            self._scrollProfileRowSink = profiling and function(rowKey, elapsed)
+                if elapsed > worstRowElapsed then
+                    worstRowElapsed = elapsed
+                    worstRowKey = rowKey
+                end
+            end or nil
             UpdateMainSectionWidget(self, assign.mod, assign.yOff or 0, xOff, colW, assign.col, false, assign.expansionHeaderKey)
+            self._scrollProfileRowSink = nil
+            if sectionStarted then
+                local sectionElapsed = debugprofilestop() - sectionStarted
+                if sectionElapsed > worstSectionElapsed then
+                    worstSectionElapsed = sectionElapsed
+                    worstSectionKey = assign.mod.key
+                end
+            end
         end
     end
     self._mainMaterializedTop, self._mainMaterializedBottom = GetMainRenderRange(self)
@@ -470,6 +506,11 @@ function MR:RefreshMainPanelViewport()
 
     if self.UpdateTimerRowTicker then
         self:UpdateTimerRowTicker()
+    end
+    if profileStarted and self.CaptureScrollProfile then
+        local elapsed = debugprofilestop() - profileStarted
+        local detail = string.format("pool=%.1fms module=%s %.1fms row=%s %.1fms", poolElapsed, tostring(worstSectionKey), worstSectionElapsed, tostring(worstRowKey), worstRowElapsed)
+        self:CaptureScrollProfile("viewport", elapsed, detail)
     end
     return true
 end

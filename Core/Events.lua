@@ -163,7 +163,7 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
         dirty = true
     end
 
-    if currencyID == 3290 and self.RefreshDelvesLiveProgress and self:HasVisibleMainTrackingSurface() then
+    if self.RefreshDelvesLiveProgress and self:HasVisibleMainTrackingSurface() then
         if self._delvesLiveProgressTimer then
             self:CancelTimer(self._delvesLiveProgressTimer)
         end
@@ -179,6 +179,43 @@ function MR:OnCurrencyDisplayUpdate(_, currencyID)
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
     end
+end
+
+function MR:OnDelveWidgetUpdate()
+    if self._delvesWidgetProgressTimer then
+        self:CancelTimer(self._delvesWidgetProgressTimer)
+    end
+    self._delvesWidgetProgressTimer = self:ScheduleTimer(function()
+        self._delvesWidgetProgressTimer = nil
+        local visible = self:HasVisibleMainTrackingSurface()
+        self:RefreshDelvesLiveProgress(visible)
+        if not visible then
+            self:MarkBackgroundDataDirty()
+        end
+    end, 0.2)
+end
+
+function MR:OnDelveLootReady()
+    if not self.RecordGildedStashLoot then
+        return
+    end
+
+    local _, matched = self:RecordGildedStashLoot(self:HasVisibleMainTrackingSurface())
+    if matched then
+        if self._gildedStashLootTimer then
+            self:CancelTimer(self._gildedStashLootTimer)
+            self._gildedStashLootTimer = nil
+        end
+        return
+    end
+
+    if self._gildedStashLootTimer then
+        self:CancelTimer(self._gildedStashLootTimer)
+    end
+    self._gildedStashLootTimer = self:ScheduleTimer(function()
+        self._gildedStashLootTimer = nil
+        self:RecordGildedStashLoot(self:HasVisibleMainTrackingSurface())
+    end, 0.1)
 end
 
 function MR:OnQuestDataChanged()
@@ -311,6 +348,9 @@ function MR:OnBagUpdateDelayed()
     local dirty = self:RefreshItemProgress(nil, false)
 
     if self:RefreshModuleScans(SCAN_S1, false) then
+        dirty = true
+    end
+    if self:RefreshModuleScans(SCAN_DELVES, false) then
         dirty = true
     end
 

@@ -12,7 +12,7 @@ local MR = {
 }
 ns.MR = MR
 MR.ns = ns
-MR._eventController = Foundry.Events:New(addonName)
+MR._eventController = Foundry:RequireModule("Events", 2):New(addonName)
 MR._timers = {}
 MR._buckets = {}
 

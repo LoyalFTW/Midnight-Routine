@@ -131,7 +131,12 @@ function ns.AttachScrollList(scroll, content, track, opts)
     end)
 
     scroll:SetScript("OnMouseWheel", function(_, delta)
+        local addon = ns.MR
+        local started = addon and addon._scrollProfileArmed and scroll == addon.scroll and debugprofilestop and debugprofilestop() or nil
         ns.ScrollByDelta(scroll, content, delta, opts.wheelStep, UpdateScrollBar)
+        if started and addon.CaptureScrollProfile then
+            addon:CaptureScrollProfile("wheel dispatch", debugprofilestop() - started, "delta=" .. tostring(delta))
+        end
     end)
     scroll:SetScript("OnSizeChanged", UpdateScrollBar)
     scroll:SetScript("OnScrollRangeChanged", UpdateScrollBar)

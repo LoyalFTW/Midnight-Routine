@@ -336,6 +336,27 @@ function MR:RunSelfTest()
     ))
 end
 
+function MR:ArmScrollProfile()
+    self._scrollProfileArmed = true
+    self._scrollProfileDeadline = (GetTime and GetTime() or 0) + 60
+    print("|cff2ae7c6Routine:|r Scroll profiler armed for 60 seconds. Open the panel and reproduce the hitch.")
+end
+
+function MR:CaptureScrollProfile(kind, elapsed, detail)
+    if self._scrollProfileArmed and self._scrollProfileDeadline and GetTime and GetTime() > self._scrollProfileDeadline then
+        self._scrollProfileArmed = nil
+        self._scrollProfileDeadline = nil
+        return false
+    end
+    if not self._scrollProfileArmed or type(elapsed) ~= "number" or elapsed < 100 then
+        return false
+    end
+    self._scrollProfileArmed = nil
+    self._scrollProfileDeadline = nil
+    print(string.format("|cffff8c42Routine scroll profile:|r %s %.1f ms%s", tostring(kind), elapsed, detail and ("; " .. detail) or ""))
+    return true
+end
+
 SLASH_MIDROUTE1 = "/routine"
 SLASH_MIDROUTE2 = "/mr"
 SlashCmdList["MIDROUTE"] = function(msg)
@@ -396,6 +417,7 @@ SlashCmdList["MIDROUTE"] = function(msg)
     elseif msg == "rares" then MR:ToggleRares()
     elseif msg == "rares config" then MR:ToggleRaresConfig()
     elseif msg == "gathering" then MR:ToggleGatheringLocations()
+    elseif msg == "scrollprofile" or msg == "scroll profile" then MR:ArmScrollProfile()
     elseif msg == "mem" or msg == "memory" then MR:PrintMemoryReport()
     elseif msg == "mem modules" or msg == "memory modules" then
         MR:PrintMemoryReport("modules")

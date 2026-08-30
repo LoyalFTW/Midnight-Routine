@@ -1159,14 +1159,24 @@ function MR:RefreshUI()
         return
     end
 
+    local profiling = self._scrollProfileArmed and debugprofilestop
+    local profileStarted = profiling and debugprofilestop() or nil
+    local statsElapsed = 0
+    local mainElapsed = 0
+    local createdBefore = self._mainRowWidgetCreatedCount or 0
+    local optionalBefore = self._mainRowOptionalPartCreatedCount or 0
+
     self._refreshUIInProgress = true
     self._refreshUIDirty = nil
     self._refreshUICount = (self._refreshUICount or 0) + 1
 
     RecalcLayout()
+    local statsStarted = profiling and debugprofilestop() or nil
     self._moduleStatsCache = BuildModuleStatsCache(self)
+    if statsStarted then statsElapsed = debugprofilestop() - statsStarted end
     local expansionInfo = ns.GetExpansionDisplayInfo(false)
     local refreshMain = self.frame and self.frame:IsShown()
+    local mainStarted = profiling and refreshMain and debugprofilestop() or nil
 
     if not refreshMain then
         self._mainPanelNeedsRefresh = true
@@ -1384,6 +1394,7 @@ function MR:RefreshUI()
             SetMainFrameChromeVisible(true)
         end
     end
+    if mainStarted then mainElapsed = debugprofilestop() - mainStarted end
 
     self:RefreshVisibleDetachedFrames()
 
@@ -1408,6 +1419,13 @@ function MR:RefreshUI()
 
     if collectgarbage then
         collectgarbage("step", 160)
+    end
+    if profileStarted and self.CaptureScrollProfile then
+        local elapsed = debugprofilestop() - profileStarted
+        local created = (self._mainRowWidgetCreatedCount or 0) - createdBefore
+        local optional = (self._mainRowOptionalPartCreatedCount or 0) - optionalBefore
+        local detail = string.format("stats=%.1fms main=%.1fms rows=%d optional=%d", statsElapsed, mainElapsed, created, optional)
+        self:CaptureScrollProfile("full refresh", elapsed, detail)
     end
 end
 

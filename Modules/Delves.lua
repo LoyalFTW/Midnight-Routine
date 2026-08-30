@@ -2,22 +2,25 @@ local _, ns = ...
 local MR = ns.MR
 
 local SCAN_THROTTLE      = 2
-local DELVE_T8_MIN_LEVEL = 8
-local GILDED_STASH_SPELL_ID = 7591
+local GILDED_STASH_WIDGET_ID = 7591
 local GILDED_STASH_REQUIRED = 4
+local GILDED_STASH_OBJECT_IDS = {
+    [584507] = true,
+    [506498] = true,
+}
 local DELVERS_BOUNTY_ITEMS = {
+    274374,
     252415,
     265714,
 }
 
 local QUEST_DELVERS_BOUNTY_LOOTED = 86371
-local QUEST_DELVERS_BOUNTY_USED = 92887
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local EXPANSIONS = {
     {
         label  = L["Midnight"],
-        mapIds = { [2393]=true, [2395]=true, [2405]=true, [2413]=true, [2424]=true, [2437]=true, [2512]=true, [2635]=true },
+        mapIds = { [2393]=true, [2395]=true, [2405]=true, [2413]=true, [2424]=true, [2437]=true, [2512]=true, [2633]=true, [2635]=true },
         zones  = {
             { uiMapId = 2393, delves = { {8426,8425,91186}, {8440,8439,92444} } },
             { uiMapId = 2424, delves = { {8428,8427,91182} } },
@@ -25,7 +28,7 @@ local EXPANSIONS = {
             { uiMapId = 2405, delves = { {8432,8431,91184}, {8430,8429,91183} } },
             { uiMapId = 2413, delves = { {8434,8433,91185}, {8436,8435,91187} } },
             { uiMapId = 2437, delves = { {8444,8443,91188}, {8442,8441,91190} } },
-            { uiMapId = 2512, delves = {}, dynamicDelves = true },
+            { uiMapId = 2512, delves = { {8763,8764,95715}, {8760,8761,95716} } },
         },
     },
     {
@@ -80,18 +83,6 @@ local function ScanExpansion(exp, mdb)
                 entries[#entries + 1] = zoneName .. ": " .. (poiInfo.name or "?")
             end
         end
-        if zone.dynamicDelves and C_AreaPoiInfo.GetAreaPOIForMap then
-            for _, poiID in ipairs(C_AreaPoiInfo.GetAreaPOIForMap(zone.uiMapId) or {}) do
-                local poiInfo = C_AreaPoiInfo.GetAreaPOIInfo(zone.uiMapId, poiID)
-                local name = poiInfo and poiInfo.name
-                local atlasName = tostring(poiInfo and (poiInfo.atlasName or poiInfo.textureAtlasName) or "")
-                if name and atlasName:lower():find("bount", 1, true) then
-                    total = total + 1
-                    active = active + 1
-                    entries[#entries + 1] = zoneName .. ": " .. name
-                end
-            end
-        end
     end
 
     mdb["bountiful_live"]    = active
@@ -108,12 +99,57 @@ local function IsQuestCompleted(questId)
     return C_QuestLog.IsQuestFlaggedCompleted(questId) == true
 end
 
+local function HasDelversBounty()
+    if not (C_Item and C_Item.GetItemCount) then
+        return false
+    end
+
+    for _, itemId in ipairs(DELVERS_BOUNTY_ITEMS) do
+        if (C_Item.GetItemCount(itemId, true, false, true, true) or 0) > 0 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetGildedStashTooltip()
+    local getter = C_UIWidgetManager and C_UIWidgetManager.GetSpellDisplayVisualizationInfo
+    if not getter then
+        return nil
+    end
+
+    local ok, widget = pcall(getter, GILDED_STASH_WIDGET_ID)
+    local spellInfo = ok and type(widget) == "table" and widget.spellInfo or nil
+    if type(spellInfo) == "table"
+        and type(spellInfo.tooltip) == "string"
+        and spellInfo.tooltip ~= "" then
+        return spellInfo.tooltip
+    end
+
+    return nil
+end
+
+local function GetWorldActivityProgress()
+    local progress = {}
+    if not (C_WeeklyRewards and C_WeeklyRewards.GetSortedProgressForActivity) then
+        return progress
+    end
+
+    local activityType = Enum
+        and Enum.WeeklyRewardChestThresholdType
+        and Enum.WeeklyRewardChestThresholdType.World
+        or 6
+    return C_WeeklyRewards.GetSortedProgressForActivity(activityType, true) or progress
+end
+
 local bountifulRow
 local bountyRow
 local gildedStashRow
 local lastScan = 0
 local pendingScanTimer
 local DELVES_SCAN_KEYS = { "delves" }
+local seenGildedStashSources = {}
 
 local function IsBountyRowComplete(done)
     return (tonumber(done) or 0) >= 1
@@ -143,34 +179,38 @@ local function ExtractTooltipProgress(text)
     return fallbackCurrent, fallbackTotal
 end
 
+local function GetGildedStashFloor(mdb)
+    local saved = tonumber(mdb and mdb.gilded_stash) or 0
+    local manual = MR.GetManualOverride and tonumber(MR:GetManualOverride("delves", "gilded_stash")) or 0
+    return math.max(saved, manual)
+end
+
 local function UpdateGildedStashProgress(mdb, row)
     if type(mdb) ~= "table" or not row then
         return false
     end
 
-    local oldValue = tonumber(mdb["gilded_stash"]) or 0
+    local storedValue = tonumber(mdb["gilded_stash"]) or 0
+    local oldValue = GetGildedStashFloor(mdb)
     local oldTotal = tonumber(mdb["gilded_stash_total"]) or 0
     local oldMax = tonumber(row.max) or 0
     local oldCountText = row.countText
     local oldNote = row.note
 
-    local widget = C_UIWidgetManager
-        and C_UIWidgetManager.GetSpellDisplayVisualizationInfo
-        and C_UIWidgetManager.GetSpellDisplayVisualizationInfo(GILDED_STASH_SPELL_ID)
-    local tooltip = widget and widget.spellInfo and widget.spellInfo.tooltip or nil
+    local tooltip = GetGildedStashTooltip()
     local fulfilled, required = ExtractTooltipProgress(tooltip)
     local hasLiveData = fulfilled ~= nil
 
     if hasLiveData then
         required = required or GILDED_STASH_REQUIRED
-        fulfilled = math.max(0, math.min(fulfilled, required))
+        fulfilled = math.max(oldValue, math.max(0, math.min(fulfilled, required)))
         mdb["gilded_stash"] = fulfilled
         mdb["gilded_stash_total"] = required
         row.max = required
         row.countText = nil
         row.countColor = nil
-        row.note = L["Delves_GildedStash_Note"] or "Complete Tier 11 Delves to earn Gilded Stash."
-        return oldValue ~= fulfilled
+        row.note = L["Delves_GildedStash_Note"] or "Requires Delver's Journey Rank 4; loot up to 4 Gilded Stashes from Tier 11 Delves each week."
+        return storedValue ~= fulfilled
             or oldTotal ~= required
             or oldMax ~= required
             or oldCountText ~= row.countText
@@ -178,7 +218,7 @@ local function UpdateGildedStashProgress(mdb, row)
     end
 
     row.max = (tonumber(mdb["gilded_stash_total"]) or 0) > 0 and mdb["gilded_stash_total"] or GILDED_STASH_REQUIRED
-    row.note = L["Delves_GildedStash_Note"] or "Complete Tier 11 Delves to earn Gilded Stash."
+    row.note = L["Delves_GildedStash_Note"] or "Requires Delver's Journey Rank 4; loot up to 4 Gilded Stashes from Tier 11 Delves each week."
 
     if (tonumber(mdb["gilded_stash"]) or 0) >= row.max then
         row.countText = L["Done"] or "Done"
@@ -188,7 +228,7 @@ local function UpdateGildedStashProgress(mdb, row)
         row.countColor = nil
     end
 
-    return oldValue ~= (tonumber(mdb["gilded_stash"]) or 0)
+    return storedValue ~= (tonumber(mdb["gilded_stash"]) or 0)
         or oldTotal ~= (tonumber(mdb["gilded_stash_total"]) or 0)
         or oldMax ~= (tonumber(row.max) or 0)
         or oldCountText ~= row.countText
@@ -302,30 +342,26 @@ MR:RegisterModule({
         end
 
         local buckets = MR.GetWeeklyRewardActivityBuckets and MR:GetWeeklyRewardActivityBuckets() or nil
+        local savedRuns = tonumber(mdb["delve_runs"]) or 0
+        local manualRuns = MR.GetManualOverride and tonumber(MR:GetManualOverride("delves", "delve_runs")) or 0
         if buckets and buckets.world and buckets.world[1] then
             local bestRuns = 0
-            local bestLevel = 0
             for _, act in ipairs(buckets.world) do
                 if (act.progress or 0) > bestRuns then
                     bestRuns = act.progress or 0
                 end
-                if (act.level or 0) > bestLevel then
-                    bestLevel = act.level or 0
-                end
             end
 
-            local t8 = (bestLevel >= DELVE_T8_MIN_LEVEL) and 1 or 0
+            bestRuns = math.max(bestRuns, savedRuns, manualRuns)
+
             if mdb["delve_runs"] ~= bestRuns then mdb["delve_runs"] = bestRuns end
-            if mdb["delve_t8"]   ~= t8       then mdb["delve_t8"]   = t8 end
         else
-            if mdb["delve_runs"] ~= 0 then mdb["delve_runs"] = 0 end
-            if mdb["delve_t8"]   ~= 0 then mdb["delve_t8"] = 0 end
+            local bestRuns = math.max(savedRuns, manualRuns)
+            if mdb["delve_runs"] ~= bestRuns then mdb["delve_runs"] = bestRuns end
         end
 
         local bountyLooted = IsQuestCompleted(QUEST_DELVERS_BOUNTY_LOOTED) and 1 or 0
-
-        local bountyUsedDetected = IsQuestCompleted(QUEST_DELVERS_BOUNTY_USED) and 1 or 0
-        local bountyProgress = (bountyUsedDetected > 0 or (tonumber(mdb["delve_bounty"]) or 0) > 0) and 1 or 0
+        local bountyProgress = bountyLooted > 0 and not HasDelversBounty() and 1 or 0
 
         if mdb["delve_bounty"] ~= bountyProgress then
             mdb["delve_bounty"] = bountyProgress
@@ -355,24 +391,44 @@ MR:RegisterModule({
             max     = 8,
             note    = L["Delves_Runs_Note"],
             liveKey = "delve_runs",
-        },
-        {
-            key   = "delve_t8",
-            label = L["Delves_T8_Label"],
-            max   = 1,
-            note  = L["Delves_T8_Note"],
+            tooltipFunc = function(tip)
+                local mdb = MR.db.char.progress["delves"]
+                local completed = math.min(tonumber(mdb and mdb["delve_runs"]) or 0, 8)
+                local desiredRuns = 8
+
+                tip:AddLine(" ")
+                tip:AddLine(string.format(L["Delves_Runs_Progress"] or "%d / 8 completed this week", completed), 0.40, 0.85, 0.40)
+                tip:AddLine(string.format(L["Delves_Runs_Top"] or "Top %d Activities This Week", desiredRuns), 1, 1, 1)
+
+                for _, tierProgress in ipairs(GetWorldActivityProgress()) do
+                    local numRuns = math.min(tonumber(tierProgress.numPoints) or 0, desiredRuns)
+                    if numRuns > 0 then
+                        local difficulty = tonumber(tierProgress.difficulty) or 1
+                        desiredRuns = desiredRuns - numRuns
+                        if difficulty > 1 then
+                            tip:AddLine(string.format(L["Delves_Runs_Tier"] or "- Tier %d (%d)", difficulty, numRuns), 0.9, 0.85, 0.6)
+                        else
+                            tip:AddLine(string.format(L["Delves_Runs_TierWorld"] or "- Tier %d / World Activities (%d)", difficulty, numRuns), 0.9, 0.85, 0.6)
+                        end
+                    end
+                    if desiredRuns <= 0 then
+                        break
+                    end
+                end
+
+                if completed == 0 then
+                    tip:AddLine(L["Delves_Runs_None"] or "No qualifying activities recorded this week.", 0.6, 0.6, 0.6)
+                end
+            end,
         },
         {
             key   = "gilded_stash",
             label = L["Delves_GildedStash_Label"] or "|cffc8956cGilded Stash:|r",
             max   = GILDED_STASH_REQUIRED,
-            note  = L["Delves_GildedStash_Note"] or "Complete Tier 11 Delves to earn Gilded Stash.",
+            note  = L["Delves_GildedStash_Note"] or "Requires Delver's Journey Rank 4; loot up to 4 Gilded Stashes from Tier 11 Delves each week.",
             tooltipFunc = function(tip)
                 local mdb = MR.db.char.progress["delves"]
-                local tooltip = C_UIWidgetManager
-                    and C_UIWidgetManager.GetSpellDisplayVisualizationInfo
-                    and C_UIWidgetManager.GetSpellDisplayVisualizationInfo(GILDED_STASH_SPELL_ID)
-                tooltip = tooltip and tooltip.spellInfo and tooltip.spellInfo.tooltip or nil
+                local tooltip = GetGildedStashTooltip()
 
                 tip:AddLine(" ")
                 if tooltip and tooltip ~= "" then
@@ -388,9 +444,9 @@ MR:RegisterModule({
                         ),
                         0.9, 0.85, 0.6
                     )
-                    tip:AddLine(L["Delves_GildedStash_Refresh"] or "Visit Silvermoon City to refresh Gilded Stash progress.", 0.6, 0.6, 0.6, true)
+                    tip:AddLine(L["Delves_GildedStash_Refresh"] or "Open the Gilded Stash at the end of a completed Tier 11 Delve to update this weekly count.", 0.6, 0.6, 0.6, true)
                 else
-                    tip:AddLine(L["Delves_GildedStash_Refresh"] or "Visit Silvermoon City to refresh Gilded Stash progress.", 0.6, 0.6, 0.6, true)
+                    tip:AddLine(L["Delves_GildedStash_Refresh"] or "Open the Gilded Stash at the end of a completed Tier 11 Delve to update this weekly count.", 0.6, 0.6, 0.6, true)
                 end
             end,
         },
@@ -470,4 +526,73 @@ function MR:RefreshDelvesLiveProgress(refreshUI)
     end
 
     return changed
+end
+
+function MR:RecordGildedStashLoot(refreshUI)
+    if not (GetNumLootItems and GetLootSourceInfo and strsplit) then
+        return false
+    end
+
+    local sourceGuid
+    for slot = 1, GetNumLootItems() do
+        local sources = { GetLootSourceInfo(slot) }
+        for index = 1, #sources, 2 do
+            local guid = sources[index]
+            local objectId = type(guid) == "string" and tonumber((select(6, strsplit("-", guid)))) or nil
+            if objectId and GILDED_STASH_OBJECT_IDS[objectId] then
+                sourceGuid = guid
+                break
+            end
+        end
+        if sourceGuid then
+            break
+        end
+    end
+
+    if not sourceGuid then
+        return false, false
+    end
+    if seenGildedStashSources[sourceGuid] then
+        return false, true
+    end
+    seenGildedStashSources[sourceGuid] = true
+
+    local progress = self.db and self.db.char and self.db.char.progress
+    if not progress then
+        return false, true
+    end
+    if not progress.delves then
+        progress.delves = {}
+    end
+
+    local mdb = progress.delves
+    local storedValue = tonumber(mdb.gilded_stash) or 0
+    local oldValue = GetGildedStashFloor(mdb)
+    local liveValue, liveTotal = ExtractTooltipProgress(GetGildedStashTooltip())
+    local newValue = math.max(oldValue, tonumber(liveValue) or 0)
+    if newValue <= oldValue then
+        newValue = oldValue + 1
+    end
+    local required = tonumber(liveTotal) or tonumber(mdb.gilded_stash_total) or GILDED_STASH_REQUIRED
+    newValue = math.min(newValue, required)
+
+    mdb.gilded_stash = newValue
+    mdb.gilded_stash_total = required
+    gildedStashRow.max = required
+    gildedStashRow.note = L["Delves_GildedStash_Note"] or "Requires Delver's Journey Rank 4; loot up to 4 Gilded Stashes from Tier 11 Delves each week."
+    if newValue >= required then
+        gildedStashRow.countText = L["Done"] or "Done"
+        gildedStashRow.countColor = { 0.40, 0.85, 0.40 }
+    else
+        gildedStashRow.countText = nil
+        gildedStashRow.countColor = nil
+    end
+
+    self._moduleStatsCache = nil
+    if refreshUI then
+        self:RefreshUI()
+    else
+        self:MarkBackgroundDataDirty()
+    end
+    return newValue ~= storedValue, true
 end
