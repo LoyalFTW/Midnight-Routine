@@ -353,9 +353,7 @@ local function ExtractInlineLabelColor(text)
     return "#" .. hexColor
 end
 
-local function HideTooltipIfOwned(frame)
-    ns.HideTooltip(frame)
-end
+local HideOwnedTooltip = ns.HideOwnedTooltip
 
 local function MainSectionHeaderOnMouseDown(selfFrame, button)
     if selfFrame._mrDetachedHost and button == "LeftButton" then
@@ -462,7 +460,7 @@ local function MainSectionHeaderOnLeave(selfFrame)
     if selfFrame._hdrHover then
         selfFrame._hdrHover:SetColorTexture(1, 1, 1, 0)
     end
-    HideTooltipIfOwned(selfFrame)
+    HideOwnedTooltip(selfFrame)
 end
 
 local function CurrencyBrowserButtonOnClick()
@@ -494,7 +492,7 @@ local function CurrencyBrowserButtonOnLeave(selfBtn)
     if selfBtn._label then
         selfBtn._label:SetTextColor(0.42, 0.92, 0.84, selfBtn._mrTransparent and 0.75 or 1)
     end
-    HideTooltipIfOwned(selfBtn)
+    HideOwnedTooltip(selfBtn)
 end
 
 local function StyleSectionCollapseIndicator(indicator, isOpen)
@@ -586,7 +584,7 @@ local function MainHeaderActionOnEnter(selfBtn)
 end
 
 local function MainHeaderActionOnLeave(selfBtn)
-    HideTooltipIfOwned(selfBtn)
+    HideOwnedTooltip(selfBtn)
 end
 
 
@@ -662,7 +660,6 @@ UI.COL = COL
 UI.ApplyTheme = ApplyTheme
 UI.CleanLabelText = CleanLabelText
 UI.ExtractInlineLabelColor = ExtractInlineLabelColor
-UI.HideTooltipIfOwned = HideTooltipIfOwned
 UI.MainSectionHeaderOnMouseDown = MainSectionHeaderOnMouseDown
 UI.MainSectionHeaderOnDragStart = MainSectionHeaderOnDragStart
 UI.MainSectionHeaderOnDragStop = MainSectionHeaderOnDragStop

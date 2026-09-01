@@ -71,7 +71,7 @@ local COL = UI.COL
 local ApplyTheme = UI.ApplyTheme
 local CleanLabelText = UI.CleanLabelText
 local ExtractInlineLabelColor = UI.ExtractInlineLabelColor
-local HideTooltipIfOwned = UI.HideTooltipIfOwned
+local HideOwnedTooltip = ns.HideOwnedTooltip
 local MainSectionHeaderOnMouseDown = UI.MainSectionHeaderOnMouseDown
 local MainSectionHeaderOnDragStart = UI.MainSectionHeaderOnDragStart
 local MainSectionHeaderOnDragStop = UI.MainSectionHeaderOnDragStop
@@ -269,7 +269,7 @@ local function MainRowOnLeave(selfRow)
     if selfRow._hover then
         selfRow._hover:SetColorTexture(1, 1, 1, 0)
     end
-    HideTooltipIfOwned(selfRow)
+    HideOwnedTooltip(selfRow)
     if ns.HideWarbandTooltip then
         ns.HideWarbandTooltip()
     end
@@ -399,7 +399,7 @@ local function MainStatusButtonOnLeave(selfBtn)
     if owner and owner._hover then
         owner._hover:SetColorTexture(1, 1, 1, 0)
     end
-    HideTooltipIfOwned(selfBtn)
+    HideOwnedTooltip(selfBtn)
 end
 
 local function HideMainRowWidget(rowFrame)
@@ -407,12 +407,12 @@ local function HideMainRowWidget(rowFrame)
         return
     end
 
-    HideTooltipIfOwned(rowFrame)
+    HideOwnedTooltip(rowFrame)
     if rowFrame._headerActionButton then
-        HideTooltipIfOwned(rowFrame._headerActionButton)
+        HideOwnedTooltip(rowFrame._headerActionButton)
     end
     if rowFrame._statusBtn then
-        HideTooltipIfOwned(rowFrame._statusBtn)
+        HideOwnedTooltip(rowFrame._statusBtn)
     end
 	
     local data = rowFrame._mrData
@@ -451,7 +451,7 @@ local function HideMainSectionWidget(section)
     end
 
     if section._hdrFrame then
-        HideTooltipIfOwned(section._hdrFrame)
+        HideOwnedTooltip(section._hdrFrame)
     end
     if section._rows then
         local recycleKeys = section._recycleRowKeys or {}

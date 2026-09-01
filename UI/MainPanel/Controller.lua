@@ -69,7 +69,6 @@ local COL = UI.COL
 local ApplyTheme = UI.ApplyTheme
 local CleanLabelText = UI.CleanLabelText
 local ExtractInlineLabelColor = UI.ExtractInlineLabelColor
-local HideTooltipIfOwned = UI.HideTooltipIfOwned
 local MainSectionHeaderOnMouseDown = UI.MainSectionHeaderOnMouseDown
 local MainSectionHeaderOnDragStart = UI.MainSectionHeaderOnDragStart
 local MainSectionHeaderOnDragStop = UI.MainSectionHeaderOnDragStop
@@ -514,7 +513,7 @@ function MR:BuildUI()
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     f:SetWidth(w)
     f:SetHeight(h)
-    f:SetFrameStrata("MEDIUM")
+    self:RegisterPriorityFrame(f)
     f:SetBackdrop(MakeBackdrop())
     if ns.HookBackdropFrame then ns.HookBackdropFrame(f) end
     f:SetBackdropColor(COL.bg[1], COL.bg[2], COL.bg[3], COL.bg[4])
@@ -764,7 +763,7 @@ function MR:BuildUI()
         selfBtn:SetBackdropColor(0.07, 0.09, 0.13, 0.96)
         selfBtn:SetBackdropBorderColor(0.24, 0.31, 0.38, 0.95)
         warbandText:SetTextColor(0.84, 0.92, 0.96)
-        ns.HideTooltip(selfBtn)
+        ns.HideOwnedTooltip(selfBtn)
     end)
     warbandBtn:SetScript("OnClick", function()
         MR:ToggleWarbandBoard()
@@ -864,7 +863,7 @@ function MR:BuildUI()
         selfBtn:SetBackdropColor(0.020, 0.040, 0.060, 0.96)
         selfBtn:SetBackdropBorderColor(0.08, 0.16, 0.22, 0.45)
         characterCaret:SetTextColor(0.48, 0.72, 0.74)
-        ns.HideTooltip(selfBtn)
+        ns.HideOwnedTooltip(selfBtn)
     end)
     self.characterBar = characterBar
 

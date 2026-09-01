@@ -134,7 +134,7 @@ function ns.HeaderButton(parent, opts)
     button:SetScript("OnLeave", function(self)
         ApplyBackdrop(normalBg, normalBorder)
         SetIconColor(normalColor)
-        ns.HideTooltip(self)
+        ns.HideOwnedTooltip(self)
     end)
     if opts.onClick then
         button:SetScript("OnClick", opts.onClick)
@@ -161,7 +161,7 @@ function ns.HeaderIconButton(parent, texturePath, tintColor, hoverTintColor, too
     button:SetScript("OnLeave", function(self)
         ApplyButtonHover(self, false)
         texture:SetVertexColor((tintColor and tintColor[1]) or 1, (tintColor and tintColor[2]) or 1, (tintColor and tintColor[3]) or 1)
-        ns.HideTooltip(self)
+        ns.HideOwnedTooltip(self)
     end)
 
     if onClick then
@@ -193,7 +193,7 @@ function ns.HeaderToggleButton(parent, getLabel, tooltipText, onClick)
     button:SetScript("OnLeave", function(self)
         ApplyButtonHover(self, false)
         label:SetTextColor(0.25, 0.80, 0.68)
-        ns.HideTooltip(self)
+        ns.HideOwnedTooltip(self)
     end)
     button:SetScript("OnClick", function(...)
         if onClick then

@@ -743,20 +743,29 @@ function ns.OptionsDivider(body, yOff, pad)
     frame:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad, yOff)
     frame:SetHeight(1)
     frame:SetBackdrop(ns.MakeBackdrop(false))
-    frame:SetBackdropColor(1, 1, 1, 0.07)
-    return yOff - 4
+    frame:SetBackdropColor(0.18, 0.78, 0.72, 0.24)
+    return yOff - 5
 end
 
 function ns.OptionsSectionLabel(body, yOff, text, pad, fontSize)
     pad = pad or 8
-    local fs = body:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(ns.FONT_ROWS, fontSize or 9, ns.GetFontFlags())
-    fs:SetText("|cff888888" .. text .. "|r")
-    fs:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
-    fs:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad, yOff)
+    local frame = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    frame:SetPoint("TOPLEFT", body, "TOPLEFT", pad - 2, yOff)
+    frame:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad + 2, yOff)
+    frame:SetHeight(17)
+    frame:SetBackdrop(ns.MakeBackdrop())
+    frame:SetBackdropColor(0.025, 0.12, 0.15, 0.92)
+    frame:SetBackdropBorderColor(0.12, 0.42, 0.44, 0.58)
+
+    local fs = frame:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(ns.FONT_HEADERS or ns.FONT_ROWS, math.max(fontSize or 9, 10), ns.GetFontFlags())
+    fs:SetText(text)
+    fs:SetTextColor(0.46, 0.92, 0.84)
+    fs:SetPoint("LEFT", frame, "LEFT", 6, 0)
+    fs:SetPoint("RIGHT", frame, "RIGHT", -6, 0)
     fs:SetJustifyH("LEFT")
     fs:SetWordWrap(false)
-    return yOff - 12
+    return yOff - 20
 end
 
 function ns.OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, pad, onRefresh, fontSize)
@@ -784,25 +793,27 @@ function ns.OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, pad, onR
     return yOff - 19
 end
 
-function ns.OptionsBtn(body, yOff, label, onClick, width, pad, fontSize)
+function ns.OptionsBtn(body, yOff, label, onClick, width, pad, fontSize, style)
     pad = pad or 8
     width = width or 184
+    local primary = style == "primary"
+    local height = primary and 24 or 20
 
     local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
-    btn:SetSize(width, 20)
+    btn:SetSize(width, height)
     btn:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
     btn:SetBackdrop(ns.MakeBackdrop())
-    btn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-    btn:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
+    btn:SetBackdropColor(primary and 0.04 or 0.05, primary and 0.25 or 0.10, primary and 0.28 or 0.18, 1)
+    btn:SetBackdropBorderColor(primary and 0.20 or 0.18, primary and 0.82 or 0.40, primary and 0.72 or 0.45, 1)
 
     local fs = btn:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(ns.FONT_ROWS, fontSize or 10, ns.GetFontFlags())
+    fs:SetFont(primary and (ns.FONT_HEADERS or ns.FONT_ROWS) or ns.FONT_ROWS, fontSize or 10, ns.GetFontFlags())
     fs:SetPoint("LEFT", btn, "LEFT", 6, 0)
     fs:SetWidth(width - 12)
-    fs:SetJustifyH("LEFT")
+    fs:SetJustifyH(primary and "CENTER" or "LEFT")
     fs:SetWordWrap(false)
     fs:SetText(label)
-    fs:SetTextColor(0.70, 0.88, 0.85)
+    fs:SetTextColor(primary and 0.92 or 0.70, primary and 1 or 0.88, primary and 0.98 or 0.85)
 
     btn:SetScript("OnClick", onClick)
     btn:SetScript("OnEnter", function()
@@ -811,12 +822,12 @@ function ns.OptionsBtn(body, yOff, label, onClick, width, pad, fontSize)
         fs:SetTextColor(1, 1, 1)
     end)
     btn:SetScript("OnLeave", function()
-        btn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-        btn:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
-        fs:SetTextColor(0.70, 0.88, 0.85)
+        btn:SetBackdropColor(primary and 0.04 or 0.05, primary and 0.25 or 0.10, primary and 0.28 or 0.18, 1)
+        btn:SetBackdropBorderColor(primary and 0.20 or 0.18, primary and 0.82 or 0.40, primary and 0.72 or 0.45, 1)
+        fs:SetTextColor(primary and 0.92 or 0.70, primary and 1 or 0.88, primary and 0.98 or 0.85)
     end)
 
-    return yOff - 22
+    return yOff - height - 2
 end
 
 function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fillR, fillG, fillB, pad, disabled, fontSize)
@@ -972,7 +983,7 @@ function ns.OptionsColorSwatch(parent, r, g, b, onPick, onReset, tooltip)
     end)
     swatch:SetScript("OnLeave", function()
         swatch:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-        ns.HideTooltip(swatch)
+        ns.HideOwnedTooltip(swatch)
     end)
     return swatch
 end

@@ -70,26 +70,30 @@ function ns.ShowTooltip(owner, opts)
     end
 end
 
-function ns.HideTooltip(owner)
-    if not GameTooltip then
-        return
+function ns.HideOwnedTooltip(owner)
+    if not owner or not GameTooltip then
+        return false
     end
 
-    if not owner or not GameTooltip.GetOwner or GameTooltip:GetOwner() == owner then
-        GameTooltip:Hide()
+    if GameTooltip.GetOwner and GameTooltip:GetOwner() ~= owner then
+        return false
     end
+
+    GameTooltip:Hide()
+    return true
 end
 
 function ns.AddTooltipLines(owner, build)
-    if not GameTooltip or type(build) ~= "function" then
-        return
+    if not owner or not GameTooltip or type(build) ~= "function" then
+        return false
     end
-    if owner and GameTooltip.GetOwner and GameTooltip:GetOwner() ~= owner then
-        return
+    if GameTooltip.GetOwner and GameTooltip:GetOwner() ~= owner then
+        return false
     end
 
     build(GameTooltip)
     GameTooltip:Show()
+    return true
 end
 
 local warbandTooltip
@@ -129,12 +133,17 @@ end
 
 function ns.ShowWarbandTooltip(owner, build)
     if not owner or type(build) ~= "function" or not GameTooltip then
-        return
+        return false
     end
 
     local addon = ns.MR
     if not (addon and addon.db and addon.db.profile and addon.db.profile.showWarbandTooltips ~= false) then
-        return
+        ns.HideWarbandTooltip()
+        return false
+    end
+    if GameTooltip.GetOwner and GameTooltip:GetOwner() ~= owner then
+        ns.HideWarbandTooltip()
+        return false
     end
 
     EnsureWarbandShiftWatcher()
@@ -151,8 +160,10 @@ function ns.ShowWarbandTooltip(owner, build)
 
     if tip:NumLines() > 0 then
         tip:Show()
+        return true
     else
         tip:Hide()
+        return false
     end
 end
 
@@ -174,6 +185,6 @@ function ns.BindTooltip(frame, opts)
         ns.ShowTooltip(owner, resolved)
     end)
     frame:HookScript("OnLeave", function(owner)
-        ns.HideTooltip(owner)
+        ns.HideOwnedTooltip(owner)
     end)
 end

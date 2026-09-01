@@ -409,6 +409,7 @@ function MR:ResetAllSettings()
 
     RestoreDefaults(self.db.profile, DEFAULTS.profile)
     RestoreDefaults(self.db.char, DEFAULTS.char)
+    self:SetFrameStrata(DEFAULTS.profile.frameStrata)
 
     self.db.char.welcomeSeen = welcomeSeen and true or false
     self.db.profile.welcomeSuppressed = welcomeSuppressed and true or false
@@ -693,6 +694,12 @@ function MR:ToggleManagedWindows()
     end
 
     return self:ShowMainPanel(true)
+end
+
+_G.BINDING_HEADER_MIDNIGHTROUTINE = L["Binding_Header"] or "Routine"
+_G.BINDING_NAME_MIDNIGHTROUTINE_TOGGLE_WINDOWS = L["Binding_ToggleWindows"] or "Show / Hide Routine Windows"
+_G.MidnightRoutine_ToggleWindows = function()
+    MR:ToggleManagedWindows()
 end
 
 function MR:UpdateInstanceFrameVisibility()

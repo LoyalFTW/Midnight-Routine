@@ -123,6 +123,27 @@ function MR:RunSelfTest()
         return true
     end)
 
+    run("Tooltip ownership API", function()
+        local required = {
+            "ApplyTooltipPosition",
+            "ShowTooltip",
+            "HideOwnedTooltip",
+            "AddTooltipLines",
+            "ShowWarbandTooltip",
+            "HideWarbandTooltip",
+            "BindTooltip",
+        }
+        for _, name in ipairs(required) do
+            if type(ns[name]) ~= "function" then
+                return false, name .. " is unavailable"
+            end
+        end
+        if ns.HideTooltip ~= nil then
+            return false, "legacy HideTooltip API is still exposed"
+        end
+        return true
+    end)
+
     run("Modules registered", function()
         local count = #self.modules
         if count == 0 then return false, "no modules registered" end

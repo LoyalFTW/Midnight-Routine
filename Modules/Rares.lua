@@ -852,6 +852,7 @@ BuildRaresFrame = function()
     end
 
     local f = StyledFrame(UIParent, nil, "MEDIUM", 10)
+    MR:RegisterPriorityFrame(f)
     f.layoutKey = GetRaresLayoutKey()
     f:SetSize(W, minimized and TITLE_H or H)
     f:SetBackdropColor(0.018, 0.024, 0.034, 0.97 * alpha)
@@ -1180,7 +1181,7 @@ BuildRaresFrame = function()
                                  or (flagged and "today") or nil
                 local achieved = IsAchievementCriteriaCompleted(zone.achievId, zoneIdx, rare)
                 SetRareRowVisual(hit, dot, lbl, killStat, achieved, cr, cg, cb, alpha, false)
-                ns.HideTooltip(hit)
+                ns.HideOwnedTooltip(hit)
             end)
             hit:SetScript("OnMouseUp", function(_, button)
                 if button ~= "LeftButton" or not (rare[3] and rare[4] and rare[5]) then return end
@@ -1364,7 +1365,7 @@ end
 local function BuildRaresConfigFrame()
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     f:SetWidth(268)
-    f:SetFrameStrata("HIGH")
+    MR:RegisterPriorityFrame(f)
     f:SetFrameLevel(20)
     f:SetClampedToScreen(true)
     f:SetMovable(true)

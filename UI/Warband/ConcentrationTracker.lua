@@ -154,6 +154,7 @@ function MR:ToggleConcentrationTracker()
 
     if not self.concentrationTrackerFrame then
         local frame = StyledFrame(UIParent, nil, "DIALOG", 35)
+        self:RegisterPriorityFrame(frame)
         local savedSize = GetWindowLayoutValue("concentrationTrackerSize")
         frame:SetSize((savedSize and savedSize.width) or 440, (savedSize and savedSize.height) or 520)
         frame:SetScale(self.db.profile.scale or 1)
@@ -383,7 +384,7 @@ end
 function MR:BuildConcentrationTrackerConfigFrame()
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     f:SetWidth(300)
-    f:SetFrameStrata("HIGH")
+    self:RegisterPriorityFrame(f)
     f:SetFrameLevel(40)
     f:SetClampedToScreen(true)
     f:SetMovable(true)

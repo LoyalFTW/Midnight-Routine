@@ -49,6 +49,7 @@ local function BuildWelcomeScreen()
     pendingAutoEnableNewModules = MR:ShouldAutoEnableNewModules()
 
     local f = StyledFrame(UIParent, nil, "FULLSCREEN_DIALOG", 200)
+    MR:RegisterPriorityFrame(f)
     f:SetSize(460, 680)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
     f:SetBackdropColor(0.02, 0.04, 0.10, 0.98)

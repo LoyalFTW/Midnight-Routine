@@ -69,7 +69,7 @@ function MR:PopulateConfigFrame(f)
         if color then r, g, b = hex(color) end
         yOff = OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, 4, nil, cfgFs)
     end
-    local function Btn(label, onClick) yOff = OptionsBtn(body, yOff, label, onClick, math.max(192, contentW), 8, cfgFs) end
+    local function Btn(label, onClick, style) yOff = OptionsBtn(body, yOff, label, onClick, math.max(192, contentW), 8, cfgFs, style) end
     local function ChoiceDropdown(label, choices, getVal, setVal, getResetValue)
         local caption = body:CreateFontString(nil, "OVERLAY")
         caption:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
@@ -77,7 +77,8 @@ function MR:PopulateConfigFrame(f)
         caption:SetPoint("TOPRIGHT", body, "TOPRIGHT", -8, yOff)
         caption:SetJustifyH("LEFT")
         caption:SetWordWrap(false)
-        caption:SetText("|cff888888" .. label .. "|r")
+        caption:SetText(label)
+        caption:SetTextColor(0.62, 0.82, 0.80)
 
         yOff = yOff - 14
 
@@ -291,7 +292,18 @@ function MR:PopulateConfigFrame(f)
             end, "#c9853f")
 
         Gap(4); Divider()
-        SectionLabel(L["OPTIONS"])
+        SectionLabel(L["Config_SectionKeyBinding"] or "KEY BINDING")
+        Gap(2)
+        local bindingKey = GetBindingKey and GetBindingKey("MIDNIGHTROUTINE_TOGGLE_WINDOWS")
+        local bindingText = bindingKey and GetBindingText and GetBindingText(bindingKey, "KEY_") or bindingKey
+        local bindingLabel = (L["Config_SetKeyBinding"] or "Set Show / Hide Key") .. ": "
+            .. (bindingText or L["Config_KeyBindingNotBound"] or "Not Bound")
+        Btn(bindingLabel, function()
+            MR:ShowToggleWindowsKeybindDialog()
+        end, "primary")
+
+        Gap(4); Divider()
+        SectionLabel(L["Config_SectionCompletion"] or "COMPLETION")
         Checkbox(L["Config_AutoEnableNewModules"] or "Automatically Enable New Modules",
             function() return MR:ShouldAutoEnableNewModules() end,
             function(v)
@@ -324,32 +336,51 @@ function MR:PopulateConfigFrame(f)
                     MR:RefreshUI()
                 end
             end)
+        Gap(4); Divider()
+        SectionLabel(L["Config_SectionFrame"] or "FRAME")
         Checkbox(L["Config_LockFrame"],
             function() return MR.db.profile.locked end,
             function(v)
                 MR.db.profile.locked = v
                 if MR.frame then MR.frame:SetMovable(not v) end
             end)
-        Checkbox(L["Config_HideMinimap"],
-            function() return MR.db.profile.minimap and MR.db.profile.minimap.hide or false end,
-            function(v) MR:SetMinimapHidden(v) end)
+        Checkbox(L["Config_AutoHidePanelHeaders"],
+            function() return MR.db.profile.autoHidePanelHeaders end,
+            function(v)
+                MR.db.profile.autoHidePanelHeaders = v
+                if MR.RefreshPanelHeaderVisibility then
+                    MR:RefreshPanelHeaderVisibility(MR.frame)
+                    MR:RefreshPanelHeaderVisibility(MR.renownFrame)
+                    MR:RefreshPanelHeaderVisibility(MR.raresFrame)
+                    MR:RefreshPanelHeaderVisibility(MR.gatheringLocationsFrame)
+                    MR:RefreshPanelHeaderVisibility(MR.concentrationTrackerFrame)
+                end
+            end)
+        Checkbox(L["Config_PeekOnHover"],
+            function() return MR.db.profile.peekOnHover end,
+            function(v) MR:ApplyPeekOnHover(v) end)
+        ChoiceDropdown(L["Config_WindowPriority"] or "Window Priority", {
+            { label = "Background", value = "BACKGROUND" },
+            { label = "Low", value = "LOW" },
+            { label = "Medium", value = "MEDIUM" },
+            { label = "High", value = "HIGH" },
+            { label = "Dialog", value = "DIALOG" },
+        },
+            function() return MR:GetFrameStrata() end,
+            function(value) MR:SetFrameStrata(value) end,
+            function() return "HIGH" end)
+
+        Gap(4); Divider()
+        SectionLabel(L["Config_SectionVisibility"] or "VISIBILITY")
+        Checkbox(L["Config_AutoHideOnLogin"] or "Auto-Hide on Login",
+            function() return MR.db.profile.autoHideOnLogin == true end,
+            function(v) MR.db.profile.autoHideOnLogin = v and true or false end)
         Checkbox(L["Config_HideInInstances"],
             function() return MR.db.profile.hideFramesInInstances end,
             function(v)
                 MR.db.profile.hideFramesInInstances = v
                 if MR.UpdateInstanceFrameVisibility then
                     MR:UpdateInstanceFrameVisibility()
-                end
-            end)
-        Checkbox(L["Config_AutoHideOnLogin"] or "Auto-Hide on Login",
-            function() return MR.db.profile.autoHideOnLogin == true end,
-            function(v) MR.db.profile.autoHideOnLogin = v and true or false end)
-        Checkbox(L["Config_HideAdventureGuideBossIDs"],
-            function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
-            function(v)
-                MR.db.profile.hideAdventureGuideBossIDs = v and true or false
-                if MR.RefreshEncounterJournalOverlays then
-                    MR:RefreshEncounterJournalOverlays()
                 end
             end)
         Checkbox(L["Config_DisabledInCombat"] or "Disabled in Combat",
@@ -364,6 +395,12 @@ function MR:PopulateConfigFrame(f)
                 end
                 MR:PopulateConfigFrame(f)
             end)
+
+        Gap(4); Divider()
+        SectionLabel(L["Config_SectionMinimap"] or "MINIMAP")
+        Checkbox(L["Config_HideMinimap"],
+            function() return MR.db.profile.minimap and MR.db.profile.minimap.hide or false end,
+            function(v) MR:SetMinimapHidden(v) end)
         Checkbox(L["Config_RememberManagedWindowsVisibility"],
             function() return MR.db.profile.rememberManagedWindowsVisibility end,
             function(v)
@@ -373,19 +410,14 @@ function MR:PopulateConfigFrame(f)
                     MR:RefreshUI()
                 end
             end)
-        Checkbox(L["Config_PeekOnHover"],
-            function() return MR.db.profile.peekOnHover end,
-            function(v) MR:ApplyPeekOnHover(v) end)
-        Checkbox(L["Config_AutoHidePanelHeaders"],
-            function() return MR.db.profile.autoHidePanelHeaders end,
+        Gap(4); Divider()
+        SectionLabel(L["Config_SectionAdventureGuide"] or "ADVENTURE GUIDE")
+        Checkbox(L["Config_HideAdventureGuideBossIDs"],
+            function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
             function(v)
-                MR.db.profile.autoHidePanelHeaders = v
-                if MR.RefreshPanelHeaderVisibility then
-                    MR:RefreshPanelHeaderVisibility(MR.frame)
-                    MR:RefreshPanelHeaderVisibility(MR.renownFrame)
-                    MR:RefreshPanelHeaderVisibility(MR.raresFrame)
-                    MR:RefreshPanelHeaderVisibility(MR.gatheringLocationsFrame)
-                    MR:RefreshPanelHeaderVisibility(MR.concentrationTrackerFrame)
+                MR.db.profile.hideAdventureGuideBossIDs = v and true or false
+                if MR.RefreshEncounterJournalOverlays then
+                    MR:RefreshEncounterJournalOverlays()
                 end
             end)
         Gap(4); Divider()

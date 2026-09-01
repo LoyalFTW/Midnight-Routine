@@ -112,7 +112,7 @@ function ns.CreateDropdown(parent, opts)
         end
 
         popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        popup:SetFrameStrata("DIALOG")
+        popup:SetFrameStrata("TOOLTIP")
         popup:SetFrameLevel(50)
         popup:SetClampedToScreen(true)
         popup:SetBackdrop(ns.MakeBackdrop())
@@ -133,7 +133,7 @@ function ns.CreateDropdown(parent, opts)
 
         dismiss = CreateFrame("Frame", nil, UIParent)
         dismiss:SetAllPoints(UIParent)
-        dismiss:SetFrameStrata("DIALOG")
+        dismiss:SetFrameStrata("TOOLTIP")
         dismiss:SetFrameLevel(49)
         dismiss:EnableMouse(true)
         dismiss:Hide()

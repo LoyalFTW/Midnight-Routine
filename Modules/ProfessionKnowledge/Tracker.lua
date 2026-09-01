@@ -1111,6 +1111,7 @@ local function BeginProfessionRender(content)
     for _, bucket in pairs(renderArena.frames) do
         bucket.used = 0
         for _, frame in ipairs(bucket) do
+            ns.HideOwnedTooltip(frame)
             frame:Hide()
         end
     end
@@ -1334,7 +1335,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     end)
     row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        ns.HideTooltip(selfRow)
+        ns.HideOwnedTooltip(selfRow)
     end)
     row:SetScript("OnClick", function()
         MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
@@ -1397,7 +1398,7 @@ local function RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, conte
     end)
     row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        ns.HideTooltip(selfRow)
+        ns.HideOwnedTooltip(selfRow)
     end)
     row:SetScript("OnClick", function()
         MR:SetProfessionKnowledgeWaypoint(entry, sectionKey)
@@ -1506,7 +1507,7 @@ local function RenderCatchupRow(card, cardW, cardY, rowHeight, fontSize, content
     end)
     row:SetScript("OnLeave", function(selfRow)
         hover:SetColorTexture(cr, cg, cb, 0)
-        ns.HideTooltip(selfRow)
+        ns.HideOwnedTooltip(selfRow)
     end)
 
     return cardY + rowHeight + 10
@@ -1698,7 +1699,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         end)
         taskFrame:SetScript("OnLeave", function()
             hover:SetColorTexture(rr, rg, rb, 0)
-            ns.HideTooltip(taskFrame)
+            ns.HideOwnedTooltip(taskFrame)
         end)
         taskFrame:SetScript("OnClick", function()
             if row.professionKnowledgeEntry or row.profKnowledgeSectionKey then
@@ -1752,7 +1753,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         end)
         statusBtn:SetScript("OnLeave", function()
             hover:SetColorTexture(rr, rg, rb, 0)
-            ns.HideTooltip(statusBtn)
+            ns.HideOwnedTooltip(statusBtn)
         end)
 
         cardY = cardY + rowHeight + 3
@@ -2205,6 +2206,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     end
 
     local frame = StyledFrame(UIParent, nil, "MEDIUM", 10)
+    MR:RegisterPriorityFrame(frame)
     frame:SetSize(width, minimized and TITLE_H or height)
     RestoreManagedFramePos(frame, "gatheringLocPos", 860, 0)
     frame.leftAccent = nil
@@ -2495,7 +2497,6 @@ local function BuildGatheringLocationsFrame(isRetry)
         thumbTex:SetColorTexture(0.80, 0.53, 0.20, 0.6 * chromeAlpha)
 
         frame._emptyDrag = nil
-        ns.HideTooltip()
         BeginProfessionRender(content)
         yOff = BuildProfessionCards(content, width, 0, db.gatheringFontSize or 9, contentAlpha, borderAlpha, chromeAlpha, accentAlpha, db, selectedExpansion)
         frame._professionKnowledgeEmptyState = yOff == 0
@@ -2588,6 +2589,7 @@ end
 
 local function BuildGatheringConfigFrame()
     local frame = StyledFrame(UIParent, nil, "HIGH", 20)
+    MR:RegisterPriorityFrame(frame)
     frame:SetWidth(268)
     ApplyGatheringFrameTheme(frame, {
         alpha = 1,
@@ -2898,7 +2900,7 @@ PopulateGatheringConfig = function(frame)
             end)
             eyeBtn:SetScript("OnLeave", function()
                 ApplyState(enabled)
-                ns.HideTooltip(eyeBtn)
+                ns.HideOwnedTooltip(eyeBtn)
             end)
 
             local rsr, rsg, rsb = hex(MR:GetRowColor(modKey, rowKey) or (rowData.colorKey and MR:GetRowColor(modKey, rowData.colorKey)) or MR:GetHeaderColor(modKey))
@@ -3012,7 +3014,7 @@ PopulateGatheringConfig = function(frame)
                                 text = toggleBtn:GetChecked() and "Hide this profession in the Profession Knowledge window" or "Show this profession in the Profession Knowledge window",
                             })
                         end)
-                        toggleBtn:SetScript("OnLeave", function() ns.HideTooltip(toggleBtn) end)
+                        toggleBtn:SetScript("OnLeave", function() ns.HideOwnedTooltip(toggleBtn) end)
 
                         local expandBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
                         expandBtn:SetSize(18, 18)
@@ -3039,7 +3041,7 @@ PopulateGatheringConfig = function(frame)
                             expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                             expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
                             expandLbl:SetTextColor(0.45, 0.75, 0.70)
-                            ns.HideTooltip(expandBtn)
+                            ns.HideOwnedTooltip(expandBtn)
                         end)
 
                         local swatch = OptionsColorSwatch(row, cr, cg, cb, function(r, g, b)

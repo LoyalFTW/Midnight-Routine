@@ -205,7 +205,7 @@ local function EnsureWarbandCharacterButton(frame, index)
         selfBtn:SetBackdropColor(0.035, 0.060, 0.090, 0.88)
         selfBtn:SetBackdropBorderColor(0.12, 0.20, 0.26, 0.72)
         selfBtn._label:SetTextColor(0.78, 0.88, 0.92)
-        ns.HideTooltip(selfBtn)
+        ns.HideOwnedTooltip(selfBtn)
     end)
 
     btn:SetScript("OnClick", function(selfBtn)
@@ -226,7 +226,7 @@ local function EnsureWarbandCharacterButton(frame, index)
         frame.charRail:SetScript("OnUpdate", UpdateAltBoardCharacterDrag)
         WBStartDragVisual(entry.name, selfBtn._classR, selfBtn._classG, selfBtn._classB)
         selfBtn:SetBackdropBorderColor(selfBtn._classR, selfBtn._classG, selfBtn._classB, 1)
-        ns.HideTooltip()
+        ns.HideOwnedTooltip(selfBtn)
     end)
     btn:SetScript("OnMouseUp", function(_, button)
         if button == "LeftButton" then
@@ -247,7 +247,7 @@ local function EnsureWarbandCharacterButton(frame, index)
             selfBtn:SetBackdropColor(0.018, 0.032, 0.052, 0.90)
             selfBtn:SetBackdropBorderColor(0.07, 0.12, 0.18, 0.56)
         end
-        ns.HideTooltip(selfBtn)
+        ns.HideOwnedTooltip(selfBtn)
     end)
 
     buttons[index] = btn
@@ -301,7 +301,7 @@ local function EnsureWarbandDetailRow(card, index)
             end,
         })
     end)
-    row:SetScript("OnLeave", function(selfRow) ns.HideTooltip(selfRow) end)
+    row:SetScript("OnLeave", function(selfRow) ns.HideOwnedTooltip(selfRow) end)
     rows[index] = row
     MR._warbandDetailRowCreatedCount = (MR._warbandDetailRowCreatedCount or 0) + 1
     return row
@@ -394,7 +394,7 @@ local function EnsureWarbandConcentrationChip(frame, index)
         WBStartDragVisual(selfChip._labelText, selfChip._r, selfChip._g, selfChip._b)
         selfChip:SetBackdropColor(0.055 + selfChip._r * 0.050, 0.075 + selfChip._g * 0.050, 0.095 + selfChip._b * 0.050, 0.98)
         selfChip:SetBackdropBorderColor(selfChip._r, selfChip._g, selfChip._b, 1)
-        ns.HideTooltip()
+        ns.HideOwnedTooltip(selfChip)
     end)
     chip:SetScript("OnMouseUp", function(selfChip, button)
         if button ~= "LeftButton" then return end
@@ -413,7 +413,7 @@ local function EnsureWarbandConcentrationChip(frame, index)
             selfChip:SetBackdropColor(0.018 + selfChip._r * 0.045, 0.030 + selfChip._g * 0.045, 0.046 + selfChip._b * 0.045, 0.92)
             selfChip:SetBackdropBorderColor(selfChip._r * 0.42, selfChip._g * 0.42, selfChip._b * 0.42, 0.72)
         end
-        ns.HideTooltip(selfChip)
+        ns.HideOwnedTooltip(selfChip)
     end)
 
     chips[index] = chip
@@ -875,6 +875,7 @@ function MR:ToggleWarbandBoard()
 
     if not self.altBoardFrame then
         local frame = StyledFrame(UIParent, nil, "DIALOG", 30)
+        self:RegisterPriorityFrame(frame)
         frame:SetSize(860, 640)
         frame:SetScale(self.db.profile.scale or 1)
         local pos = GetWindowLayoutValue("warbandBoardPosition")
@@ -1209,7 +1210,7 @@ function MR:ToggleWarbandBoard()
             ns.ShowTooltip(selfBox, { text = L["AltBoard_NoteTooltip"] or "Add a short note or tag for this character." })
         end)
         heroNoteBox:SetScript("OnLeave", function(selfBox)
-            ns.HideTooltip(selfBox)
+            ns.HideOwnedTooltip(selfBox)
         end)
 
         local concentrationPane = CreateFrame("Frame", nil, rightPane, "BackdropTemplate")

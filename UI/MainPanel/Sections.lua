@@ -71,7 +71,6 @@ local COL = UI.COL
 local ApplyTheme = UI.ApplyTheme
 local CleanLabelText = UI.CleanLabelText
 local ExtractInlineLabelColor = UI.ExtractInlineLabelColor
-local HideTooltipIfOwned = UI.HideTooltipIfOwned
 local MainSectionHeaderOnMouseDown = UI.MainSectionHeaderOnMouseDown
 local MainSectionHeaderOnDragStart = UI.MainSectionHeaderOnDragStart
 local MainSectionHeaderOnDragStop = UI.MainSectionHeaderOnDragStop

@@ -691,7 +691,7 @@ local function EnsureConcentrationRow(card, index)
         selfRow._dragging = true
         selfRow:SetBackdropColor(0.055 + selfRow._r * 0.040, 0.070 + selfRow._g * 0.040, 0.090 + selfRow._b * 0.040, 0.40)
         selfRow:SetBackdropBorderColor(selfRow._r, selfRow._g, selfRow._b, 1)
-        ns.HideTooltip()
+        ns.HideOwnedTooltip(selfRow)
     end)
     row:SetScript("OnMouseUp", function(selfRow, button)
         if button ~= "LeftButton" then return end
@@ -707,7 +707,7 @@ local function EnsureConcentrationRow(card, index)
     row:SetScript("OnEnter", function(selfRow)
         ns.ShowTooltip(selfRow, { text = L["AltBoard_DragProfessionOrder"] or "Click and drag to reorder professions." })
     end)
-    row:SetScript("OnLeave", function(selfRow) ns.HideTooltip(selfRow) end)
+    row:SetScript("OnLeave", function(selfRow) ns.HideOwnedTooltip(selfRow) end)
 
     rows[index] = row
     MR._warbandConcentrationRowCreatedCount = (MR._warbandConcentrationRowCreatedCount or 0) + 1
@@ -1114,6 +1114,7 @@ end
 
 local function WBBuildMainAltPicker()
     local frame = StyledFrame(UIParent, nil, "DIALOG", 26)
+    MR:RegisterPriorityFrame(frame)
     frame:SetSize(220, 286)
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)

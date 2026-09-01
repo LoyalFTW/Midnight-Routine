@@ -27,6 +27,7 @@ local DEFAULTS = {
         scale           = 1.0,
         minimized       = false,
         frameAlpha      = 1.0,
+        frameStrata     = "HIGH",
         hideFramesInInstances = false,
         hideAdventureGuideBossIDs = false,
         disabledInCombat = true,

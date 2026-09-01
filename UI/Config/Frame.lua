@@ -2,7 +2,28 @@ local _, ns = ...
 local MR = ns.MR
 
 local cfgFrame
+local keybindCaptureFrame
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
+local TOGGLE_WINDOWS_BINDING = "MIDNIGHTROUTINE_TOGGLE_WINDOWS"
+local MODIFIER_KEYS = {
+    LALT = true,
+    RALT = true,
+    ALT = true,
+    LCTRL = true,
+    RCTRL = true,
+    CTRL = true,
+    LSHIFT = true,
+    RSHIFT = true,
+    SHIFT = true,
+    LMETA = true,
+    RMETA = true,
+    META = true,
+}
+local MOUSE_BUTTON_KEYS = {
+    LeftButton = "BUTTON1",
+    RightButton = "BUTTON2",
+    MiddleButton = "BUTTON3",
+}
 
 local PANEL_MIN_WIDTH  = 200
 local PANEL_MAX_WIDTH  = 500
@@ -170,10 +191,177 @@ function MR:HideConfig()
     if cfgFrame then cfgFrame:Hide() end
 end
 
+local function GetCapturedBindingText(key)
+    if GetBindingText then
+        local text = GetBindingText(key, "KEY_")
+        if text and text ~= "" then return text end
+    end
+    return key
+end
+
+local function BuildCapturedBinding(key)
+    local prefix = ""
+    if IsAltKeyDown and IsAltKeyDown() then prefix = prefix .. "ALT-" end
+    if IsControlKeyDown and IsControlKeyDown() then prefix = prefix .. "CTRL-" end
+    if IsShiftKeyDown and IsShiftKeyDown() then prefix = prefix .. "SHIFT-" end
+    if IsMetaKeyDown and IsMetaKeyDown() then prefix = prefix .. "META-" end
+    return prefix .. key
+end
+
+local function RefreshKeyBindingPage()
+    if cfgFrame and cfgFrame:IsShown() then
+        MR:PopulateConfigFrame(cfgFrame)
+    end
+end
+
+local function ClearToggleWindowsBinding()
+    local first, second = GetBindingKey(TOGGLE_WINDOWS_BINDING)
+    if first then SetBinding(first) end
+    if second then SetBinding(second) end
+    SaveBindings(GetCurrentBindingSet())
+    RefreshKeyBindingPage()
+end
+
+local function EnsureKeybindCaptureFrame()
+    if keybindCaptureFrame then return keybindCaptureFrame end
+
+    local capture = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    capture:SetAllPoints(UIParent)
+    capture:SetFrameStrata("FULLSCREEN_DIALOG")
+    capture:SetFrameLevel(500)
+    capture:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+    capture:SetBackdropColor(0, 0, 0, 0)
+    capture:EnableMouse(true)
+    capture:EnableMouseWheel(true)
+    capture:EnableKeyboard(true)
+    capture:SetPropagateKeyboardInput(false)
+    capture:Hide()
+
+    local panel = CreateFrame("Frame", nil, capture, "BackdropTemplate")
+    panel:SetSize(320, 172)
+    panel:SetPoint("CENTER")
+    panel:SetBackdrop(MakeBackdrop())
+    panel:SetBackdropColor(0.03, 0.07, 0.13, 1)
+    panel:SetBackdropBorderColor(0.16, 0.78, 0.75, 1)
+    panel:EnableMouse(false)
+
+    local title = panel:CreateFontString(nil, "OVERLAY")
+    title:SetFont(FONT_HEADERS, 14, GetFontFlags())
+    title:SetPoint("TOP", panel, "TOP", 0, -22)
+    title:SetText(L["Config_SetKeyBinding"] or "Set Show / Hide Key")
+    title:SetTextColor(0.16, 0.91, 0.78)
+
+    local prompt = panel:CreateFontString(nil, "OVERLAY")
+    prompt:SetFont(FONT_ROWS, 11, GetFontFlags())
+    prompt:SetPoint("TOPLEFT", panel, "TOPLEFT", 24, -56)
+    prompt:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -24, -56)
+    prompt:SetJustifyH("CENTER")
+    prompt:SetWordWrap(true)
+    prompt:SetText(L["Config_KeyBindingPrompt"] or "Press any key, mouse button, or scroll the mouse wheel. Modifiers may be held.")
+    prompt:SetTextColor(0.92, 0.95, 1)
+
+    local status = panel:CreateFontString(nil, "OVERLAY")
+    status:SetFont(FONT_ROWS, 10, GetFontFlags())
+    status:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 24, 22)
+    status:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -24, 22)
+    status:SetJustifyH("CENTER")
+    status:SetWordWrap(true)
+    status:SetText(L["Config_KeyBindingCancel"] or "Escape cancels. Backspace clears the binding.")
+    status:SetTextColor(0.62, 0.68, 0.76)
+
+    capture.status = status
+    capture.pendingKey = nil
+
+    local function FinishCapture()
+        capture.pendingKey = nil
+        capture:Hide()
+        RefreshKeyBindingPage()
+    end
+
+    local function SaveCapturedBinding(key)
+        if InCombatLockdown and InCombatLockdown() then
+            print((L["Binding_Header"] or "Routine") .. ": " .. (L["Config_KeyBindingsCombat"] or "Key bindings cannot be changed during combat."))
+            FinishCapture()
+            return
+        end
+
+        local action = GetBindingAction(key)
+        if action and action ~= "" and action ~= TOGGLE_WINDOWS_BINDING then
+            if capture.pendingKey ~= key then
+                capture.pendingKey = key
+                local actionName = GetBindingName and GetBindingName(action) or action
+                capture.status:SetText((L["Config_KeyBindingConflict"] or "%s is already assigned to %s. Press it again to replace that binding."):format(GetCapturedBindingText(key), actionName))
+                capture.status:SetTextColor(1, 0.62, 0.20)
+                return
+            end
+        end
+
+        local first, second = GetBindingKey(TOGGLE_WINDOWS_BINDING)
+        if first and first ~= key then SetBinding(first) end
+        if second and second ~= key then SetBinding(second) end
+        if not SetBinding(key, TOGGLE_WINDOWS_BINDING) then
+            capture.pendingKey = nil
+            capture.status:SetText(L["Config_KeyBindingFailed"] or "That binding could not be saved. Try another key.")
+            capture.status:SetTextColor(1, 0.32, 0.28)
+            return
+        end
+        SaveBindings(GetCurrentBindingSet())
+        FinishCapture()
+    end
+
+    local function CaptureKey(key)
+        if key == "ESCAPE" then
+            FinishCapture()
+            return
+        end
+        if key == "BACKSPACE" then
+            ClearToggleWindowsBinding()
+            FinishCapture()
+            return
+        end
+        if MODIFIER_KEYS[key] or key == "UNKNOWN" then return end
+        SaveCapturedBinding(BuildCapturedBinding(key))
+    end
+
+    capture:SetScript("OnKeyDown", function(_, key)
+        CaptureKey(key)
+    end)
+    capture:SetScript("OnMouseDown", function(_, button)
+        local number = button and button:match("^Button(%d+)$")
+        CaptureKey(MOUSE_BUTTON_KEYS[button] or (number and ("BUTTON" .. number)) or string.upper(button or "UNKNOWN"))
+    end)
+    capture:SetScript("OnMouseWheel", function(_, delta)
+        CaptureKey(delta > 0 and "MOUSEWHEELUP" or "MOUSEWHEELDOWN")
+    end)
+    capture:SetScript("OnShow", function()
+        capture.pendingKey = nil
+        capture.status:SetText(L["Config_KeyBindingCancel"] or "Escape cancels. Backspace clears the binding.")
+        capture.status:SetTextColor(0.62, 0.68, 0.76)
+        capture:EnableKeyboard(true)
+        capture:EnableMouseWheel(true)
+        capture:SetPropagateKeyboardInput(false)
+    end)
+    capture:SetScript("OnHide", function()
+        capture:EnableKeyboard(false)
+        capture:EnableMouseWheel(false)
+    end)
+
+    keybindCaptureFrame = capture
+    return capture
+end
+
+function MR:ShowToggleWindowsKeybindDialog()
+    if InCombatLockdown and InCombatLockdown() then
+        print((L["Binding_Header"] or "Routine") .. ": " .. (L["Config_KeyBindingsCombat"] or "Key bindings cannot be changed during combat."))
+        return
+    end
+    EnsureKeybindCaptureFrame():Show()
+end
+
 function MR:BuildConfigFrame()
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     f:SetWidth(344)
-    f:SetFrameStrata("HIGH")
+    self:RegisterPriorityFrame(f)
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:SetBackdrop(MakeBackdrop())

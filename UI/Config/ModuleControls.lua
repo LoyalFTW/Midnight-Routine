@@ -65,9 +65,9 @@ local function CreateGrip(parent, height, enabled, onStart, onCommit)
         grip:SetBackdropColor(0.12, 0.22, 0.20, 0.6)
         grip:SetBackdropBorderColor(0.30, 0.55, 0.48, 0.7)
     end)
-    grip:SetScript("OnMouseDown", function()
+    grip:SetScript("OnMouseDown", function(selfGrip)
         if enabled and onStart then
-            onStart()
+            onStart(selfGrip)
         end
     end)
     grip:SetScript("OnClick", function()
@@ -110,7 +110,7 @@ local function CreateExpandButton(parent, expanded, onToggle)
     end)
     button:SetScript("OnLeave", function()
         ApplyState(false)
-        ns.HideTooltip(button)
+        ns.HideOwnedTooltip(button)
     end)
     return button
 end
@@ -159,7 +159,7 @@ local function CreateHideCompleteButton(parent, moduleKey, anchor)
     end)
     button:SetScript("OnLeave", function()
         ApplyState(false)
-        ns.HideTooltip(button)
+        ns.HideOwnedTooltip(button)
     end)
     return button
 end
@@ -259,9 +259,9 @@ function Config.CreateTaskControl(spec)
     frame:SetSize(spec.width, spec.height)
     frame:EnableMouse(true)
     frame:SetAlpha(spec.available and 1 or 0.55)
-    frame:SetScript("OnMouseDown", function(_, button)
+    frame:SetScript("OnMouseDown", function(selfFrame, button)
         if spec.available and button == "LeftButton" and spec.onDragStart then
-            spec.onDragStart()
+            spec.onDragStart(selfFrame)
         end
     end)
     frame:SetScript("OnMouseUp", function(_, button)
@@ -273,7 +273,7 @@ function Config.CreateTaskControl(spec)
         ns.ShowTooltip(frame, { text = L["Config_DragRowTooltip"] })
     end)
     frame:SetScript("OnLeave", function()
-        ns.HideTooltip(frame)
+        ns.HideOwnedTooltip(frame)
     end)
 
     local dot = frame:CreateTexture(nil, "ARTWORK")
@@ -328,7 +328,7 @@ function Config.CreateTaskControl(spec)
     end)
     visibility:SetScript("OnLeave", function()
         ApplyState(false)
-        ns.HideTooltip(visibility)
+        ns.HideOwnedTooltip(visibility)
     end)
 
     local r, g, b = hex(MR:GetRowColor(moduleKey, rowKey) or MR:GetHeaderColor(moduleKey))
@@ -371,7 +371,7 @@ function Config.CreateTaskControl(spec)
             else
                 icon:SetVertexColor(0.45, 0.47, 0.52)
             end
-            ns.HideTooltip(soundBtn)
+            ns.HideOwnedTooltip(soundBtn)
         end)
         local hasSoundNow = ns.GetCompletionSoundValue and ns.GetCompletionSoundValue(moduleKey, rowKey) ~= nil
         if hasSoundNow then

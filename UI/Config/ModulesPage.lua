@@ -61,7 +61,7 @@ function Config.BuildModulesPage(ctx)
 
     local dragGhost = CreateFrame("Frame", nil, body, "BackdropTemplate")
     dragGhost:SetHeight(20)
-    dragGhost:SetFrameStrata("DIALOG")
+    dragGhost:SetFrameStrata("TOOLTIP")
     dragGhost:SetBackdrop(MakeBackdrop())
     dragGhost:SetBackdropColor(0.08, 0.28, 0.22, 0.95)
     dragGhost:SetBackdropBorderColor(0.2, 0.9, 0.65, 1)
@@ -73,7 +73,7 @@ function Config.BuildModulesPage(ctx)
 
     local dragLine = CreateFrame("Frame", nil, body)
     dragLine:SetHeight(2)
-    dragLine:SetFrameStrata("DIALOG")
+    dragLine:SetFrameStrata("TOOLTIP")
     dragLine:Hide()
     local dragLineTex = dragLine:CreateTexture(nil, "OVERLAY")
     dragLineTex:SetAllPoints()
@@ -353,7 +353,7 @@ function Config.BuildModulesPage(ctx)
             expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
             expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
             expandLbl:SetTextColor(0.45, 0.75, 0.70)
-            ns.HideTooltip(expandBtn)
+            ns.HideOwnedTooltip(expandBtn)
         end)
 
         local hideBtn = CreateFrame("Button", nil, groupFr, "BackdropTemplate")
@@ -381,7 +381,7 @@ function Config.BuildModulesPage(ctx)
         end)
         hideBtn:SetScript("OnLeave", function()
             ApplyHideState(false)
-            ns.HideTooltip(hideBtn)
+            ns.HideOwnedTooltip(hideBtn)
         end)
 
         local lbl
@@ -670,7 +670,7 @@ function Config.BuildModulesPage(ctx)
     local storyTotal, storyEnabled = 0, 0
     local professionSource = MR.GetMainFrameProgressSource and MR:GetMainFrameProgressSource() or nil
 
-    local function StartProfessionGroupDrag()
+    local function StartProfessionGroupDrag(owner)
         if drag.active then return end
         drag.active = true
         f:SetScript("OnUpdate", DragOnUpdate)
@@ -680,7 +680,7 @@ function Config.BuildModulesPage(ctx)
         drag.srcKey = PROFESSION_GROUP_KEY
         drag.targetIdx = nil
         dragGhostLbl:SetText(L["ProfKnowledge_Title"] or "Profession Knowledge")
-        ns.HideTooltip()
+        ns.HideOwnedTooltip(owner)
     end
 
     local function IsProfessionKnownForConfig(profession)
@@ -902,7 +902,7 @@ function Config.BuildModulesPage(ctx)
                                 text = enableBtn:GetChecked() and (L["Config_DisableModule"] or "Disable this profession") or (L["Config_EnableModule"] or "Enable this profession"),
                             })
                         end)
-                        enableBtn:SetScript("OnLeave", function() ns.HideTooltip(enableBtn) end)
+                        enableBtn:SetScript("OnLeave", function() ns.HideOwnedTooltip(enableBtn) end)
 
                         local expandBtn = CreateFrame("Button", nil, rowFr, "BackdropTemplate")
                         expandBtn:SetSize(16, 16)
@@ -1054,7 +1054,7 @@ function Config.BuildModulesPage(ctx)
         dragGhostLbl:SetText(mod.label)
     end
 
-    local function StartRowDrag(mod, row)
+    local function StartRowDrag(mod, row, owner)
         if drag.active then return end
         drag.active = true
         f:SetScript("OnUpdate", DragOnUpdate)
@@ -1064,7 +1064,7 @@ function Config.BuildModulesPage(ctx)
         drag.srcKey = row.key
         drag.targetIdx = nil
         dragGhostLbl:SetText(FormatRowConfigLabel(mod, row))
-        ns.HideTooltip()
+        ns.HideOwnedTooltip(owner)
     end
 
     local function ToggleModuleExpanded(key)
@@ -1182,8 +1182,8 @@ function Config.BuildModulesPage(ctx)
                     fontSize = moduleRowFs,
                     label = FormatRowConfigLabel(mod, currentRow),
                     available = rowAvailable,
-                    onDragStart = function()
-                        StartRowDrag(mod, currentRow)
+                    onDragStart = function(owner)
+                        StartRowDrag(mod, currentRow, owner)
                     end,
                     onDragCommit = function()
                         if drag.active and drag.mode == "row" and drag.moduleKey == key then

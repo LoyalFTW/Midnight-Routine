@@ -9,6 +9,39 @@ local IsTableEmpty = Core.IsTableEmpty
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 local DEFAULTS = Core.defaults
 
+local VALID_FRAME_STRATA = {
+    BACKGROUND = true,
+    LOW = true,
+    MEDIUM = true,
+    HIGH = true,
+    DIALOG = true,
+}
+
+function MR:GetFrameStrata()
+    local strata = self.db and self.db.profile and self.db.profile.frameStrata or "HIGH"
+    return VALID_FRAME_STRATA[strata] and strata or "HIGH"
+end
+
+function MR:RegisterPriorityFrame(frame)
+    if not frame or not frame.SetFrameStrata then return frame end
+    self._priorityFrames = self._priorityFrames or setmetatable({}, { __mode = "k" })
+    self._priorityFrames[frame] = true
+    frame:SetFrameStrata(self:GetFrameStrata())
+    return frame
+end
+
+function MR:SetFrameStrata(strata)
+    if not VALID_FRAME_STRATA[strata] then return end
+    self.db.profile.frameStrata = strata
+    if self._priorityFrames then
+        for frame in pairs(self._priorityFrames) do
+            if frame and frame.SetFrameStrata then
+                frame:SetFrameStrata(strata)
+            end
+        end
+    end
+end
+
 function MR:ApplyScaleToAll(v)
     self.db.profile.scale          = v
     self.db.profile.raresScale     = v

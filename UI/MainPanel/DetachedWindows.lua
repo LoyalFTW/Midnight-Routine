@@ -69,7 +69,6 @@ local COL = UI.COL
 local ApplyTheme = UI.ApplyTheme
 local CleanLabelText = UI.CleanLabelText
 local ExtractInlineLabelColor = UI.ExtractInlineLabelColor
-local HideTooltipIfOwned = UI.HideTooltipIfOwned
 local MainSectionHeaderOnMouseDown = UI.MainSectionHeaderOnMouseDown
 local MainSectionHeaderOnDragStart = UI.MainSectionHeaderOnDragStart
 local MainSectionHeaderOnDragStop = UI.MainSectionHeaderOnDragStop
@@ -183,7 +182,7 @@ function MR:EnsureDetachedFrame(mod)
     local defaultH = HEADER_HEIGHT + 120
     local title = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     title:SetSize(savedSize and savedSize.width or defaultW, savedSize and savedSize.height or defaultH)
-    title:SetFrameStrata("MEDIUM")
+    self:RegisterPriorityFrame(title)
     title:SetBackdrop(MakeBackdrop())
     if ns.HookBackdropFrame then ns.HookBackdropFrame(title) end
     title:SetBackdropColor(COL.bg[1], COL.bg[2], COL.bg[3], COL.bg[4])
