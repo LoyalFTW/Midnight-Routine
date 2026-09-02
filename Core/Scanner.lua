@@ -112,7 +112,10 @@ local function UpdateCurrencyProgressForRow(self, progress, mod, row)
             collected = collected + (wallet - previousWallet)
         end
 
-        collected = math.max(collected, weekly, wallet)
+        -- Only the API's own earned-this-week figure may raise the tally. The wallet
+        -- balance is currency held, not currency earned, so using it as a floor reports
+        -- a full week's progress for anything carried across the reset.
+        collected = math.max(collected, weekly)
         if trackingCap and trackingCap > 0 then
             collected = math.min(collected, trackingCap)
         end
