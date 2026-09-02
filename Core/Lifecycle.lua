@@ -747,6 +747,39 @@ function MR:CheckScheduledResets()
     end
 end
 
+function MR:OnQuestTurnInCompletion(_, questID)
+    local entry = TURN_IN_COMPLETIONS[questID]
+    if not entry or not self.db then return end
+    local ch = self.db.char
+    local modProgress = ch.progress and ch.progress[entry.mod]
+    if entry.mod == "s1_weekly" and entry.row == "saltherils_soiree" then
+        if not modProgress or modProgress["soiree_active_quest"] ~= questID then
+            return
+        end
+        modProgress["soiree_completed_name"] = modProgress["soiree_active_name"]
+    elseif entry.mod == "s1_weekly" and entry.row == "unity_against_void" then
+        if modProgress then
+            modProgress["uatv_completed_branch_name"] = modProgress["uatv_branch_name"]
+        end
+    elseif entry.mod == "s1_weekly" and entry.row == "ritual_sites" then
+        if modProgress then
+            modProgress["ritual_site_completed_name"] = modProgress["ritual_site_active_name"]
+                or modProgress["ritual_site_completed_name"]
+            modProgress["ritual_site_completed_map_id"] = modProgress["ritual_site_active_map_id"]
+                or modProgress["ritual_site_completed_map_id"]
+        end
+    end
+    if not ch.progress[entry.mod] then ch.progress[entry.mod] = {} end
+    ch.progress[entry.mod][entry.row] = 1
+    if self:IsModuleEnabled(entry.mod) then
+        if self.RequestDataRefresh then
+            self:RequestDataRefresh()
+        else
+            self:RefreshUI()
+        end
+    end
+end
+
 function MR:OnEnable()
     self:RegisterBucketEvent({
         "AREA_POIS_UPDATED",
@@ -798,6 +831,7 @@ function MR:OnEnable()
     self:RegisterEvent("LOOT_READY",               "OnDelveLootReady")
     self:RegisterEvent("LOOT_OPENED",              "OnDelveLootReady")
     self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnedIn")
+    self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnInCompletion")
     self:RegisterEvent("QUEST_ACCEPTED",           "OnQuestAccepted")
     self:RegisterEvent("QUEST_REMOVED",            "OnQuestRemoved")
     self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
@@ -811,44 +845,5 @@ function MR:OnEnable()
     end
 
     self:ScheduleRepeatingTimer("CheckScheduledResets", 60)
-
-    if not self._questTurnInFrame then
-        local addon = self
-        local f = CreateFrame("Frame")
-        f:RegisterEvent("QUEST_TURNED_IN")
-        f:SetScript("OnEvent", function(_, _, questID)
-            local entry = TURN_IN_COMPLETIONS[questID]
-            if not entry or not addon.db then return end
-            local ch = addon.db.char
-            local modProgress = ch.progress and ch.progress[entry.mod]
-            if entry.mod == "s1_weekly" and entry.row == "saltherils_soiree" then
-                if not modProgress or modProgress["soiree_active_quest"] ~= questID then
-                    return
-                end
-                modProgress["soiree_completed_name"] = modProgress["soiree_active_name"]
-            elseif entry.mod == "s1_weekly" and entry.row == "unity_against_void" then
-                if modProgress then
-                    modProgress["uatv_completed_branch_name"] = modProgress["uatv_branch_name"]
-                end
-            elseif entry.mod == "s1_weekly" and entry.row == "ritual_sites" then
-                if modProgress then
-                    modProgress["ritual_site_completed_name"] = modProgress["ritual_site_active_name"]
-                        or modProgress["ritual_site_completed_name"]
-                    modProgress["ritual_site_completed_map_id"] = modProgress["ritual_site_active_map_id"]
-                        or modProgress["ritual_site_completed_map_id"]
-                end
-            end
-            if not ch.progress[entry.mod] then ch.progress[entry.mod] = {} end
-            ch.progress[entry.mod][entry.row] = 1
-            if addon:IsModuleEnabled(entry.mod) then
-                if addon.RequestDataRefresh then
-                    addon:RequestDataRefresh()
-                else
-                    addon:RefreshUI()
-                end
-            end
-        end)
-        self._questTurnInFrame = f
-    end
 end
 
