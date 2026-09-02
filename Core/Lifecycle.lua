@@ -11,7 +11,9 @@ local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 local DEFAULTS = Core.defaults
 local STATIC_TURN_IN_COMPLETIONS = assert(Core.staticTurnInCompletions, "Core settings must load first")
 local TURN_IN_COMPLETIONS = assert(Core.turnInCompletions, "Core settings must load first")
-local PruneProgressStore = assert(ns.CoreData, "Core progress must load before lifecycle").PruneProgressStore
+local CoreData = assert(ns.CoreData, "Core progress must load before lifecycle")
+local PruneProgressStore = CoreData.PruneProgressStore
+local SetProgressValue = CoreData.SetProgressValue
 
 local function CountArray(t)
     return type(t) == "table" and #t or 0
@@ -769,8 +771,10 @@ function MR:OnQuestTurnInCompletion(_, questID)
                 or modProgress["ritual_site_completed_map_id"]
         end
     end
-    if not ch.progress[entry.mod] then ch.progress[entry.mod] = {} end
-    ch.progress[entry.mod][entry.row] = 1
+    SetProgressValue(ch.progress, entry.mod, entry.row, 1)
+    -- The module header counts are built from this cache; without dropping it a
+    -- turn-in can leave the header reading the count from before the hand-in.
+    self._moduleStatsCache = nil
     if self:IsModuleEnabled(entry.mod) then
         if self.RequestDataRefresh then
             self:RequestDataRefresh()
