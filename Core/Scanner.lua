@@ -278,6 +278,15 @@ end
 
 
 
+local function ListContains(list, value)
+    for i = 1, #list do
+        if list[i] == value then
+            return true
+        end
+    end
+    return false
+end
+
 function MR:ScanAutoUpdateInstanceRows(changedQuestId, changedEncounterId, difficultyId)
     if not (self and self.db and self.db.char and self.db.char.progress) then
         return
@@ -291,11 +300,8 @@ function MR:ScanAutoUpdateInstanceRows(changedQuestId, changedEncounterId, diffi
         if self:IsModuleEnabled(mod.key) then
             for _, row in ipairs(mod.rows) do
 
-                if row.autoUpdateInstances and row.questIds and (changedQuestId == nil or (function()
-                    for _, qid in ipairs(row.questIds) do
-                        if qid == changedQuestId then return true end
-                    end
-                end)()) then
+                if row.autoUpdateInstances and row.questIds
+                    and (changedQuestId == nil or ListContains(row.questIds, changedQuestId)) then
                     if not row.turnInTracked then
                         UpdateQuestProgressForRow(self, progress, mod, row)
                     elseif row.allowQuestFlagBackfill then
@@ -307,11 +313,8 @@ function MR:ScanAutoUpdateInstanceRows(changedQuestId, changedEncounterId, diffi
                     end
                 end
 
-                if row.encounterIds and (changedEncounterId == nil or (function()
-                    for _, eid in ipairs(row.encounterIds) do
-                        if eid == changedEncounterId then return true end
-                    end
-                end)()) then
+                if row.encounterIds
+                    and (changedEncounterId == nil or ListContains(row.encounterIds, changedEncounterId)) then
 
                     local diffOk = (not difficultyId) or (not row.encounterDifficulties) or (row.encounterDifficulties[difficultyId] == true)
                     if diffOk then
