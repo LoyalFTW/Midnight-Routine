@@ -94,10 +94,13 @@ function MR:OnEnteringWorld()
         self:MaybeShowWelcomeScreen()
     end
     if self.OnRenownUpdate and not self._renownUpdateBucketHandle then
+        -- No COMBAT_TEXT_UPDATE here. It fires for every floating damage and heal
+        -- number, and bucket handlers get no payload, so its faction-gain subtype
+        -- cannot be told apart from the rest. UPDATE_FACTION already covers every
+        -- reputation change it would have reported.
         self._renownUpdateBucketHandle = self:RegisterBucketEvent({
             "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
             "UPDATE_FACTION",
-            "COMBAT_TEXT_UPDATE",
         }, 1, "OnRenownUpdate")
     end
     if not shouldHideFrames and not temporarilyHidden and not self:IsManagedWindowsBundleHidden() then
