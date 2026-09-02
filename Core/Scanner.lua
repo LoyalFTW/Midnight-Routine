@@ -590,7 +590,8 @@ local function RunScanPass(self)
             if mdb then
                 for _, row in ipairs(mod.rows) do
                     if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
-                        local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
+                        local rowMax = row.max or mdb[row.liveKey]
+                        local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], rowMax)
                         local _ov = self.db.char.manualOverrides
                         if _ov and _ov[mod.key] then
                             local mo = _ov[mod.key][row.key]
