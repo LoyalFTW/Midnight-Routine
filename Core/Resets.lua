@@ -15,18 +15,13 @@ local function GetResetTimestampFromCountdown(secondsUntilReset, cycleSeconds)
         return nil
     end
 
-    local maxExpected = cycleSeconds + (2 * 60 * 60)
-    if secondsUntilReset > maxExpected then
+    -- A countdown longer than one whole cycle would put the last reset in the
+    -- future, which is not a reading this can work back from.
+    if secondsUntilReset > cycleSeconds then
         return nil
     end
 
-    local now = GetServerTime()
-    local resetAt = now + secondsUntilReset - cycleSeconds
-    if resetAt > now then
-        return nil
-    end
-
-    return resetAt
+    return GetServerTime() + secondsUntilReset - cycleSeconds
 end
 
 function MR:GetLastDailyTimestamp()
