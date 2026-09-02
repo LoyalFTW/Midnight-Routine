@@ -120,6 +120,9 @@ function MR:DoWeeklyReset()
         return
     end
 
+    local prevResetAt = self.db.char.lastResetAt
+    local firstRun = not prevResetAt or prevResetAt == 0
+
     local ts = self:GetLastResetTimestamp()
     if ts then self.db.char.lastResetAt = ts end
 
@@ -139,6 +142,10 @@ function MR:DoWeeklyReset()
     self.db.char.raresKills = {}
     self:RefreshUI()
     self:RequestScan(20)
-    print(L["Weekly_Reset"] or "|cff2ae7c6MidnightRoutine:|r Weekly reset applied.")
+    -- On a character with no stored reset timestamp this pass is seeding that
+    -- timestamp, not reacting to a reset, so there is nothing to announce.
+    if not firstRun then
+        print(L["Weekly_Reset"] or "|cff2ae7c6MidnightRoutine:|r Weekly reset applied.")
+    end
 end
 
