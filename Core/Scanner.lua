@@ -197,7 +197,8 @@ local function UpdateItemProgressForRow(self, progress, mod, row)
     if C_Item and C_Item.GetItemCount then
         count = C_Item.GetItemCount(row.itemId, false, false, true) or 0
     elseif GetItemCount then
-        count = GetItemCount(row.itemId, false, false) or 0
+        -- Same arguments as the C_Item call above: bag and reagent bank, no charges.
+        count = GetItemCount(row.itemId, false, false, true) or 0
     end
 
     local value = row.noMax and count or math.min(count, row.max or count)
