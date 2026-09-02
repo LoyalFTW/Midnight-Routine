@@ -1,10 +1,36 @@
-local _, ns = ...
+local addonName, ns = ...
 local MR = ns.MR
+local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 
 local CoreData = assert(ns.CoreData, "MidnightRoutine CoreData must load before Core/Scanner.lua")
 local DeepCopy = CoreData.DeepCopy
 local SetProgressValue = CoreData.SetProgressValue
 local PruneProgressStore = CoreData.PruneProgressStore
+
+-- Scan failures are announced once per source per session; a module that throws
+-- every scan would otherwise flood the chat frame.
+local reportedScanFailures = {}
+
+local function ReportScanFailure(source, err)
+    if reportedScanFailures[source] then
+        return
+    end
+    reportedScanFailures[source] = true
+    print(string.format(
+        L["Scan_Failed"] or "|cff2ae7c6MidnightRoutine:|r Scan step '%s' failed and was skipped: %s",
+        tostring(source), tostring(err)))
+end
+
+-- Runs a module's own scan without letting a throw escape into the caller. One
+-- broken module must not stop the modules after it, nor abandon the scan latch.
+local function SafeModuleScan(mod)
+    local ok, changed = pcall(mod.onScan, mod)
+    if not ok then
+        ReportScanFailure(mod.key or "?", changed)
+        return nil
+    end
+    return changed
+end
 
 local function WriteProgress(progress, modKey, rowKey, val, overrides)
     if overrides and overrides[modKey] then
@@ -204,8 +230,7 @@ function MR:PrimeModuleData(mod)
     end
 
     if mod.onScan then
-        local ok, changed = pcall(mod.onScan, mod)
-        dirty = (ok and changed == true) or dirty
+        dirty = (SafeModuleScan(mod) == true) or dirty
     end
 
     self._moduleStatsCache = nil
@@ -469,7 +494,7 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
                 end
             end
 
-            local moduleChanged = mod.onScan(mod) == true
+            local moduleChanged = SafeModuleScan(mod) == true
 
             self.db.char.rowVisibility = self.db.char.rowVisibility or {}
             self.db.char.rowVisibility[moduleKey] = self.db.char.rowVisibility[moduleKey] or {}
@@ -517,6 +542,98 @@ function MR:RefreshModuleScans(moduleKeys, refreshUI)
     end
 
     return dirty
+end
+
+-- The body of one scan pass. Extracted so MR:Scan can run it under pcall and
+-- clear the in-progress latch whether it returns or throws.
+local function RunScanPass(self)
+    self.db.char.lastSyncAt = GetServerTime()
+    local beforeProgress = DeepCopy(self.db.char.progress)
+    local beforeRows = {}
+    for _, mod in ipairs(self.modules) do
+        if self:IsModuleEnabled(mod.key) then
+            local rows = {}
+            beforeRows[mod.key] = rows
+            for _, row in ipairs(mod.rows or {}) do
+                rows[row.key] = RowScanSignature(row)
+            end
+        end
+    end
+    local concentrationChanged = self:RefreshProfessionConcentration()
+
+    local progress = self.db.char.progress
+
+    for _, mod in ipairs(self.modules) do
+        if self:IsModuleEnabled(mod.key) then
+            for _, row in ipairs(mod.rows) do
+            if row.questIds and not row.turnInTracked then
+                UpdateQuestProgressForRow(self, progress, mod, row)
+            elseif row.questIds and row.turnInTracked and row.allowQuestFlagBackfill then
+                local currentValue = progress[mod.key] and progress[mod.key][row.key] or 0
+                if currentValue <= 0 then
+                    UpdateQuestProgressForRow(self, progress, mod, row)
+                end
+            end
+            if row.currencyId then
+                UpdateCurrencyProgressForRow(self, progress, mod, row)
+            end
+            if row.itemId and not row.noItemProgress then
+                UpdateItemProgressForRow(self, progress, mod, row)
+            end
+            end
+
+            if mod.onScan then
+                SafeModuleScan(mod)
+            end
+
+            local mdb = progress[mod.key]
+            if mdb then
+                for _, row in ipairs(mod.rows) do
+                    if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
+                        local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
+                        local _ov = self.db.char.manualOverrides
+                        if _ov and _ov[mod.key] then
+                            local mo = _ov[mod.key][row.key]
+                            if mo and mo > capped then capped = mo end
+                        end
+                        SetProgressValue(progress, mod.key, row.key, capped)
+                    end
+                    if row.liveTierLabelKey then
+                        row.vaultLabel = mdb[row.liveTierLabelKey]
+                    end
+                    if row.liveTierColorKey then
+                        row.vaultColor = mdb[row.liveTierColorKey]
+                    end
+                end
+            end
+        end
+    end
+
+    PruneProgressStore(progress)
+    if self.db.global then
+        PruneProgressStore(self.db.global.customTaskProgress)
+    end
+
+    local dirty = concentrationChanged == true or not ValuesEqual(beforeProgress, progress)
+    if not dirty then
+        for _, mod in ipairs(self.modules) do
+            local moduleRows = beforeRows[mod.key]
+            if moduleRows then
+                for _, row in ipairs(mod.rows or {}) do
+                    if moduleRows[row.key] ~= RowScanSignature(row) then
+                        dirty = true
+                        break
+                    end
+                end
+            end
+            if dirty then break end
+        end
+    end
+
+    if dirty then self:RequestDataRefresh() end
+    if self.SyncAllRareKills then self:SyncAllRareKills() end
+    if self.RefreshRares  then self:RefreshRares()  end
+    if self.RefreshRenown then self:RefreshRenown() end
 end
 
 function MR:Scan()
@@ -568,96 +685,15 @@ function MR:Scan()
 
     self._scanCount = (self._scanCount or 0) + 1
     self._scanInProgress = true
-    self.db.char.lastSyncAt = GetServerTime()
-    local beforeProgress = DeepCopy(self.db.char.progress)
-    local beforeRows = {}
-    for _, mod in ipairs(self.modules) do
-        if self:IsModuleEnabled(mod.key) then
-            local rows = {}
-            beforeRows[mod.key] = rows
-            for _, row in ipairs(mod.rows or {}) do
-                rows[row.key] = RowScanSignature(row)
-            end
-        end
-    end
-    local concentrationChanged = self:RefreshProfessionConcentration()
 
-    local progress = self.db.char.progress
-
-    for _, mod in ipairs(self.modules) do
-        if self:IsModuleEnabled(mod.key) then
-            for _, row in ipairs(mod.rows) do
-            if row.questIds and not row.turnInTracked then
-                UpdateQuestProgressForRow(self, progress, mod, row)
-            elseif row.questIds and row.turnInTracked and row.allowQuestFlagBackfill then
-                local currentValue = progress[mod.key] and progress[mod.key][row.key] or 0
-                if currentValue <= 0 then
-                    UpdateQuestProgressForRow(self, progress, mod, row)
-                end
-            end
-            if row.currencyId then
-                UpdateCurrencyProgressForRow(self, progress, mod, row)
-            end
-            if row.itemId and not row.noItemProgress then
-                UpdateItemProgressForRow(self, progress, mod, row)
-            end
-            end
-
-            if mod.onScan then
-                mod.onScan(mod)
-            end
-
-            local mdb = progress[mod.key]
-            if mdb then
-                for _, row in ipairs(mod.rows) do
-                    if row.liveKey and row.liveKey ~= row.key and mdb[row.liveKey] ~= nil then
-                        local capped = row.noMax and mdb[row.liveKey] or math.min(mdb[row.liveKey], row.max)
-                        local _ov = self.db.char.manualOverrides
-                        if _ov and _ov[mod.key] then
-                            local mo = _ov[mod.key][row.key]
-                            if mo and mo > capped then capped = mo end
-                        end
-                        SetProgressValue(progress, mod.key, row.key, capped)
-                    end
-                    if row.liveTierLabelKey then
-                        row.vaultLabel = mdb[row.liveTierLabelKey]
-                    end
-                    if row.liveTierColorKey then
-                        row.vaultColor = mdb[row.liveTierColorKey]
-                    end
-                end
-            end
-        end
-    end
-
-    PruneProgressStore(progress)
-    if self.db.global then
-        PruneProgressStore(self.db.global.customTaskProgress)
-    end
-
-    local dirty = concentrationChanged == true or not ValuesEqual(beforeProgress, progress)
-    if not dirty then
-        for _, mod in ipairs(self.modules) do
-            local moduleRows = beforeRows[mod.key]
-            if moduleRows then
-                for _, row in ipairs(mod.rows or {}) do
-                    if moduleRows[row.key] ~= RowScanSignature(row) then
-                        dirty = true
-                        break
-                    end
-                end
-            end
-            if dirty then break end
-        end
-    end
-
-    if dirty then self:RequestDataRefresh() end
-    if self.SyncAllRareKills then self:SyncAllRareKills() end
-    if self.RefreshRares  then self:RefreshRares()  end
-    if self.RefreshRenown then self:RefreshRenown() end
+    local ok, err = pcall(RunScanPass, self)
 
     self._lastScanAt = GetTime and GetTime() or now
     self._scanInProgress = nil
+
+    if not ok then
+        ReportScanFailure("Scan", err)
+    end
 
     if self._scanPending and not self._scanThrottleTimer then
         self._scanPending = nil
