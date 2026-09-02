@@ -37,7 +37,7 @@ local function ApplyVisibilityState(button, label, active)
 end
 
 local function CreateGrip(parent, height, enabled, onStart, onCommit)
-    local grip = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local grip = ns.AcquireFrame(parent, "grip", "Button", "BackdropTemplate")
     grip:SetSize(16, math.max(height - 4, 14))
     grip:SetPoint("LEFT", parent, "LEFT", 1, 0)
     grip:RegisterForClicks("LeftButtonUp")
@@ -47,7 +47,7 @@ local function CreateGrip(parent, height, enabled, onStart, onCommit)
     grip:SetEnabled(enabled)
     grip:SetAlpha(enabled and 1 or 0.35)
 
-    local label = grip:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(grip, "label", "OVERLAY")
     label:SetFont(ns.FONT_HEADERS, 13, GetFontFlags())
     label:SetPoint("CENTER")
     label:SetText("=")
@@ -82,12 +82,12 @@ Config.CreateGrip = CreateGrip
 
 local function CreateExpandButton(parent, expanded, onToggle)
     local isExpanded = expanded == true
-    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local button = ns.AcquireFrame(parent, "expandButton", "Button", "BackdropTemplate")
     button:SetSize(16, 16)
     button:SetPoint("RIGHT", parent, "RIGHT", -1, 0)
     button:SetBackdrop(MakeBackdrop())
 
-    local label = button:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(button, "label", "OVERLAY")
     label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
     label:SetPoint("CENTER", button, "CENTER", 0, 1)
     label:SetText(isExpanded and "v" or ">")
@@ -117,12 +117,12 @@ end
 
 local function CreateHideCompleteButton(parent, moduleKey, anchor)
     local isCurrencyModule = moduleKey == "currencies" or moduleKey == "pvp_currencies"
-    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local button = ns.AcquireFrame(parent, "hideCompleteButton", "Button", "BackdropTemplate")
     button:SetSize(16, 16)
     button:SetPoint("RIGHT", anchor, "LEFT", -2, 0)
     button:SetBackdrop(MakeBackdrop())
 
-    local label = button:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(button, "label", "OVERLAY")
     label:SetFont(ns.FONT_ROWS, 8, GetFontFlags())
     label:SetPoint("CENTER")
 
@@ -198,7 +198,7 @@ function Config.CreateModuleControl(spec)
     local mod = spec.module
     local moduleKey = mod.key
     local frameTemplate = spec.emphasized and "BackdropTemplate" or nil
-    local frame = CreateFrame("Frame", nil, spec.parent, frameTemplate)
+    local frame = ns.AcquireFrame(spec.parent, spec.emphasized and "moduleControlEmphasized" or "moduleControl", "Frame", frameTemplate)
     frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 4, spec.y)
     frame:SetSize(spec.width, spec.height)
 
@@ -210,7 +210,7 @@ function Config.CreateModuleControl(spec)
     end
 
     local grip = CreateGrip(frame, spec.height, spec.available, spec.onDragStart, spec.onDragCommit)
-    local checkbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+    local checkbox = ns.AcquireFrame(frame, "enable", "CheckButton", "UICheckButtonTemplate")
     checkbox:SetSize(20, 20)
     checkbox:SetPoint("LEFT", grip, "RIGHT", 1, 0)
     checkbox:SetChecked(MR:IsModuleEnabled(moduleKey))
@@ -229,7 +229,7 @@ function Config.CreateModuleControl(spec)
     local hide = CreateHideCompleteButton(frame, moduleKey, expand)
     local color = CreateModuleColorControls(frame, spec, hide)
 
-    local label = frame:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(frame, "label", "OVERLAY")
     label:SetFont(ns.FONT_ROWS, spec.fontSize, GetFontFlags())
     label:SetPoint("LEFT", checkbox, "RIGHT", 2, 0)
     label:SetPoint("RIGHT", color, "LEFT", -2, 0)
@@ -254,7 +254,7 @@ function Config.CreateTaskControl(spec)
     local rowKey = row.key
     local enabled = MR:IsRowEnabled(moduleKey, rowKey)
 
-    local frame = CreateFrame("Frame", nil, spec.parent)
+    local frame = ns.AcquireFrame(spec.parent, "taskControl", "Frame")
     frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 18, spec.y)
     frame:SetSize(spec.width, spec.height)
     frame:EnableMouse(true)
@@ -276,23 +276,23 @@ function Config.CreateTaskControl(spec)
         ns.HideOwnedTooltip(frame)
     end)
 
-    local dot = frame:CreateTexture(nil, "ARTWORK")
+    local dot = ns.AcquireTexture(frame, "dot", "ARTWORK")
     dot:SetSize(5, 5)
     dot:SetPoint("LEFT", frame, "LEFT", 0, 0)
 
-    local label = frame:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(frame, "label", "OVERLAY")
     label:SetFont(ns.FONT_ROWS, spec.fontSize, GetFontFlags())
     label:SetPoint("LEFT", frame, "LEFT", 10, 0)
     label:SetPoint("RIGHT", frame, "RIGHT", -48, 0)
     label:SetJustifyH("LEFT")
     label:SetText(spec.label)
 
-    local visibility = CreateFrame("Button", nil, frame, "BackdropTemplate")
+    local visibility = ns.AcquireFrame(frame, "visibility", "Button", "BackdropTemplate")
     visibility:SetSize(14, 14)
     visibility:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
     visibility:SetBackdrop(MakeBackdrop())
     visibility:SetEnabled(spec.available)
-    local visibilityLabel = visibility:CreateFontString(nil, "OVERLAY")
+    local visibilityLabel = ns.AcquireFontString(visibility, "label", "OVERLAY")
     visibilityLabel:SetFont(ns.FONT_ROWS, spec.fontSize, GetFontFlags())
     visibilityLabel:SetPoint("CENTER")
 
@@ -345,11 +345,11 @@ function Config.CreateTaskControl(spec)
 
     local canHaveCompletionSound = type(row.max) == "number" and row.max > 0 and not row.noMax and not row.currencyId
     if canHaveCompletionSound then
-        local soundBtn = CreateFrame("Button", nil, frame)
+        local soundBtn = ns.AcquireFrame(frame, "soundButton", "Button")
         soundBtn:SetSize(14, 14)
         soundBtn:SetPoint("RIGHT", swatch, "LEFT", -4, 0)
 
-        local icon = soundBtn:CreateTexture(nil, "ARTWORK")
+        local icon = ns.AcquireTexture(soundBtn, "icon", "ARTWORK")
         icon:SetAllPoints()
         icon:SetAtlas("common-icon-sound", true)
         soundBtn:SetScript("OnClick", function()

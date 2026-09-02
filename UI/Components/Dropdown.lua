@@ -142,6 +142,13 @@ function ns.CreateDropdown(parent, opts)
             dismiss:Hide()
         end)
 
+        -- The popup and the click catcher are children of UIParent, so hiding
+        -- the button does not take them with it.
+        button:SetScript("OnHide", function()
+            popup:Hide()
+            dismiss:Hide()
+        end)
+
         button._popup = popup
         button._popupScroll = popupScroll
         button._dismiss = dismiss
@@ -223,6 +230,9 @@ function ns.CreateDropdown(parent, opts)
     function button:Update()
         local options = GetOptions()
         local selectedKey = opts.getSelected and opts.getSelected()
+        -- Cleared first: without this a dropdown whose selection is no longer
+        -- among its options keeps showing the last value that did match.
+        label:SetText("")
         for _, option in ipairs(options) do
             if OptionKey(option) == selectedKey then
                 label:SetText(OptionLabel(option))

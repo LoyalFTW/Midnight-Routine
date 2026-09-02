@@ -30,20 +30,21 @@ local RefreshFonts = Config.RefreshFonts
 local SetWindowLayoutValue = Config.SetWindowLayoutValue
 local RefreshVisualSettings = Config.RefreshVisualSettings
 local ScheduleSettingsGarbageCollect = Config.ScheduleSettingsGarbageCollect
-local ReleaseConfigWidgetTree = Config.ReleaseConfigWidgetTree
 local RestoreFramePos = Config.RestoreFramePos
 
 function MR:PopulateConfigFrame(f)
-    if f.body then
-        ReleaseConfigWidgetTree(f.body)
-        f.body = nil
+    local bodyParent = (f.scroll and f.scroll:GetScrollChild()) or f
+    local body = f.body
+    if not body then
+        body = CreateFrame("Frame", nil, bodyParent)
+        body:SetPoint("TOPLEFT",  bodyParent, "TOPLEFT",  0, 0)
+        body:SetPoint("TOPRIGHT", bodyParent, "TOPRIGHT", 0, 0)
+        f.body = body
     end
 
-    local bodyParent = (f.scroll and f.scroll:GetScrollChild()) or f
-    local body = CreateFrame("Frame", nil, bodyParent)
-    body:SetPoint("TOPLEFT",  bodyParent, "TOPLEFT",  0, 0)
-    body:SetPoint("TOPRIGHT", bodyParent, "TOPRIGHT", 0, 0)
-    f.body = body
+    -- Widgets are reused across passes; anything this pass does not claim is
+    -- hidden by the matching FinishWidgetPool call at the end of the build.
+    local widgetPool = ns.StartWidgetPool(body)
 
     local yOff = f.scroll and -4 or -26
     local cfgFs = GetFontSize()
@@ -71,7 +72,7 @@ function MR:PopulateConfigFrame(f)
     end
     local function Btn(label, onClick, style) yOff = OptionsBtn(body, yOff, label, onClick, math.max(192, contentW), 8, cfgFs, style) end
     local function ChoiceDropdown(label, choices, getVal, setVal, getResetValue)
-        local caption = body:CreateFontString(nil, "OVERLAY")
+        local caption = ns.AcquireFontString(body, "choiceCaption", "OVERLAY")
         caption:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
         caption:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
         caption:SetPoint("TOPRIGHT", body, "TOPRIGHT", -8, yOff)
@@ -82,28 +83,41 @@ function MR:PopulateConfigFrame(f)
 
         yOff = yOff - 14
 
-        local row = CreateFrame("Frame", nil, body)
+        local row = ns.AcquireFrame(body, "choiceRow", "Frame")
         row:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
         row:SetSize(contentW, 26)
 
-        local dropdown = ns.CreateDropdown(row, {
-            width = math.max(170, contentW - 28),
-            height = 20,
-            maxHeight = 20,
-            maxWidth = 420,
-            fontSize = cfgFs,
-            getOptions = function()
-                return choices
-            end,
-            getSelected = getVal,
-            onSelect = function(value, choice)
-                setVal(value, choice)
-            end,
-            dynamicMenuWidth = true,
-            maxVisibleRows = 10,
-            style = "teal",
-        })
+        -- A dropdown reads its options and callbacks out of this table every
+        -- time it is opened, so a reused one is re-pointed at a different
+        -- setting by rewriting the table it was built with.
+        local opts = row._choiceOpts
+        if not opts then
+            opts = {
+                height = 20,
+                maxHeight = 20,
+                maxWidth = 420,
+                dynamicMenuWidth = true,
+                maxVisibleRows = 10,
+                style = "teal",
+            }
+            row._choiceOpts = opts
+        end
+        opts.width = math.max(170, contentW - 28)
+        opts.fontSize = cfgFs
+        opts.getOptions = function()
+            return choices
+        end
+        opts.getSelected = getVal
+        opts.onSelect = function(value, choice)
+            setVal(value, choice)
+        end
+
+        local dropdown = ns.AcquireWidget(row, "choiceDropdown", function()
+            return ns.CreateDropdown(row, opts)
+        end)
+        dropdown:SetWidth(opts.width)
         dropdown:SetPoint("LEFT", row, "LEFT", 0, 0)
+        dropdown:Update()
 
         local resetBtn = ns.CloseButton(row, function()
             local resetValue = getResetValue and getResetValue() or choices[1].value
@@ -121,7 +135,6 @@ function MR:PopulateConfigFrame(f)
         resetBtn:SetSize(20, 20)
         resetBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
 
-        row._mrExternalFrames = { dropdown._popup, dropdown._dismiss }
         yOff = yOff - 34
     end
 
@@ -214,7 +227,7 @@ function MR:PopulateConfigFrame(f)
         local tabFs = math.min(cfgFs, 10)
         local tabY = yOff
         for i, tab in ipairs(tabs) do
-            local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+            local btn = ns.AcquireFrame(body, "pageTab", "Button", "BackdropTemplate")
             btn:SetSize(tabW, 18)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", 8 + (i - 1) * (tabW + 2), tabY)
             btn:SetBackdrop(MakeBackdrop())
@@ -223,7 +236,7 @@ function MR:PopulateConfigFrame(f)
             btn:SetBackdropColor(isActive and 0.11 or 0.05, isActive and 0.24 or 0.09, isActive and 0.23 or 0.15, 1)
             btn:SetBackdropBorderColor(isActive and 0.22 or 0.16, isActive and 0.82 or 0.28, isActive and 0.70 or 0.36, 1)
 
-            local lbl = btn:CreateFontString(nil, "OVERLAY")
+            local lbl = ns.AcquireFontString(btn, "label", "OVERLAY")
             lbl:SetFont(ns.FONT_ROWS, tabFs, GetFontFlags())
             lbl:SetPoint("LEFT", btn, "LEFT", 2, 0)
             lbl:SetPoint("RIGHT", btn, "RIGHT", -2, 0)
@@ -434,7 +447,7 @@ function MR:PopulateConfigFrame(f)
         local modeY = yOff - 4
         local modeBtnW = math.floor((contentW - 2) / 2)
         local function CreateModeButton(label, enabled, x)
-            local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+            local btn = ns.AcquireFrame(body, "layoutModeButton", "Button", "BackdropTemplate")
             btn:SetSize(modeBtnW, 18)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", x, modeY)
             btn:SetBackdrop(MakeBackdrop())
@@ -442,7 +455,7 @@ function MR:PopulateConfigFrame(f)
             btn:SetBackdropColor(active and 0.12 or 0.05, active and 0.30 or 0.09, active and 0.24 or 0.16, 1)
             btn:SetBackdropBorderColor(active and 0.24 or 0.16, active and 0.82 or 0.28, active and 0.70 or 0.36, 1)
 
-            local lbl = btn:CreateFontString(nil, "OVERLAY")
+            local lbl = ns.AcquireFontString(btn, "label", "OVERLAY")
             lbl:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             lbl:SetPoint("CENTER")
             lbl:SetText(label)
@@ -546,7 +559,7 @@ function MR:PopulateConfigFrame(f)
         local headerModeY = yOff - 4
         local headerModeBtnW = math.floor((contentW - 2) / 2)
         local function CreateHeaderModeButton(label, value, x)
-            local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+            local btn = ns.AcquireFrame(body, "headerModeButton", "Button", "BackdropTemplate")
             btn:SetSize(headerModeBtnW, 18)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", x, headerModeY)
             btn:SetBackdrop(MakeBackdrop())
@@ -554,7 +567,7 @@ function MR:PopulateConfigFrame(f)
             btn:SetBackdropColor(active and 0.12 or 0.05, active and 0.30 or 0.09, active and 0.24 or 0.16, 1)
             btn:SetBackdropBorderColor(active and 0.24 or 0.16, active and 0.82 or 0.28, active and 0.70 or 0.36, 1)
 
-            local lbl = btn:CreateFontString(nil, "OVERLAY")
+            local lbl = ns.AcquireFontString(btn, "label", "OVERLAY")
             lbl:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             lbl:SetPoint("CENTER")
             lbl:SetText(label)
@@ -657,14 +670,14 @@ function MR:PopulateConfigFrame(f)
         local presets = { {"S", 9}, {"M", 11}, {"L", 14}, {"XL", 17} }
         local btnW = math.floor((contentW - 6) / #presets)
         for i, p in ipairs(presets) do
-            local pb = CreateFrame("Button", nil, body, "BackdropTemplate")
+            local pb = ns.AcquireFrame(body, "fontPreset", "Button", "BackdropTemplate")
             pb:SetSize(btnW, 16)
             pb:SetPoint("TOPLEFT", body, "TOPLEFT", 8 + (i - 1) * (btnW + 2), yOff - 18)
             pb:SetBackdrop(MakeBackdrop())
             local isActive = (GetFontSize() == p[2])
             pb:SetBackdropColor(isActive and 0.12 or 0.05, isActive and 0.35 or 0.10, isActive and 0.32 or 0.18, 1)
             pb:SetBackdropBorderColor(isActive and 0.25 or 0.18, isActive and 0.85 or 0.40, isActive and 0.70 or 0.45, 1)
-            local pfs = pb:CreateFontString(nil, "OVERLAY")
+            local pfs = ns.AcquireFontString(pb, "label", "OVERLAY")
             pfs:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             pfs:SetPoint("CENTER")
             pfs:SetText(p[1])
@@ -778,7 +791,7 @@ function MR:PopulateConfigFrame(f)
         local tooltipY = yOff - 4
         local tooltipBtnW = math.floor((contentW - ((#tooltipChoices - 1) * 2)) / #tooltipChoices)
         local function CreateTooltipPositionButton(choice, index)
-            local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+            local btn = ns.AcquireFrame(body, "tooltipPositionButton", "Button", "BackdropTemplate")
             btn:SetSize(tooltipBtnW, 18)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", 8 + (index - 1) * (tooltipBtnW + 2), tooltipY)
             btn:SetBackdrop(MakeBackdrop())
@@ -787,7 +800,7 @@ function MR:PopulateConfigFrame(f)
             btn:SetBackdropColor(active and 0.12 or 0.05, active and 0.30 or 0.09, active and 0.24 or 0.16, 1)
             btn:SetBackdropBorderColor(active and 0.24 or 0.16, active and 0.82 or 0.28, active and 0.70 or 0.36, 1)
 
-            local lbl = btn:CreateFontString(nil, "OVERLAY")
+            local lbl = ns.AcquireFontString(btn, "label", "OVERLAY")
             lbl:SetFont(ns.FONT_ROWS, math.min(cfgFs, 10), GetFontFlags())
             lbl:SetPoint("LEFT", btn, "LEFT", 2, 0)
             lbl:SetPoint("RIGHT", btn, "RIGHT", -2, 0)
@@ -847,7 +860,7 @@ function MR:PopulateConfigFrame(f)
 
     if activePage == "support" then
         local function CopyableLinkRow(label, url, accentHex)
-            local capLabel = body:CreateFontString(nil, "OVERLAY")
+            local capLabel = ns.AcquireFontString(body, "linkCaption", "OVERLAY")
             capLabel:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             capLabel:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
             capLabel:SetPoint("TOPRIGHT", body, "TOPRIGHT", -8, yOff)
@@ -857,7 +870,7 @@ function MR:PopulateConfigFrame(f)
 
             yOff = yOff - 14
 
-            local boxBg = CreateFrame("Frame", nil, body, "BackdropTemplate")
+            local boxBg = ns.AcquireFrame(body, "linkBox", "Frame", "BackdropTemplate")
             boxBg:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
             boxBg:SetSize(math.max(192, contentW), 20)
             boxBg:SetBackdrop(MakeBackdrop())
@@ -865,7 +878,7 @@ function MR:PopulateConfigFrame(f)
             boxBg:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
             boxBg:EnableMouse(true)
 
-            local eb = CreateFrame("EditBox", nil, boxBg)
+            local eb = ns.AcquireFrame(boxBg, "editBox", "EditBox")
             eb:SetAutoFocus(false)
             eb:SetPoint("TOPLEFT", boxBg, "TOPLEFT", 6, -3)
             eb:SetPoint("BOTTOMRIGHT", boxBg, "BOTTOMRIGHT", -6, 3)
@@ -922,16 +935,16 @@ function MR:PopulateConfigFrame(f)
         }
 
         for _, t in ipairs(translators) do
-            local row = CreateFrame("Frame", nil, body)
+            local row = ns.AcquireFrame(body, "translatorRow", "Frame")
             row:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
             row:SetSize(contentW, 16)
 
-            local dot = row:CreateTexture(nil, "ARTWORK")
+            local dot = ns.AcquireTexture(row, "dot", "ARTWORK")
             dot:SetSize(5, 5)
             dot:SetPoint("LEFT", row, "LEFT", 0, 0)
             dot:SetColorTexture(0.20, 0.66, 0.63, 0.9)
 
-            local rowFs = row:CreateFontString(nil, "OVERLAY")
+            local rowFs = ns.AcquireFontString(row, "label", "OVERLAY")
             rowFs:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             rowFs:SetPoint("LEFT", row, "LEFT", 10, 0)
             rowFs:SetPoint("RIGHT", row, "RIGHT", 0, 0)
@@ -943,7 +956,7 @@ function MR:PopulateConfigFrame(f)
         end
 
         Gap(6)
-        local wanted = body:CreateFontString(nil, "OVERLAY")
+        local wanted = ns.AcquireFontString(body, "translatorsWanted", "OVERLAY")
         wanted:SetFont(ns.FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
         wanted:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
         wanted:SetPoint("TOPRIGHT", body, "TOPRIGHT", -8, yOff)
@@ -998,6 +1011,8 @@ function MR:PopulateConfigFrame(f)
     end
 
     Gap(8)
+    ns.FinishWidgetPool(widgetPool)
+
     local totalH = math.abs(yOff) + 8
     local maxBodyH = math.max(220, math.min(PANEL_MAX_HEIGHT - 22, (UIParent:GetHeight() or 768) - 120))
     body:SetHeight(totalH)
