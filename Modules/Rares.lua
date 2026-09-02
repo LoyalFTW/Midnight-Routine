@@ -712,20 +712,30 @@ local RefreshRaresFrame
 local LayoutRaresFrame
 local PopulateRaresConfig
 
+-- Only the shimmer has to animate every frame; cursor and shift polling run at 10Hz.
+local RARES_POLL_INTERVAL = 0.1
+
 local function ApplyRaresFrameUpdater(frame)
     if not frame then return end
 
+    frame.raresPollElapsed = 0
     frame:SetScript("OnUpdate", function(self, dt)
-        if self.UpdatePanelHeaderVisibility then
-            self:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(self))
-        end
+        dt = dt or 0
 
         if MR.db and MR.db.profile and MR.db.profile.raresShimmer then
-            self.shimmerElapsed = (self.shimmerElapsed or 0) + (dt or 0)
+            self.shimmerElapsed = (self.shimmerElapsed or 0) + dt
             local pulse = 0.06 + 0.04 * math.sin(self.shimmerElapsed * 2)
             for _, tex in ipairs(self.shimmerTextures or {}) do
                 tex:SetAlpha(pulse)
             end
+        end
+
+        self.raresPollElapsed = (self.raresPollElapsed or 0) + dt
+        if self.raresPollElapsed < RARES_POLL_INTERVAL then return end
+        self.raresPollElapsed = 0
+
+        if self.UpdatePanelHeaderVisibility then
+            self:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(self))
         end
 
         if hoveredWarbandHit then
@@ -736,7 +746,6 @@ local function ApplyRaresFrameUpdater(frame)
                 if onEnter then onEnter(hoveredWarbandHit) end
             end
         end
-
     end)
 end
 
