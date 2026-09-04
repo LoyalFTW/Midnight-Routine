@@ -1,6 +1,6 @@
 ## Interface: 120007, 120100
 ## Title: |cff2ae7c6Routine
-## Notes: Auto-tracking quest log style todo list for Midnight
+## Notes: Auto-tracking quest log style todo list, with custom tasks.
 ## Notes-zhCN: 自动追踪至暗之夜任务进度及其他待办日志
 ## Author: Azro
 ## Version: @project-version@
