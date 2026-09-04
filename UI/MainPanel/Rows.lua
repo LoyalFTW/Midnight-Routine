@@ -1222,7 +1222,10 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         or (row.itemId ~= nil)
     local hasWaypoint = row.zone and row.x and row.y
     local hasNavigation = hasWaypoint
-    if not hasNavigation and MR.GetRowWaypointTarget then
+    local previousData = rowFrame._mrData
+    if self._dragger and self._dragger._dragging and previousData and previousData.row == row then
+        hasNavigation = previousData.hasNavigation
+    elseif not hasNavigation and MR.GetRowWaypointTarget then
         hasNavigation = MR:GetRowWaypointTarget(row, false) ~= nil
     end
     local isComplete = self:IsRowComplete(mod, row, done)

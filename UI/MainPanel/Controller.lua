@@ -995,20 +995,21 @@ function MR:BuildUI()
         local dy = dragStartY - cy
         local newW = math.max(PANEL_MIN_WIDTH, math.min(PANEL_MAX_WIDTH, dragStartW + dx))
         local newH = math.max(PANEL_MIN_HEIGHT, math.min(PANEL_MAX_HEIGHT, dragStartH + dy))
-        f:SetWidth(newW)
-        f:SetHeight(newH)
+        newW = math.floor(newW)
+        newH = math.floor(newH)
+        if f:GetWidth() ~= newW then f:SetWidth(newW) end
+        if f:GetHeight() ~= newH then f:SetHeight(newH) end
         resizeLayoutElapsed = resizeLayoutElapsed + (elapsed or 0)
-        if resizeLayoutElapsed >= 0.04 then
+        if resizeLayoutElapsed >= 0.1
+            and (MR.db.profile.width ~= newW or MR.db.profile.height ~= newH) then
             resizeLayoutElapsed = 0
-            MR.db.profile.width = math.floor(newW)
-            MR.db.profile.height = math.floor(newH)
+            MR.db.profile.width = newW
+            MR.db.profile.height = newH
             if MR.RefreshMainPanelSectionsOnly then
-                MR:RefreshMainPanelSectionsOnly()
+                MR:RefreshMainPanelSectionsOnly(true)
             elseif MR.UpdateScrollBar then
                 MR.UpdateScrollBar()
             end
-        elseif MR.UpdateScrollBar then
-            MR.UpdateScrollBar()
         end
     end
     dragger:SetScript("OnMouseDown", function(_, button)
@@ -1029,6 +1030,7 @@ function MR:BuildUI()
             FinishMainFrameResize()
         end
     end)
+    dragger:SetScript("OnHide", FinishMainFrameResize)
     self._dragger = dragger
 
     self._timerRows = {}
@@ -1113,6 +1115,11 @@ function MR:RefreshUI()
         self:NoteRefreshSource("RefreshUI")
     end
     self._refreshUIAttemptCount = (self._refreshUIAttemptCount or 0) + 1
+
+    if self._dragger and self._dragger._dragging then
+        self._refreshUIDirty = true
+        return
+    end
 
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self._refreshUIDirty = true

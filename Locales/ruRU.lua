@@ -3,6 +3,7 @@ if not L then return end
 -- Translator ZamestoTV
 -- Core / Chat
 L["Weekly_Reset"] = "|cff2ae7c6MidnightRoutine:|r Еженедельный сброс выполнен."
+L["Scan_Failed"] = "|cff2ae7c6MidnightRoutine:|r Scan step '%s' failed and was skipped: %s"
 L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r Панель закреплена."
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r Панель откреплена."
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r Иконка у миникарты скрыта."

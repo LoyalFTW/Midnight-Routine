@@ -1026,12 +1026,14 @@ MR:RegisterModule({
         end
 
         for key, value in pairs(db[mod.key]) do
-            if beforeProgress[key] ~= value then
+            local previous = beforeProgress[key]
+            if previous ~= value and not (previous == nil and value == 0) then
                 return true
             end
         end
         for key in pairs(beforeProgress) do
-            if db[mod.key][key] ~= beforeProgress[key] then
+            local value = db[mod.key][key]
+            if value ~= beforeProgress[key] and not (value == nil and beforeProgress[key] == 0) then
                 return true
             end
         end

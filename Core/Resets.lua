@@ -15,18 +15,11 @@ local function GetResetTimestampFromCountdown(secondsUntilReset, cycleSeconds)
         return nil
     end
 
-    local maxExpected = cycleSeconds + (2 * 60 * 60)
-    if secondsUntilReset > maxExpected then
+    if secondsUntilReset > cycleSeconds then
         return nil
     end
 
-    local now = GetServerTime()
-    local resetAt = now + secondsUntilReset - cycleSeconds
-    if resetAt > now then
-        return nil
-    end
-
-    return resetAt
+    return GetServerTime() + secondsUntilReset - cycleSeconds
 end
 
 function MR:GetLastDailyTimestamp()
@@ -115,10 +108,18 @@ function MR:CheckWeeklyReset()
     end
 end
 
-function MR:DoWeeklyReset()
+function MR:DoWeeklyReset(manual)
+    if manual then
+        self._manualWeeklyResetPending = true
+    end
     if self:ShouldDeferForCombat("weeklyReset") then
         return
     end
+
+    local prevResetAt = self.db.char.lastResetAt
+    local firstRun = not prevResetAt or prevResetAt == 0
+    local announceReset = not firstRun or self._manualWeeklyResetPending
+    self._manualWeeklyResetPending = nil
 
     local ts = self:GetLastResetTimestamp()
     if ts then self.db.char.lastResetAt = ts end
@@ -139,6 +140,7 @@ function MR:DoWeeklyReset()
     self.db.char.raresKills = {}
     self:RefreshUI()
     self:RequestScan(20)
-    print(L["Weekly_Reset"] or "|cff2ae7c6MidnightRoutine:|r Weekly reset applied.")
+    if announceReset then
+        print(L["Weekly_Reset"] or "|cff2ae7c6MidnightRoutine:|r Weekly reset applied.")
+    end
 end
-

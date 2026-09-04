@@ -413,6 +413,9 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
 end
 
 function MR:RefreshMainPanelViewport()
+    if self._dragger and self._dragger._dragging then
+        return false
+    end
     if self._mainViewportRefreshInProgress or self._refreshUIInProgress then
         return false
     end
@@ -524,7 +527,7 @@ local function ClearArrayContents(t)
     end
 end
 
-function MR:RefreshMainPanelSectionsOnly()
+function MR:RefreshMainPanelSectionsOnly(reuseStats)
     if not (self and self.frame and self.content and self.frame:IsShown()) then
         return false
     end
@@ -542,7 +545,9 @@ function MR:RefreshMainPanelSectionsOnly()
     RecalcLayout()
     self._mainMaterializedTop = nil
     self._mainMaterializedBottom = nil
-    self._moduleStatsCache = BuildModuleStatsCache(self)
+    if not reuseStats or not self._moduleStatsCache then
+        self._moduleStatsCache = BuildModuleStatsCache(self)
+    end
 
     self.widgets = self.widgets or {}
     self.sectionRegistry = self.sectionRegistry or {}

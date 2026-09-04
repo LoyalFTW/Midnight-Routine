@@ -24,27 +24,41 @@ function MR:RegisterEvent(event, callback)
         error(("MidnightRoutine:RegisterEvent(%s) missing callback"):format(tostring(event)), 2)
     end
 
-    if self._eventController:IsRegistered(event) then
-        self._eventController:Unregister(event)
+    self._eventHandlers = self._eventHandlers or {}
+
+    local handlers = self._eventHandlers[event]
+    if handlers then
+        handlers[#handlers + 1] = { fn = fn, bindSelf = bindSelf }
+        return
     end
+
+    handlers = { { fn = fn, bindSelf = bindSelf } }
+    self._eventHandlers[event] = handlers
 
     self._eventController:Register(event, function(firedEvent, ...)
         if self._trackIdleWork and self.NoteIdleWork then
             self:NoteIdleWork("event:" .. tostring(firedEvent))
         end
-        if bindSelf then
-            fn(self, firedEvent, ...)
-        else
-            fn(firedEvent, ...)
+        for i = 1, #handlers do
+            local entry = handlers[i]
+            if entry.bindSelf then
+                xpcall(entry.fn, CallErrorHandler, self, firedEvent, ...)
+            else
+                xpcall(entry.fn, CallErrorHandler, firedEvent, ...)
+            end
         end
     end)
 end
 
 function MR:UnregisterEvent(event)
+    if self._eventHandlers then
+        self._eventHandlers[event] = nil
+    end
     self._eventController:Unregister(event)
 end
 
 function MR:UnregisterAllEvents()
+    self._eventHandlers = nil
     self._eventController:UnregisterAll()
 end
 

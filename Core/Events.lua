@@ -93,7 +93,6 @@ function MR:OnEnteringWorld()
         self._renownUpdateBucketHandle = self:RegisterBucketEvent({
             "MAJOR_FACTION_RENOWN_LEVEL_CHANGED",
             "UPDATE_FACTION",
-            "COMBAT_TEXT_UPDATE",
         }, 1, "OnRenownUpdate")
     end
     if not shouldHideFrames and not temporarilyHidden and not self:IsManagedWindowsBundleHidden() then
@@ -467,4 +466,3 @@ managedWindowRestoreFrame:SetScript("OnEvent", function(self)
         end
     end)
 end)
-

@@ -4,6 +4,7 @@ if not L then return end
 
 -- Core / Chat
 L["Weekly_Reset"] = "|cff2ae7c6MidnightRoutine:|r 每週重置已套用。"
+L["Scan_Failed"] = "|cff2ae7c6MidnightRoutine:|r Scan step '%s' failed and was skipped: %s"
 L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r 框架已鎖定。"
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r 框架已解鎖。"
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r 小地圖圖示已隱藏。"

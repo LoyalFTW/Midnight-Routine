@@ -3,6 +3,7 @@ if not L then return end
 
 -- Core / Chat
 L["Weekly_Reset"] = "|cff2ae7c6MidnightRoutine:|r Wöchentlicher Reset angewendet."
+L["Scan_Failed"] = "|cff2ae7c6MidnightRoutine:|r Scan step '%s' failed and was skipped: %s"
 L["Frame_Locked"] = "|cff2ae7c6MidnightRoutine:|r Fenster gesperrt."
 L["Frame_Unlocked"] = "|cff2ae7c6MidnightRoutine:|r Fenster entsperrt."
 L["Minimap_Hidden"] = "|cff2ae7c6MidnightRoutine:|r Minimap-Symbol ausgeblendet."

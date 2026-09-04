@@ -738,7 +738,7 @@ end
 
 function ns.OptionsDivider(body, yOff, pad)
     pad = pad or 8
-    local frame = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    local frame = ns.AcquireFrame(body, "optDivider", "Frame", "BackdropTemplate")
     frame:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
     frame:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad, yOff)
     frame:SetHeight(1)
@@ -749,7 +749,7 @@ end
 
 function ns.OptionsSectionLabel(body, yOff, text, pad, fontSize)
     pad = pad or 8
-    local frame = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    local frame = ns.AcquireFrame(body, "optSectionLabel", "Frame", "BackdropTemplate")
     frame:SetPoint("TOPLEFT", body, "TOPLEFT", pad - 2, yOff)
     frame:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad + 2, yOff)
     frame:SetHeight(17)
@@ -757,7 +757,7 @@ function ns.OptionsSectionLabel(body, yOff, text, pad, fontSize)
     frame:SetBackdropColor(0.025, 0.12, 0.15, 0.92)
     frame:SetBackdropBorderColor(0.12, 0.42, 0.44, 0.58)
 
-    local fs = frame:CreateFontString(nil, "OVERLAY")
+    local fs = ns.AcquireFontString(frame, "text", "OVERLAY")
     fs:SetFont(ns.FONT_HEADERS or ns.FONT_ROWS, math.max(fontSize or 9, 10), ns.GetFontFlags())
     fs:SetText(text)
     fs:SetTextColor(0.46, 0.92, 0.84)
@@ -770,7 +770,7 @@ end
 
 function ns.OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, pad, onRefresh, fontSize)
     pad = pad or 8
-    local frame = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+    local frame = ns.AcquireFrame(body, "optCheckbox", "CheckButton", "UICheckButtonTemplate")
     frame:SetSize(20, 20)
     frame:SetPoint("TOPLEFT", body, "TOPLEFT", pad - 2, yOff)
     frame:SetChecked(getVal())
@@ -782,7 +782,7 @@ function ns.OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, pad, onR
         end
     end)
 
-    local lbl = frame:CreateFontString(nil, "OVERLAY")
+    local lbl = ns.AcquireFontString(frame, "label", "OVERLAY")
     lbl:SetFont(ns.FONT_ROWS, fontSize or 10, ns.GetFontFlags())
     lbl:SetText(label)
     lbl:SetTextColor(r or 0.88, g or 0.88, b or 0.88)
@@ -799,14 +799,14 @@ function ns.OptionsBtn(body, yOff, label, onClick, width, pad, fontSize, style)
     local primary = style == "primary"
     local height = primary and 24 or 20
 
-    local btn = CreateFrame("Button", nil, body, "BackdropTemplate")
+    local btn = ns.AcquireFrame(body, "optBtn", "Button", "BackdropTemplate")
     btn:SetSize(width, height)
     btn:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
     btn:SetBackdrop(ns.MakeBackdrop())
     btn:SetBackdropColor(primary and 0.04 or 0.05, primary and 0.25 or 0.10, primary and 0.28 or 0.18, 1)
     btn:SetBackdropBorderColor(primary and 0.20 or 0.18, primary and 0.82 or 0.40, primary and 0.72 or 0.45, 1)
 
-    local fs = btn:CreateFontString(nil, "OVERLAY")
+    local fs = ns.AcquireFontString(btn, "label", "OVERLAY")
     fs:SetFont(primary and (ns.FONT_HEADERS or ns.FONT_ROWS) or ns.FONT_ROWS, fontSize or 10, ns.GetFontFlags())
     fs:SetPoint("LEFT", btn, "LEFT", 6, 0)
     fs:SetWidth(width - 12)
@@ -840,7 +840,7 @@ function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fil
         fillB = fillB or 0.10
     end
 
-    local lbl = body:CreateFontString(nil, "OVERLAY")
+    local lbl = ns.AcquireFontString(body, "optSliderLabel", "OVERLAY")
     lbl:SetFont(ns.FONT_ROWS, fontSize or 9, ns.GetFontFlags())
     lbl:SetText("|cff" .. (disabled and "555555" or "888888") .. label .. "|r")
     lbl:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
@@ -860,26 +860,26 @@ function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fil
     local valueBoxW = 44
     local sliderW = math.max(96, bodyWidth - (pad * 2) - valueBoxW - 4)
 
-    local bg = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    local bg = ns.AcquireFrame(body, "optSliderTrack", "Frame", "BackdropTemplate")
     bg:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
     bg:SetSize(sliderW, 14)
     bg:SetBackdrop(ns.MakeBackdrop())
     bg:SetBackdropColor(0, 0, 0, disabled and 0.25 or 0.5)
     bg:SetBackdropBorderColor(0.25, 0.25, 0.3, disabled and 0.4 or 1)
 
-    local fill = bg:CreateTexture(nil, "ARTWORK")
+    local fill = ns.AcquireTexture(bg, "fill", "ARTWORK")
     fill:SetPoint("LEFT", bg, "LEFT", 2, 0)
     fill:SetHeight(10)
     fill:SetColorTexture(fillR, fillG, fillB, disabled and 0.4 or 0.85)
 
-    local valBox = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    local valBox = ns.AcquireFrame(body, "optSliderValueBox", "Frame", "BackdropTemplate")
     valBox:SetPoint("LEFT", bg, "RIGHT", 4, 0)
     valBox:SetSize(valueBoxW, 14)
     valBox:SetBackdrop(ns.MakeBackdrop())
     valBox:SetBackdropColor(0, 0, 0, disabled and 0.25 or 0.5)
     valBox:SetBackdropBorderColor(0.25, 0.25, 0.3, disabled and 0.4 or 1)
 
-    local valTxt = valBox:CreateFontString(nil, "OVERLAY")
+    local valTxt = ns.AcquireFontString(valBox, "text", "OVERLAY")
     valTxt:SetFont(ns.FONT_ROWS, fontSize or 9, ns.GetFontFlags())
     valTxt:SetPoint("CENTER", valBox, "CENTER", 0, 0)
     valTxt:SetTextColor(disabled and 0.4 or 1, disabled and 0.4 or 1, disabled and 0.4 or 1)
@@ -890,7 +890,9 @@ function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fil
         valTxt:SetText(string.format("%.2f", value):gsub("%.?0+$", ""))
     end
 
-    local slider = CreateFrame("Slider", nil, bg)
+    local slider = ns.AcquireFrame(bg, "slider", "Slider")
+    slider:SetScript("OnValueChanged", nil)
+    slider:SetScript("OnMouseUp", nil)
     slider:SetAllPoints(bg)
     slider:SetMinMaxValues(min, max)
     slider:SetValueStep(step)
@@ -906,9 +908,8 @@ function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fil
     slider:SetValue(getVal())
     UpdateVis(getVal())
 
-    if disabled then
-        slider:EnableMouse(false)
-    else
+    slider:EnableMouse(not disabled)
+    if not disabled then
         slider:SetScript("OnValueChanged", function(self, value)
             UpdateVis(value)
         end)
@@ -921,7 +922,7 @@ function ns.OptionsSlider(body, yOff, label, min, max, step, getVal, setVal, fil
 end
 
 function ns.OptionsColorSwatch(parent, r, g, b, onPick, onReset, tooltip)
-    local swatch = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local swatch = ns.AcquireFrame(parent, "colorSwatch", "Button", "BackdropTemplate")
     swatch:SetSize(16, 16)
     swatch:SetBackdrop({
         bgFile = ResolveDefaultBackground(),
@@ -931,7 +932,7 @@ function ns.OptionsColorSwatch(parent, r, g, b, onPick, onReset, tooltip)
     swatch:SetBackdropColor(0.02, 0.02, 0.02, 1)
     swatch:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
-    local fill = swatch:CreateTexture(nil, "ARTWORK")
+    local fill = ns.AcquireTexture(swatch, "fill", "ARTWORK")
     fill:SetPoint("TOPLEFT", swatch, "TOPLEFT", 2, -2)
     fill:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", -2, 2)
     fill:SetColorTexture(r, g, b, 1)

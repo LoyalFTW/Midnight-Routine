@@ -381,6 +381,9 @@ SLASH_MIDROUTE1 = "/routine"
 SLASH_MIDROUTE2 = "/mr"
 SlashCmdList["MIDROUTE"] = function(msg)
     msg = (msg or ""):lower():trim()
+    local auditDuration = msg:match("^mem sources (%d+)$")
+        or msg:match("^memory sources (%d+)$")
+        or msg:match("^mem debug (%d+)$")
     local function ApplyMainScale(value)
         if MR.db.profile.syncWindowScale and MR.ApplyScaleToAll then
             MR:ApplyScaleToAll(value)
@@ -391,7 +394,7 @@ SlashCmdList["MIDROUTE"] = function(msg)
     end
 
     if msg == "reset" then
-        MR:DoWeeklyReset()
+        MR:DoWeeklyReset(true)
     elseif msg == "lock" then
         MR.db.profile.locked = true
         if MR.frame then MR.frame:SetMovable(false) end
@@ -441,8 +444,8 @@ SlashCmdList["MIDROUTE"] = function(msg)
     elseif msg == "mem" or msg == "memory" then MR:PrintMemoryReport()
     elseif msg == "mem modules" or msg == "memory modules" then
         MR:PrintMemoryReport("modules")
-    elseif msg == "mem sources" or msg == "memory sources" or msg == "mem debug" then
-        MR:StartMemoryIdleAudit(15)
+    elseif auditDuration or msg == "mem sources" or msg == "memory sources" or msg == "mem debug" then
+        MR:StartMemoryIdleAudit(auditDuration or 15)
     elseif msg == "mem clear" or msg == "memory clear" then
         MR._refreshSourceCounts = nil
         MR._trackRefreshSources = nil

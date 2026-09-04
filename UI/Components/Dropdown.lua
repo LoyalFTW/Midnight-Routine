@@ -142,6 +142,11 @@ function ns.CreateDropdown(parent, opts)
             dismiss:Hide()
         end)
 
+        button:SetScript("OnHide", function()
+            popup:Hide()
+            dismiss:Hide()
+        end)
+
         button._popup = popup
         button._popupScroll = popupScroll
         button._dismiss = dismiss
@@ -223,6 +228,7 @@ function ns.CreateDropdown(parent, opts)
     function button:Update()
         local options = GetOptions()
         local selectedKey = opts.getSelected and opts.getSelected()
+        label:SetText("")
         for _, option in ipairs(options) do
             if OptionKey(option) == selectedKey then
                 label:SetText(OptionLabel(option))

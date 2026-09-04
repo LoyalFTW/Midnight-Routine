@@ -130,37 +130,6 @@ local function ScheduleSettingsGarbageCollect()
     end, 0.75)
 end
 
-local function ReleaseConfigWidgetTree(frame)
-    if not frame then
-        return
-    end
-
-    if frame._mrExternalFrames then
-        for _, external in ipairs(frame._mrExternalFrames) do
-            ReleaseConfigWidgetTree(external)
-        end
-        frame._mrExternalFrames = nil
-    end
-
-    local children = { frame:GetChildren() }
-    for _, child in ipairs(children) do
-        ReleaseConfigWidgetTree(child)
-    end
-
-    if frame.GetObjectType and frame:GetObjectType() == "Button" then
-        frame:SetScript("OnClick", nil)
-        frame:SetScript("OnEnter", nil)
-        frame:SetScript("OnLeave", nil)
-        frame:SetScript("OnMouseDown", nil)
-        frame:SetScript("OnMouseUp", nil)
-    end
-
-    frame:SetScript("OnUpdate", nil)
-    frame:EnableMouse(false)
-    frame:Hide()
-    frame:SetParent(nil)
-end
-
 function MR:GetConfigFrame()
     return cfgFrame
 end
@@ -434,7 +403,6 @@ ns.ConfigInternal = {
     SetWindowLayoutValue = SetWindowLayoutValue,
     RefreshVisualSettings = RefreshVisualSettings,
     ScheduleSettingsGarbageCollect = ScheduleSettingsGarbageCollect,
-    ReleaseConfigWidgetTree = ReleaseConfigWidgetTree,
     RestoreFramePos = RestoreFramePos,
 }
 

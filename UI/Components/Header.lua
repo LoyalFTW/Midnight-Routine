@@ -38,14 +38,14 @@ function ns.TitleBar(parent, height)
 end
 
 function ns.CloseButton(parent, onClose)
-    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    local button = ns.AcquireFrame(parent, "closeFrame1", "Button", "BackdropTemplate")
     button:SetSize(16, 16)
     button:SetPoint("RIGHT", parent, "RIGHT", -6, 0)
     button:SetBackdrop(ns.MakeBackdrop())
     button:SetBackdropColor(0.12, 0.04, 0.04, 1)
     button:SetBackdropBorderColor(0.45, 0.12, 0.12, 1)
 
-    local label = button:CreateFontString(nil, "OVERLAY")
+    local label = ns.AcquireFontString(button, "closeText2", "OVERLAY")
     label:SetFont(ns.FONT_HEADERS, 11, ns.GetFontFlags())
     label:SetPoint("CENTER", button, "CENTER", 0, 1)
     label:SetText("x")
