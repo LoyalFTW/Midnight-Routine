@@ -3,15 +3,6 @@ local MR = ns.MR
 
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
-local MIDNIGHT_MAP_IDS = {
-    [2393] = true,
-    [2395] = true,
-    [2405] = true,
-    [2413] = true,
-    [2437] = true,
-    [2576] = true,
-}
-
 local WORLD_BOSS_ROTATION = {
     { key = "luashal",    label = L["WB_Luashal_Label"],    note = L["WB_Luashal_Note"],    zone = 2395, match = "luashal", questId = 92560 },
     { key = "cragpine",   label = L["WB_Cragpine_Label"],   note = L["WB_Cragpine_Note"],   zone = 2437, match = "cragpine", questId = 92123 },
@@ -81,23 +72,6 @@ local function GetWorldBossKillStatus(bossKey)
     end
 
     return "week"
-end
-
-local function IsInMidnightMap()
-    local current = C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
-    if not current then return false end
-
-    local checked = 0
-    while current and checked < 10 do
-        if MIDNIGHT_MAP_IDS[current] then
-            return true
-        end
-        local info = C_Map.GetMapInfo(current)
-        current = info and info.parentMapID
-        checked = checked + 1
-    end
-
-    return false
 end
 
 local function FindWorldBossQuestID(mapID, matchText, bossKey)

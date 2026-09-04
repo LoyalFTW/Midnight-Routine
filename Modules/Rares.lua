@@ -756,35 +756,6 @@ local function GetVisibleZones()
     return result
 end
 
-local function ContentHeight(visible, W)
-    local db    = MR.db and MR.db.profile or {}
-    local ROW_H = GetRowH()
-    local cols  = (W >= 220) and COLS or 1
-    local h     = 0
-    local singleZone = #visible == 1
-    for _, zone in ipairs(visible) do
-        if not singleZone then
-            h = h + ZONE_HDR_H + BAR_H
-        else
-            h = h + BAR_H
-        end
-        if not collapsed[zone.key] then
-            local count = 0
-            for _, rare in ipairs(zone.rares) do
-                local questId  = rare[2]
-                local flagged  = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
-                local killStat = GetRareTrackedKillStatus(rare) or (flagged and "today") or nil
-                if not (db.raresHideKilled and killStat == "today") then count = count + 1 end
-            end
-            if count > 0 then
-                h = h + math.ceil(count / cols) * ROW_H + 10
-            end
-        end
-        h = h + 4
-    end
-    return h
-end
-
 local function GetRaresLayoutKey()
     local db = MR.db and MR.db.profile or {}
     local parts = { IsManagedHeaderBottom() and "bottom" or "top" }

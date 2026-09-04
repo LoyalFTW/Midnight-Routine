@@ -39,6 +39,18 @@ function MR:PopulateConfigFrame(f)
         f.body = nil
     end
 
+    local activePage = MR._cfgPage or "windows"
+    if activePage ~= "windows" and activePage ~= "layout" and activePage ~= "modules" and activePage ~= "reset" and activePage ~= "support" then
+        activePage = "windows"
+        MR._cfgPage = activePage
+    end
+
+    local configWidth = activePage == "modules" and 384 or 344
+    f:SetWidth(configWidth)
+    if f.scroll and f.scroll:GetScrollChild() then
+        f.scroll:GetScrollChild():SetWidth(configWidth)
+    end
+
     local bodyParent = (f.scroll and f.scroll:GetScrollChild()) or f
     local body = CreateFrame("Frame", nil, bodyParent)
     body:SetPoint("TOPLEFT",  bodyParent, "TOPLEFT",  0, 0)
@@ -50,16 +62,10 @@ function MR:PopulateConfigFrame(f)
     local moduleHeaderFs = math.max(FONT_SIZE_MIN, cfgFs - 1)
     local moduleRowFs = math.max(FONT_SIZE_MIN, cfgFs - 2)
     local moduleSubFs = math.max(FONT_SIZE_MIN, cfgFs - 3)
-    local moduleHeaderH = math.max(22, moduleHeaderFs + 12)
-    local moduleRowH = math.max(18, moduleRowFs + 9)
+    local moduleHeaderH = math.max(activePage == "modules" and 26 or 22, moduleHeaderFs + 14)
+    local moduleRowH = math.max(activePage == "modules" and 21 or 18, moduleRowFs + 10)
     local moduleCompactH = math.max(16, moduleSubFs + 8)
     local contentW = (f:GetWidth() or 344) - 16
-    local activePage = MR._cfgPage or "windows"
-
-    if activePage ~= "windows" and activePage ~= "layout" and activePage ~= "modules" and activePage ~= "reset" and activePage ~= "support" then
-        activePage = "windows"
-        MR._cfgPage = activePage
-    end
 
     local function Gap(h)          yOff = OptionsGap(body, yOff, h) end
     local function Divider()       yOff = OptionsDivider(body, yOff, 4) end
@@ -967,26 +973,18 @@ function MR:PopulateConfigFrame(f)
             MR:PopulateConfigFrame(f)
         end)
         Btn(L["Config_ResetOrder"], function()
-            local expansionKey = MR:GetSelectedExpansionKey()
             if MR:IsCharacterWindowLayoutEnabled() then
                 MR.db.char.moduleOrder = {}
-                MR.db.char.professionKnowledgePosition = nil
-                if MR.db.char.expansionModuleOrder then
-                    MR.db.char.expansionModuleOrder[expansionKey] = {}
-                end
+                MR.db.char.expansionModuleOrder = {}
             else
                 MR.db.profile.moduleOrder = {}
-                MR.db.profile.professionKnowledgePosition = nil
-                if MR.db.profile.expansionModuleOrder then
-                    MR.db.profile.expansionModuleOrder[expansionKey] = {}
-                end
+                MR.db.profile.expansionModuleOrder = {}
             end
-            local storage = MR:GetActiveModuleStorage(expansionKey)
-            if storage then
-                for _, state in pairs(storage) do
-                    if type(state) == "table" then
-                        state.rowOrder = nil
-                    end
+            for _, mod in ipairs(MR.modules or {}) do
+                local storage = MR:GetActiveModuleStorage(MR:GetModuleExpansionKey(mod))
+                local state = storage and storage[mod.key]
+                if type(state) == "table" then
+                    state.rowOrder = nil
                 end
             end
             MR._orderedModulesCache = nil

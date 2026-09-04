@@ -364,38 +364,6 @@ local function GetExpansionDisplayInfo(forAltBoard)
     return MR:GetExpansionInfo(key)
 end
 
-ns.GetExpansionDisplayInfo = GetExpansionDisplayInfo
-
-local function GetExpansionDisplayLabel(forAltBoard)
-    local info = GetExpansionDisplayInfo(forAltBoard)
-    return info and (info.shortLabel or info.label or info.key) or "Midnight"
-end
-
-local function CycleExpansion(forAltBoard, direction)
-    local expansions = MR:GetSelectableExpansions()
-    if #expansions <= 1 then
-        return
-    end
-
-    local currentKey = MR:GetSelectedExpansionKey(forAltBoard)
-    local currentIndex = 1
-    for idx, info in ipairs(expansions) do
-        if info.key == currentKey then
-            currentIndex = idx
-            break
-        end
-    end
-
-    local nextIndex = currentIndex + (direction or 1)
-    if nextIndex < 1 then
-        nextIndex = #expansions
-    elseif nextIndex > #expansions then
-        nextIndex = 1
-    end
-
-    MR:SetSelectedExpansionKey(expansions[nextIndex].key, forAltBoard)
-end
-
 local function BuildExpansionDropdown(parent, forAltBoard, opts)
     opts = opts or {}
     return ns.CreateDropdown(parent, {
@@ -1323,8 +1291,6 @@ local Warband = {
     WBMarkDragTarget = WBMarkDragTarget,
     WBUpdateDragTargetFromCursor = WBUpdateDragTargetFromCursor,
     GetExpansionDisplayInfo = GetExpansionDisplayInfo,
-    GetExpansionDisplayLabel = GetExpansionDisplayLabel,
-    CycleExpansion = CycleExpansion,
     BuildExpansionDropdown = BuildExpansionDropdown,
     WBConcentrationText = WBConcentrationText,
     WBConcentrationCurrent = WBConcentrationCurrent,

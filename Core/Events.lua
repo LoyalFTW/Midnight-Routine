@@ -1,20 +1,16 @@
-local addonName, ns = ...
+local _, ns = ...
 local MR = ns.MR
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
 local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
-local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 local SCAN_S1 = { "s1_weekly" }
 local SCAN_S1_PVP = { "s1_weekly", "pvp_weeklies" }
 local SCAN_DELVES = { "delves" }
 local SCAN_VAULT_DELVES = { "great_vault", "delves" }
 local SCAN_ENCOUNTER = { "great_vault", "delves", "world_bosses", "s1_weekly" }
 local SCAN_BOSS = { "world_bosses", "great_vault", "s1_weekly" }
-
-local TURN_IN_COMPLETIONS = assert(Core.turnInCompletions, "Core lifecycle must load first")
 
 function MR:RestoreSavedManagedWindows()
     if not self.db or self:IsManagedWindowsBundleHidden() or self._instanceFramesHidden then

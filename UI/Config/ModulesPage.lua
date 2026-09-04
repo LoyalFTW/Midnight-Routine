@@ -2,12 +2,8 @@ local _, ns = ...
 local MR = ns.MR
 local Config = assert(ns.ConfigInternal, "UI/Config/Frame.lua must load first")
 local L = Config.L
-local FONT_ROWS = ns.FONT_ROWS
-local FONT_HEADERS = ns.FONT_HEADERS
 local MakeBackdrop = ns.MakeBackdrop
 local OptionsGap = ns.OptionsGap
-local OptionsDivider = ns.OptionsDivider
-local OptionsSectionLabel = ns.OptionsSectionLabel
 local OptionsCheckbox = ns.OptionsCheckbox
 local OptionsColorSwatch = ns.OptionsColorSwatch
 local hex = ns.Hex
@@ -26,21 +22,42 @@ function Config.BuildModulesPage(ctx)
     local moduleCompactH = ctx.moduleCompactH
     local contentW = ctx.contentW
     local function Gap(h) yOff = OptionsGap(body, yOff, h) end
-    local function Divider() yOff = OptionsDivider(body, yOff, 4) end
-    local function SectionLabel(text) yOff = OptionsSectionLabel(body, yOff, text, 8, cfgFs) end
 
-        Gap(4); Divider()
-        SectionLabel(L["Config_ModuleSettings"])
-        local dragHint = body:CreateFontString(nil, "OVERLAY")
-        dragHint:SetFont(ns.FONT_ROWS, math.max(8, cfgFs - 1), GetFontFlags())
-        dragHint:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
-        dragHint:SetPoint("TOPRIGHT", body, "TOPRIGHT", -8, yOff)
-        dragHint:SetJustifyH("RIGHT")
-        dragHint:SetWordWrap(false)
-        dragHint:SetText(L["Config_DragRowsHint"])
-        dragHint:SetTextColor(0.42, 0.62, 0.64)
-        yOff = yOff - math.max(13, cfgFs + 2)
-        Gap(2)
+    local function IsStoryConfigModule(mod)
+        return mod and (mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")))
+    end
+
+    Gap(4)
+    local toolbarH = math.max(46, cfgFs + moduleSubFs + 25)
+    local toolbar = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    toolbar:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
+    toolbar:SetSize(contentW, toolbarH)
+    toolbar:SetBackdrop(MakeBackdrop())
+    toolbar:SetBackdropColor(0.018, 0.045, 0.070, 0.72)
+    toolbar:SetBackdropBorderColor(0, 0, 0, 0)
+
+    local toolbarEdge = toolbar:CreateTexture(nil, "ARTWORK")
+    toolbarEdge:SetPoint("BOTTOMLEFT", toolbar, "BOTTOMLEFT", 0, 0)
+    toolbarEdge:SetPoint("BOTTOMRIGHT", toolbar, "BOTTOMRIGHT", 0, 0)
+    toolbarEdge:SetHeight(1)
+    toolbarEdge:SetColorTexture(0.12, 0.46, 0.48, 0.72)
+
+    local toolbarTitle = toolbar:CreateFontString(nil, "OVERLAY")
+    toolbarTitle:SetFont(ns.FONT_HEADERS, cfgFs, GetFontFlags())
+    toolbarTitle:SetPoint("TOPLEFT", toolbar, "TOPLEFT", 8, -6)
+    toolbarTitle:SetText(string.upper(L["Config_TabModules"] or "Modules"))
+    toolbarTitle:SetTextColor(0.38, 0.98, 0.88)
+
+    local toolbarHint = toolbar:CreateFontString(nil, "OVERLAY")
+    toolbarHint:SetFont(ns.FONT_ROWS, moduleSubFs, GetFontFlags())
+    toolbarHint:SetPoint("BOTTOMLEFT", toolbar, "BOTTOMLEFT", 8, 5)
+    toolbarHint:SetPoint("BOTTOMRIGHT", toolbar, "BOTTOMRIGHT", -8, 5)
+    toolbarHint:SetJustifyH("LEFT")
+    toolbarHint:SetWordWrap(false)
+    toolbarHint:SetText(L["Config_ModulesToolbarHint"] or "Enable, customize, or drag modules to reorder")
+    toolbarHint:SetTextColor(0.50, 0.68, 0.70)
+    yOff = yOff - toolbarH
+    Gap(6)
 
     if not MR._cfgExpanded then MR._cfgExpanded = {} end
 
@@ -79,49 +96,12 @@ function Config.BuildModulesPage(ctx)
     dragLineTex:SetAllPoints()
     dragLineTex:SetColorTexture(0.2, 0.9, 0.65, 1)
 
-    local function IsStoryConfigModule(mod)
-        return mod and (mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")))
-    end
-
-    local orderedMods = MR:GetOrderedModules("all")
-    local orderIndex = {}
-    for index, mod in ipairs(orderedMods) do
-        orderIndex[mod.key] = index
-    end
-    local weeklyAnchor = orderIndex.weeklies or orderIndex.weekly_tasks or orderIndex.weekly or 2
-
-    local function GetConfigSortOrder(mod)
-        if mod and MR:GetModulePatchKey(mod) == "12.0.7" then
-            return weeklyAnchor + 0.35
-        end
-        return orderIndex[mod.key] or 9999
-    end
-
+    local orderedMods = MR:GetOrderedMainModules()
     local _allMods = {}
     for _, mod in ipairs(orderedMods) do
         _allMods[#_allMods + 1] = mod
     end
-    table.sort(_allMods, function(a, b)
-        local aStory = IsStoryConfigModule(a)
-        local bStory = IsStoryConfigModule(b)
-        if aStory ~= bStory then
-            return not aStory
-        end
-        local aSort = GetConfigSortOrder(a)
-        local bSort = GetConfigSortOrder(b)
-        if aSort ~= bSort then
-            return aSort < bSort
-        end
-        local ao = MR.GetPatchSortOrder and MR:GetPatchSortOrder(MR:GetModulePatchKey(a)) or 999999
-        local bo = MR.GetPatchSortOrder and MR:GetPatchSortOrder(MR:GetModulePatchKey(b)) or 999999
-        if ao ~= bo then
-            return ao < bo
-        end
-        return (orderIndex[a.key] or 9999) < (orderIndex[b.key] or 9999)
-    end)
 
-    local PROFESSION_GROUP_KEY = "__profession_knowledge"
-    local _cfgRows = {}
     local _cfgModuleRows = {}
     local _cfgRowRows = {}
 
@@ -328,12 +308,9 @@ function Config.BuildModulesPage(ctx)
             RebuildExpandedState()
         end)
 
-        local expandBtn = CreateFrame("Button", nil, groupFr, "BackdropTemplate")
-        expandBtn:SetSize(16, 16)
-        expandBtn:SetPoint("RIGHT", groupFr, "RIGHT", -1, 0)
-        expandBtn:SetBackdrop(MakeBackdrop())
-        expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-        expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
+        local expandBtn = CreateFrame("Button", nil, groupFr)
+        expandBtn:SetSize(20, 20)
+        expandBtn:SetPoint("RIGHT", groupFr, "RIGHT", -2, 0)
         local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")
         expandLbl:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
         expandLbl:SetPoint("CENTER", expandBtn, "CENTER", 0, 1)
@@ -344,14 +321,10 @@ function Config.BuildModulesPage(ctx)
             RebuildExpandedState()
         end)
         expandBtn:SetScript("OnEnter", function()
-            expandBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
-            expandBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
             expandLbl:SetTextColor(1, 1, 1)
             ns.ShowTooltip(expandBtn, { text = L["Config_ExpandCollapseRows"] })
         end)
         expandBtn:SetScript("OnLeave", function()
-            expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-            expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
             expandLbl:SetTextColor(0.45, 0.75, 0.70)
             ns.HideOwnedTooltip(expandBtn)
         end)
@@ -445,8 +418,26 @@ function Config.BuildModulesPage(ctx)
             end
             return rows
         end
-        if drag.mode == "profession_group" then
-            return _cfgRows
+        if drag.mode == "module" and drag.srcKey then
+            local sourceMod = MR.moduleByKey and MR.moduleByKey[drag.srcKey]
+            if sourceMod then
+                local sourceProfession = sourceMod.profSkillLine ~= nil
+                local sourceStory = IsStoryConfigModule(sourceMod)
+                local sourceExpansion = MR:GetModuleExpansionKey(sourceMod)
+                local filtered = {}
+                for _, row in ipairs(_cfgModuleRows) do
+                    local rowMod = MR.moduleByKey and MR.moduleByKey[row.key]
+                    if rowMod then
+                        local sameCategory = (rowMod.profSkillLine ~= nil) == sourceProfession
+                            and IsStoryConfigModule(rowMod) == sourceStory
+                        local sameExpansion = not sourceProfession or MR:GetModuleExpansionKey(rowMod) == sourceExpansion
+                        if sameCategory and sameExpansion then
+                            filtered[#filtered + 1] = row
+                        end
+                    end
+                end
+                return filtered
+            end
         end
         return _cfgModuleRows
     end
@@ -462,12 +453,11 @@ function Config.BuildModulesPage(ctx)
         local rows = GetActiveDragRows()
         if #rows == 0 then return end
 
-        local cx, cy = GetCursorPosition()
+        local _, cy = GetCursorPosition()
         local scale  = body:GetEffectiveScale()
         local bLeft  = body:GetLeft()
         local bTop   = body:GetTop()
         if not bLeft or not bTop then return end
-        local localX = cx / scale - bLeft
         local localY = bTop - cy / scale
 
         dragGhost:ClearAllPoints()
@@ -570,60 +560,9 @@ function Config.BuildModulesPage(ctx)
             return
         end
 
-        if mode == "profession_group" then
-            local layoutKeys = {}
-            local srcIdx
-            for index, row in ipairs(rows) do
-                layoutKeys[index] = row.key
-                if row.key == drag.srcKey then
-                    srcIdx = index
-                end
-            end
-            if srcIdx then
-                local insertAt = slot + 1
-                if srcIdx < insertAt then
-                    insertAt = insertAt - 1
-                end
-                insertAt = math.max(1, math.min(insertAt, #layoutKeys))
-                local moved = table.remove(layoutKeys, srcIdx)
-                table.insert(layoutKeys, insertAt, moved)
-                local nextNormalKey
-                local passedGroup = false
-                for _, key in ipairs(layoutKeys) do
-                    if key == PROFESSION_GROUP_KEY then
-                        passedGroup = true
-                    elseif passedGroup then
-                        local mod = MR.moduleByKey and MR.moduleByKey[key]
-                        if mod and not mod.profSkillLine and not IsStoryConfigModule(mod) then
-                            nextNormalKey = key
-                            break
-                        end
-                    end
-                end
-                local normalBefore = 0
-                for _, mod in ipairs(MR:GetOrderedModules("all")) do
-                    if mod and not mod.profSkillLine and not IsStoryConfigModule(mod) then
-                        if mod.key == nextNormalKey then
-                            break
-                        end
-                        normalBefore = normalBefore + 1
-                    end
-                end
-                MR:SetProfessionKnowledgePosition(normalBefore)
-                MR:RefreshUI()
-            end
-            drag.srcKey = nil
-            drag.targetIdx = nil
-            drag.mode = "module"
-            drag.moduleKey = nil
-            drag.configGroup = nil
-            MR:PopulateConfigFrame(f)
-            return
-        end
-
         local allMods = MR:GetOrderedModules("all")
         local visMods = {}
-        for _, row in ipairs(_cfgModuleRows) do
+        for _, row in ipairs(rows) do
             for _, m in ipairs(allMods) do
                 if m.key == row.key then table.insert(visMods, m); break end
             end
@@ -642,7 +581,7 @@ function Config.BuildModulesPage(ctx)
             local moved = table.remove(visMods, srcIdx)
             table.insert(visMods, insertAt, moved)
             local inCfgRows = {}
-            for _, row in ipairs(_cfgModuleRows) do inCfgRows[row.key] = true end
+            for _, row in ipairs(rows) do inCfgRows[row.key] = true end
             local newOrder = {}
             local vi = 1
             for _, m in ipairs(allMods) do
@@ -659,29 +598,18 @@ function Config.BuildModulesPage(ctx)
         MR:PopulateConfigFrame(f)
     end
 
+    local professionExpandedKey = "__professions"
+    local storyExpandedKey = "__storyCampaigns"
     local professionGroupRendered = false
-    local professionGroupOpen = MR._cfgExpanded.__professions == true
-    local professionTotal, professionKnown = 0, 0
+    local professionGroupOpen = MR._cfgExpanded[professionExpandedKey] == true
+    local professionTotal, professionKnown, professionModuleTotal, professionEnabled = 0, 0, 0, 0
     local storyGroupRendered = false
-    if MR._cfgExpanded.__storyCampaigns == nil then
-        MR._cfgExpanded.__storyCampaigns = true
+    if MR._cfgExpanded[storyExpandedKey] == nil then
+        MR._cfgExpanded[storyExpandedKey] = true
     end
-    local storyGroupOpen = MR._cfgExpanded.__storyCampaigns == true
+    local storyGroupOpen = MR._cfgExpanded[storyExpandedKey] == true
     local storyTotal, storyEnabled = 0, 0
     local professionSource = MR.GetMainFrameProgressSource and MR:GetMainFrameProgressSource() or nil
-
-    local function StartProfessionGroupDrag(owner)
-        if drag.active then return end
-        drag.active = true
-        f:SetScript("OnUpdate", DragOnUpdate)
-        drag.mode = "profession_group"
-        drag.moduleKey = nil
-        drag.configGroup = nil
-        drag.srcKey = PROFESSION_GROUP_KEY
-        drag.targetIdx = nil
-        dragGhostLbl:SetText(L["ProfKnowledge_Title"] or "Profession Knowledge")
-        ns.HideOwnedTooltip(owner)
-    end
 
     local function IsProfessionKnownForConfig(profession)
         if not profession then
@@ -707,7 +635,12 @@ function Config.BuildModulesPage(ctx)
         end
     end
     for _, mod in ipairs(_allMods) do
-        if IsStoryConfigModule(mod) then
+        if mod.profSkillLine and IsProfessionModuleKnownForConfig(mod) then
+            professionModuleTotal = professionModuleTotal + 1
+            if MR:IsModuleEnabled(mod.key) then
+                professionEnabled = professionEnabled + 1
+            end
+        elseif IsStoryConfigModule(mod) then
             storyTotal = storyTotal + 1
             if MR:IsModuleEnabled(mod.key) then
                 storyEnabled = storyEnabled + 1
@@ -716,7 +649,7 @@ function Config.BuildModulesPage(ctx)
     end
 
     local function BuildProfessionGroupHeader()
-        local ROW_H = math.max(38, moduleHeaderFs + moduleSubFs + 14)
+        local ROW_H = math.max(42, moduleHeaderFs + moduleSubFs + 17)
         local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         headerFr:SetSize(contentW, ROW_H)
@@ -724,15 +657,24 @@ function Config.BuildModulesPage(ctx)
         headerFr:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
         headerFr:SetBackdropBorderColor(0.24, 0.76, 0.70, 1)
 
-        local grip = Config.CreateGrip(headerFr, ROW_H, true, StartProfessionGroupDrag, function()
-            if drag.active and drag.mode == "profession_group" then
-                CommitDrag()
+        local groupToggle = CreateFrame("CheckButton", nil, headerFr, "UICheckButtonTemplate")
+        groupToggle:SetSize(18, 18)
+        groupToggle:SetPoint("LEFT", headerFr, "LEFT", 1, 0)
+        groupToggle:SetChecked(professionModuleTotal > 0 and professionEnabled >= professionModuleTotal)
+        groupToggle:SetScript("OnClick", function(control)
+            local enabled = control:GetChecked() and true or false
+            for _, professionMod in ipairs(_allMods) do
+                if professionMod.profSkillLine and IsProfessionModuleKnownForConfig(professionMod) then
+                    MR:SetModuleEnabled(professionMod.key, enabled, true)
+                end
             end
+            MR:RefreshUI()
+            RebuildExpandedState()
         end)
 
         local badge = CreateFrame("Frame", nil, headerFr, "BackdropTemplate")
         badge:SetSize(28, 24)
-        badge:SetPoint("LEFT", grip, "RIGHT", 5, 0)
+        badge:SetPoint("LEFT", groupToggle, "RIGHT", 2, 0)
         badge:SetBackdrop(MakeBackdrop())
         badge:SetBackdropColor(0.06, 0.17, 0.18, 0.95)
         badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
@@ -743,15 +685,12 @@ function Config.BuildModulesPage(ctx)
         badgeText:SetText("PK")
         badgeText:SetTextColor(0.60, 1.00, 0.90)
 
-        local arrowBtn = CreateFrame("Button", nil, headerFr, "BackdropTemplate")
-        arrowBtn:SetSize(16, 16)
-        arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", -3, 0)
-        arrowBtn:SetBackdrop(MakeBackdrop())
-        arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-        arrowBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
+        local arrowBtn = CreateFrame("Button", nil, headerFr)
+        arrowBtn:SetSize(24, 24)
+        arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", -4, 0)
 
         local arrowLbl = arrowBtn:CreateFontString(nil, "OVERLAY")
-        arrowLbl:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
+        arrowLbl:SetFont(ns.FONT_HEADERS, 14, GetFontFlags())
         arrowLbl:SetPoint("CENTER", arrowBtn, "CENTER", 0, 1)
         arrowLbl:SetText(professionGroupOpen and "v" or ">")
         arrowLbl:SetTextColor(0.45, 0.75, 0.70)
@@ -774,8 +713,8 @@ function Config.BuildModulesPage(ctx)
         sub:SetTextColor(0.58, 0.80, 0.78, 0.95)
 
         local function ToggleProfessionGroup()
-            MR._cfgExpanded.__professions = not professionGroupOpen
-            arrowLbl:SetText(MR._cfgExpanded.__professions and "v" or ">")
+            MR._cfgExpanded[professionExpandedKey] = not professionGroupOpen
+            arrowLbl:SetText(MR._cfgExpanded[professionExpandedKey] and "v" or ">")
             RebuildExpandedState()
         end
 
@@ -783,188 +722,13 @@ function Config.BuildModulesPage(ctx)
         headerFr:SetScript("OnMouseUp", ToggleProfessionGroup)
         arrowBtn:SetScript("OnClick", ToggleProfessionGroup)
         arrowBtn:SetScript("OnEnter", function()
-            arrowBtn:SetBackdropColor(0.08, 0.22, 0.32, 1)
-            arrowBtn:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
             arrowLbl:SetTextColor(1, 1, 1)
         end)
         arrowBtn:SetScript("OnLeave", function()
-            arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-            arrowBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
             arrowLbl:SetTextColor(0.45, 0.75, 0.70)
         end)
 
-        _cfgRows[#_cfgRows + 1] = { key = PROFESSION_GROUP_KEY, frame = headerFr, label = L["ProfKnowledge_Title"] or "Profession Knowledge" }
         yOff = yOff - ROW_H - 3
-    end
-
-    local function GetProfessionEntryVisibilityId(expansionKey, professionKey, sectionKey, index)
-        return tostring(expansionKey) .. ":" .. tostring(professionKey) .. ":" .. tostring(sectionKey) .. ":" .. tostring(index)
-    end
-
-    local function CleanProfessionConfigLabel(text)
-        text = tostring(text or "")
-        text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        return text
-    end
-
-    local function RenderLegacyProfessionConfigRows()
-        local expansions = ns.AllExpansions or {}
-        local profile = MR.db and MR.db.profile
-        if not profile then return end
-        profile.gatheringEntryVisibility = profile.gatheringEntryVisibility or {}
-        local entryVisibility = profile.gatheringEntryVisibility
-        local renderedAny = false
-
-        local function GroupEnabled(expansionKey, profession, section)
-            for index in ipairs(section.entries or {}) do
-                local entryId = GetProfessionEntryVisibilityId(expansionKey, profession.key, section.key, index)
-                if entryVisibility[entryId] == false then
-                    return false
-                end
-            end
-            return true
-        end
-
-        local function SetGroupEnabled(expansionKey, profession, section, enabled)
-            for index in ipairs(section.entries or {}) do
-                local entryId = GetProfessionEntryVisibilityId(expansionKey, profession.key, section.key, index)
-                entryVisibility[entryId] = enabled and true or false
-            end
-            if MR.RebuildGatheringLocationsFrame then MR:RebuildGatheringLocationsFrame() end
-            MR:PopulateConfigFrame(f)
-        end
-
-        local function ProfessionEnabled(expansionKey, profession)
-            if ns.IsProfessionKnowledgeProfessionVisible then
-                return ns.IsProfessionKnowledgeProfessionVisible(expansionKey, profession.key)
-            end
-            return true
-        end
-
-        local function SetProfessionEnabled(expansionKey, profession, enabled)
-            if ns.SetProfessionKnowledgeProfessionVisible then
-                ns.SetProfessionKnowledgeProfessionVisible(expansionKey, profession.key, enabled)
-            end
-            MR:PopulateConfigFrame(f)
-        end
-
-        for _, expansion in ipairs(expansions) do
-            if expansion.key ~= "midnight" then
-                local learned = {}
-                for _, profession in ipairs(expansion.professions or {}) do
-                    if IsProfessionKnownForConfig(profession) then
-                        learned[#learned + 1] = profession
-                    end
-                end
-                if #learned > 0 then
-                    if not renderedAny then
-                        Gap(4)
-                        renderedAny = true
-                    end
-
-                    local expH = moduleRowH
-                    local expFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
-                    expFr:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
-                    expFr:SetSize(contentW - 4, expH)
-                    expFr:SetBackdrop(MakeBackdrop())
-                    expFr:SetBackdropColor(0.035, 0.055, 0.070, 0.90)
-                    expFr:SetBackdropBorderColor(0.14, 0.30, 0.34, 0.78)
-                    local expLbl = expFr:CreateFontString(nil, "OVERLAY")
-                    expLbl:SetFont(ns.FONT_HEADERS, moduleRowFs, GetFontFlags())
-                    expLbl:SetPoint("LEFT", expFr, "LEFT", 7, 0)
-                    expLbl:SetPoint("RIGHT", expFr, "RIGHT", -7, 0)
-                    expLbl:SetJustifyH("LEFT")
-                    expLbl:SetText(string.format("%s  |cff667788%d|r", expansion.label or expansion.key, #learned))
-                    expLbl:SetTextColor(0.72, 0.86, 0.88)
-                    yOff = yOff - expH
-
-                    for _, profession in ipairs(learned) do
-                        local rowH = moduleHeaderH
-                        local rowKey = "__pk:" .. expansion.key .. ":" .. profession.key
-                        local isExp = MR._cfgExpanded[rowKey]
-                        local professionEnabled = ProfessionEnabled(expansion.key, profession)
-                        local rowFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
-                        rowFr:SetPoint("TOPLEFT", body, "TOPLEFT", 14, yOff)
-                        rowFr:SetSize(contentW - 10, rowH)
-                        rowFr:SetBackdrop(MakeBackdrop())
-                        rowFr:SetBackdropColor(0.018, 0.025, 0.032, 0.86)
-                        rowFr:SetBackdropBorderColor(0.16, 0.24, 0.28, 0.72)
-
-                        local enableBtn = CreateFrame("CheckButton", nil, rowFr, "UICheckButtonTemplate")
-                        enableBtn:SetSize(18, 18)
-                        enableBtn:SetPoint("LEFT", rowFr, "LEFT", 4, 0)
-                        enableBtn:SetChecked(professionEnabled)
-                        enableBtn:SetScript("OnClick", function(s)
-                            SetProfessionEnabled(expansion.key, profession, s:GetChecked() and true or false)
-                        end)
-                        enableBtn:SetScript("OnEnter", function()
-                            ns.ShowTooltip(enableBtn, {
-                                text = enableBtn:GetChecked() and (L["Config_DisableModule"] or "Disable this profession") or (L["Config_EnableModule"] or "Enable this profession"),
-                            })
-                        end)
-                        enableBtn:SetScript("OnLeave", function() ns.HideOwnedTooltip(enableBtn) end)
-
-                        local expandBtn = CreateFrame("Button", nil, rowFr, "BackdropTemplate")
-                        expandBtn:SetSize(16, 16)
-                        expandBtn:SetPoint("RIGHT", rowFr, "RIGHT", -4, 0)
-                        expandBtn:SetBackdrop(MakeBackdrop())
-                        expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-                        expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
-                        local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")
-                        expandLbl:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
-                        expandLbl:SetPoint("CENTER", expandBtn, "CENTER", 0, 1)
-                        expandLbl:SetText(isExp and "v" or ">")
-                        expandLbl:SetTextColor(0.45, 0.75, 0.70)
-                        expandBtn:SetScript("OnClick", function()
-                            MR._cfgExpanded[rowKey] = not isExp
-                            expandLbl:SetText(MR._cfgExpanded[rowKey] and "v" or ">")
-                            RebuildExpandedState()
-                        end)
-
-                        local lbl = rowFr:CreateFontString(nil, "OVERLAY")
-                        lbl:SetFont(ns.FONT_ROWS, moduleRowFs, GetFontFlags())
-                        lbl:SetPoint("LEFT", enableBtn, "RIGHT", 6, 0)
-                        lbl:SetPoint("RIGHT", expandBtn, "LEFT", -6, 0)
-                        lbl:SetJustifyH("LEFT")
-                        lbl:SetText(profession.label)
-                        lbl:SetTextColor(0.80, 0.86, 0.88)
-                        yOff = yOff - rowH
-
-                        if isExp then
-                            for _, section in ipairs(profession.sections or {}) do
-                                if #section.entries > 0 then
-                                    local enabled = GroupEnabled(expansion.key, profession, section)
-                                    local groupFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
-                                    groupFr:SetPoint("TOPLEFT", body, "TOPLEFT", 26, yOff)
-                                    groupFr:SetSize(contentW - 22, moduleCompactH)
-                                    groupFr:SetBackdrop(MakeBackdrop())
-                                    groupFr:SetBackdropColor(enabled and 0.035 or 0.055, enabled and 0.085 or 0.045, enabled and 0.095 or 0.050, 0.72)
-                                    groupFr:SetBackdropBorderColor(enabled and 0.10 or 0.24, enabled and 0.32 or 0.12, enabled and 0.34 or 0.12, 0.70)
-
-                                    local cb = CreateFrame("CheckButton", nil, groupFr, "UICheckButtonTemplate")
-                                    cb:SetSize(18, 18)
-                                    cb:SetPoint("LEFT", groupFr, "LEFT", 0, 0)
-                                    cb:SetChecked(enabled)
-                                    cb:SetScript("OnClick", function(s)
-                                        SetGroupEnabled(expansion.key, profession, section, s:GetChecked() and true or false)
-                                    end)
-
-                                    local sectionLbl = groupFr:CreateFontString(nil, "OVERLAY")
-                                    sectionLbl:SetFont(ns.FONT_ROWS, moduleSubFs, GetFontFlags())
-                                    sectionLbl:SetPoint("LEFT", cb, "RIGHT", 1, 0)
-                                    sectionLbl:SetPoint("RIGHT", groupFr, "RIGHT", -5, 0)
-                                    sectionLbl:SetJustifyH("LEFT")
-                                    sectionLbl:SetText(CleanProfessionConfigLabel(section.label))
-                                    sectionLbl:SetTextColor(enabled and 0.72 or 0.42, enabled and 0.90 or 0.46, enabled and 0.88 or 0.48)
-                                    yOff = yOff - moduleCompactH
-                                end
-                            end
-                            Gap(2)
-                        end
-                    end
-                end
-            end
-        end
     end
 
     local function BuildStoryGroupHeader()
@@ -972,56 +736,59 @@ function Config.BuildModulesPage(ctx)
             return
         end
 
-        local ROW_H = moduleHeaderH
+        local ROW_H = math.max(22, cfgFs + 10)
         local headerFr = CreateFrame("Frame", nil, body, "BackdropTemplate")
         headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
         headerFr:SetSize(contentW, ROW_H)
         headerFr:SetBackdrop(MakeBackdrop())
-        headerFr:SetBackdropColor(0.07, 0.10, 0.15, 0.95)
-        headerFr:SetBackdropBorderColor(0.38, 0.34, 0.16, 0.95)
+        headerFr:SetBackdropColor(0.105, 0.090, 0.035, 0.96)
+        headerFr:SetBackdropBorderColor(0.52, 0.42, 0.14, 0.96)
 
-        local cb = CreateFrame("CheckButton", nil, headerFr, "UICheckButtonTemplate")
-        cb:SetSize(20, 20)
-        cb:SetPoint("LEFT", headerFr, "LEFT", 2, 0)
-        cb:SetChecked(MR:GetStoryCampaignsEnabledPreference() ~= false)
-        cb:SetScript("OnClick", function(s)
-            local enabled = s:GetChecked() and true or false
-            MR:SetStoryCampaignsEnabledPreference(enabled)
+        local groupToggle = CreateFrame("CheckButton", nil, headerFr, "UICheckButtonTemplate")
+        groupToggle:SetSize(18, 18)
+        groupToggle:SetPoint("LEFT", headerFr, "LEFT", 1, 0)
+        groupToggle:SetChecked(storyTotal > 0 and storyEnabled >= storyTotal)
+        groupToggle:SetScript("OnClick", function(control)
+            local enabled = control:GetChecked() and true or false
+            for _, expansion in ipairs(MR:GetSelectableExpansions()) do
+                MR:SetStoryCampaignsEnabledPreference(enabled, expansion.key)
+            end
             for _, storyMod in ipairs(_allMods) do
                 if IsStoryConfigModule(storyMod) then
                     MR:SetModuleEnabled(storyMod.key, enabled, true)
                 end
             end
             MR:RefreshUI()
-            if MR.RequestConfigRepopulate then
-                MR:RequestConfigRepopulate(f, 0.04)
-            end
+            RebuildExpandedState()
         end)
 
-        local arrowBtn = CreateFrame("Button", nil, headerFr, "BackdropTemplate")
-        arrowBtn:SetSize(16, 16)
+        local arrowBtn = CreateFrame("Button", nil, headerFr)
+        arrowBtn:SetSize(22, 22)
         arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", -3, 0)
-        arrowBtn:SetBackdrop(MakeBackdrop())
-        arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-        arrowBtn:SetBackdropBorderColor(0.28, 0.26, 0.12, 1)
 
         local arrowLbl = arrowBtn:CreateFontString(nil, "OVERLAY")
-        arrowLbl:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
+        arrowLbl:SetFont(ns.FONT_HEADERS, 13, GetFontFlags())
         arrowLbl:SetPoint("CENTER", arrowBtn, "CENTER", 0, 1)
         arrowLbl:SetText(storyGroupOpen and "v" or ">")
         arrowLbl:SetTextColor(0.90, 0.82, 0.42)
 
         local lbl = headerFr:CreateFontString(nil, "OVERLAY")
         lbl:SetFont(ns.FONT_HEADERS, moduleHeaderFs, GetFontFlags())
-        lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-        lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
+        lbl:SetPoint("LEFT", groupToggle, "RIGHT", 1, 0)
+        lbl:SetPoint("RIGHT", headerFr, "RIGHT", -68, 0)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText(string.format("Story Campaigns  |cff667788%d/%d|r", storyEnabled, storyTotal))
+        lbl:SetText(L["Config_StoryCampaignsSection"] or "STORY CAMPAIGNS")
         lbl:SetTextColor(0.95, 0.88, 0.56)
 
+        local countLbl = headerFr:CreateFontString(nil, "OVERLAY")
+        countLbl:SetFont(ns.FONT_ROWS, moduleSubFs, GetFontFlags())
+        countLbl:SetPoint("RIGHT", arrowBtn, "LEFT", -7, 0)
+        countLbl:SetText(string.format("%d/%d", storyEnabled, storyTotal))
+        countLbl:SetTextColor(0.62, 0.58, 0.38)
+
         local function ToggleStoryGroup()
-            MR._cfgExpanded.__storyCampaigns = not storyGroupOpen
-            arrowLbl:SetText(MR._cfgExpanded.__storyCampaigns and "v" or ">")
+            MR._cfgExpanded[storyExpandedKey] = not storyGroupOpen
+            arrowLbl:SetText(MR._cfgExpanded[storyExpandedKey] and "v" or ">")
             RebuildExpandedState()
         end
 
@@ -1029,13 +796,9 @@ function Config.BuildModulesPage(ctx)
         headerFr:SetScript("OnMouseUp", ToggleStoryGroup)
         arrowBtn:SetScript("OnClick", ToggleStoryGroup)
         arrowBtn:SetScript("OnEnter", function()
-            arrowBtn:SetBackdropColor(0.14, 0.16, 0.16, 1)
-            arrowBtn:SetBackdropBorderColor(0.88, 0.78, 0.32, 1)
             arrowLbl:SetTextColor(1, 1, 1)
         end)
         arrowBtn:SetScript("OnLeave", function()
-            arrowBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
-            arrowBtn:SetBackdropBorderColor(0.28, 0.26, 0.12, 1)
             arrowLbl:SetTextColor(0.90, 0.82, 0.42)
         end)
 
@@ -1218,9 +981,7 @@ function Config.BuildModulesPage(ctx)
 
         if isStoryConfigModule then
             if not storyGroupRendered then
-                Gap(2)
-                Divider()
-                Gap(2)
+                Gap(4)
                 BuildStoryGroupHeader()
                 storyGroupRendered = true
                 lastPatchKey = nil
@@ -1234,6 +995,7 @@ function Config.BuildModulesPage(ctx)
                     BuildPatchHeader(patchKey, key)
                     lastPatchKey = patchKey
                 end
+                Gap(5)
                 BuildProfessionGroupHeader()
                 professionGroupRendered = true
             end
@@ -1274,6 +1036,8 @@ function Config.BuildModulesPage(ctx)
                 available = moduleAvailable,
                 expanded = MR._cfgExpanded[key] == true,
                 emphasized = currentMod.profSkillLine ~= nil,
+                story = isStoryConfigModule,
+                rowIndex = #_cfgModuleRows + 1,
                 onDragStart = function()
                     StartModuleDrag(currentMod, key)
                 end,
@@ -1290,9 +1054,8 @@ function Config.BuildModulesPage(ctx)
                     end
                 end or nil,
             })
-            _cfgRows[#_cfgRows + 1] = { key = key, frame = moduleFrame, label = currentMod.label }
             _cfgModuleRows[#_cfgModuleRows + 1] = { key = key, frame = moduleFrame, label = currentMod.label }
-            yOff = yOff - moduleHeight
+            yOff = yOff - moduleHeight - 1
 
             if MR._cfgExpanded[key] then
                 RenderModuleRows(currentMod, moduleAvailable)

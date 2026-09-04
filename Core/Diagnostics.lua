@@ -6,7 +6,6 @@ local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
-local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 
 local function BuildFakeCharacterData(self)
     local progress = {}

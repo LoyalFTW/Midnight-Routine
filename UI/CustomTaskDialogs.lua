@@ -145,8 +145,6 @@ local function EnsureCustomTaskDialog()
     local GAP  = 10
     local IGAP = 6
     local IH   = 28
-    local LH   = 14
-
     local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     frame:SetSize(400, 512)
     MR:RegisterPriorityFrame(frame)

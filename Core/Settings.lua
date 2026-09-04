@@ -1,14 +1,11 @@
-local addonName, ns = ...
+local _, ns = ...
 local MR = ns.MR
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
 local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
 local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
-local DEFAULTS = Core.defaults
-
 local VALID_FRAME_STRATA = {
     BACKGROUND = true,
     LOW = true,
@@ -258,31 +255,6 @@ function MR:RequestDataRefresh(delay)
             self:RefreshUI()
         end
     end, tonumber(delay) or 0.05)
-end
-
-function MR:RequestConfigRepopulate(reason, delay)
-    if not self.ScheduleTimer then
-        if self.RepopulateConfigFrame then
-            self:RepopulateConfigFrame(reason)
-        end
-        return
-    end
-
-    delay = tonumber(delay) or 0.06
-    self._configRepopulatePending = reason or true
-    if self._configRepopulateTimer and self.CancelTimer then
-        self:CancelTimer(self._configRepopulateTimer)
-        self._configRepopulateTimer = nil
-    end
-
-    self._configRepopulateTimer = self:ScheduleTimer(function()
-        local pendingReason = self._configRepopulatePending
-        self._configRepopulateTimer = nil
-        self._configRepopulatePending = nil
-        if pendingReason and self.RepopulateConfigFrame then
-            self:RepopulateConfigFrame(pendingReason == true and nil or pendingReason)
-        end
-    end, delay)
 end
 
 function MR:RequestVisualRefresh(opts)

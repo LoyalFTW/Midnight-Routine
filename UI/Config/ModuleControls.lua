@@ -37,33 +37,37 @@ local function ApplyVisibilityState(button, label, active)
 end
 
 local function CreateGrip(parent, height, enabled, onStart, onCommit)
-    local grip = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    grip:SetSize(16, math.max(height - 4, 14))
-    grip:SetPoint("LEFT", parent, "LEFT", 1, 0)
+    local grip = CreateFrame("Button", nil, parent)
+    grip:SetSize(18, math.max(height - 4, 16))
+    grip:SetPoint("LEFT", parent, "LEFT", 3, 0)
     grip:RegisterForClicks("LeftButtonUp")
-    grip:SetBackdrop(MakeBackdrop())
-    grip:SetBackdropColor(0.12, 0.22, 0.20, 0.6)
-    grip:SetBackdropBorderColor(0.30, 0.55, 0.48, 0.7)
     grip:SetEnabled(enabled)
     grip:SetAlpha(enabled and 1 or 0.35)
 
-    local label = grip:CreateFontString(nil, "OVERLAY")
-    label:SetFont(ns.FONT_HEADERS, 13, GetFontFlags())
-    label:SetPoint("CENTER")
-    label:SetText("=")
-    label:SetTextColor(0.50, 0.75, 0.68)
+    local dots = {}
+    for row = 0, 2 do
+        for column = 0, 1 do
+            local dot = grip:CreateTexture(nil, "ARTWORK")
+            dot:SetSize(3, 3)
+            dot:SetPoint("CENTER", grip, "CENTER", (column * 6) - 3, (row * 6) - 6)
+            dot:SetColorTexture(0.38, 0.62, 0.60, 0.85)
+            dots[#dots + 1] = dot
+        end
+    end
+
+    local function SetDotColor(r, g, b, a)
+        for _, dot in ipairs(dots) do
+            dot:SetColorTexture(r, g, b, a)
+        end
+    end
 
     grip:SetScript("OnEnter", function()
         if enabled then
-            label:SetTextColor(0.3, 1, 0.8)
-            grip:SetBackdropColor(0.15, 0.35, 0.30, 0.9)
-            grip:SetBackdropBorderColor(0.3, 1, 0.75, 1)
+            SetDotColor(0.30, 1.00, 0.80, 1)
         end
     end)
     grip:SetScript("OnLeave", function()
-        label:SetTextColor(0.50, 0.75, 0.68)
-        grip:SetBackdropColor(0.12, 0.22, 0.20, 0.6)
-        grip:SetBackdropBorderColor(0.30, 0.55, 0.48, 0.7)
+        SetDotColor(0.38, 0.62, 0.60, 0.85)
     end)
     grip:SetScript("OnMouseDown", function(selfGrip)
         if enabled and onStart then
@@ -82,10 +86,9 @@ Config.CreateGrip = CreateGrip
 
 local function CreateExpandButton(parent, expanded, onToggle)
     local isExpanded = expanded == true
-    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    button:SetSize(16, 16)
-    button:SetPoint("RIGHT", parent, "RIGHT", -1, 0)
-    button:SetBackdrop(MakeBackdrop())
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(18, 18)
+    button:SetPoint("RIGHT", parent, "RIGHT", -3, 0)
 
     local label = button:CreateFontString(nil, "OVERLAY")
     label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
@@ -93,9 +96,7 @@ local function CreateExpandButton(parent, expanded, onToggle)
     label:SetText(isExpanded and "v" or ">")
 
     local function ApplyState(hovered)
-        button:SetBackdropColor(hovered and 0.08 or 0.05, hovered and 0.22 or 0.10, hovered and 0.32 or 0.18, 1)
-        button:SetBackdropBorderColor(hovered and 0.25 or 0.15, hovered and 0.85 or 0.32, hovered and 0.72 or 0.38, 1)
-        label:SetTextColor(hovered and 1 or 0.45, hovered and 1 or 0.75, hovered and 1 or 0.70)
+        label:SetTextColor(hovered and 1 or 0.46, hovered and 1 or 0.82, hovered and 1 or 0.76)
     end
 
     ApplyState(false)
@@ -118,8 +119,8 @@ end
 local function CreateHideCompleteButton(parent, moduleKey, anchor)
     local isCurrencyModule = moduleKey == "currencies" or moduleKey == "pvp_currencies"
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    button:SetSize(16, 16)
-    button:SetPoint("RIGHT", anchor, "LEFT", -2, 0)
+    button:SetSize(18, 18)
+    button:SetPoint("RIGHT", anchor, "LEFT", -3, 0)
     button:SetBackdrop(MakeBackdrop())
 
     local label = button:CreateFontString(nil, "OVERLAY")
@@ -179,7 +180,8 @@ local function CreateModuleColorControls(parent, spec, anchor)
         RequestConfigRefresh(spec.configFrame, true)
         return 0.08, 0.09, 0.12
     end, L["Config_HeaderBackgroundColor"] or "Header Background")
-    backgroundSwatch:SetPoint("RIGHT", anchor, "LEFT", -2, 0)
+    backgroundSwatch:SetSize(18, 18)
+    backgroundSwatch:SetPoint("RIGHT", anchor, "LEFT", -3, 0)
 
     local current = MR:GetHeaderColor(moduleKey)
     local r, g, b = hex(current or spec.module.labelColor or "#ffffff")
@@ -190,29 +192,37 @@ local function CreateModuleColorControls(parent, spec, anchor)
         RequestConfigRefresh(spec.configFrame, true)
         return hex(spec.module.labelColor or "#ffffff")
     end, L["Config_HeaderColor"])
-    colorSwatch:SetPoint("RIGHT", backgroundSwatch, "LEFT", -2, 0)
+    colorSwatch:SetSize(18, 18)
+    colorSwatch:SetPoint("RIGHT", backgroundSwatch, "LEFT", -3, 0)
     return colorSwatch
 end
 
 function Config.CreateModuleControl(spec)
     local mod = spec.module
     local moduleKey = mod.key
-    local frameTemplate = spec.emphasized and "BackdropTemplate" or nil
-    local frame = CreateFrame("Frame", nil, spec.parent, frameTemplate)
+    local frame = CreateFrame("Frame", nil, spec.parent, "BackdropTemplate")
     frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 4, spec.y)
     frame:SetSize(spec.width, spec.height)
+    frame:SetBackdrop(MakeBackdrop())
 
     if spec.emphasized then
-        frame:SetBackdrop(MakeBackdrop())
         local r, g, b = hex(MR:GetHeaderColor(moduleKey) or mod.labelColor or "#2ae7c6")
         frame:SetBackdropColor(0.018 + r * 0.035, 0.024 + g * 0.035, 0.030 + b * 0.035, 0.90)
         frame:SetBackdropBorderColor(r * 0.42, g * 0.42, b * 0.42, 0.82)
+    else
+        local shade = (spec.rowIndex or 1) % 2 == 0 and 0.026 or 0.008
+        frame:SetBackdropColor(0.020 + shade, 0.045 + shade, 0.070 + shade, 0.94)
+        if spec.story then
+            frame:SetBackdropBorderColor(0.16, 0.17, 0.13, 0.52)
+        else
+            frame:SetBackdropBorderColor(0.07, 0.17, 0.21, 0.50)
+        end
     end
 
     local grip = CreateGrip(frame, spec.height, spec.available, spec.onDragStart, spec.onDragCommit)
     local checkbox = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     checkbox:SetSize(20, 20)
-    checkbox:SetPoint("LEFT", grip, "RIGHT", 1, 0)
+    checkbox:SetPoint("LEFT", grip, "RIGHT", 2, 0)
     checkbox:SetChecked(MR:IsModuleEnabled(moduleKey))
     checkbox:SetEnabled(spec.available)
     checkbox:SetAlpha(spec.available and 1 or 0.45)

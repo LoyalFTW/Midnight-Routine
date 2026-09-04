@@ -6,7 +6,6 @@ local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
-local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 local IsInRestrictedCombat = Core.IsInRestrictedCombat
 
 function MR:RegisterExpansion(def)
@@ -211,35 +210,6 @@ function MR:GetQuestName(questId, fallback)
     return fallback
 end
 
-function MR:GetAvailableExpansions()
-    local seen = {}
-    local result = {}
-
-    for key, info in pairs(self.expansions or {}) do
-        seen[key] = true
-        result[#result + 1] = self:GetExpansionInfo(key)
-    end
-
-    for _, mod in ipairs(self.modules) do
-        local key = self:GetModuleExpansionKey(mod)
-        if not seen[key] then
-            seen[key] = true
-            result[#result + 1] = self:GetExpansionInfo(key)
-        end
-    end
-
-    table.sort(result, function(a, b)
-        local ao = a.order or 999
-        local bo = b.order or 999
-        if ao ~= bo then
-            return ao < bo
-        end
-        return (a.label or a.key) < (b.label or b.key)
-    end)
-
-    return result
-end
-
 function MR:GetSelectableExpansions()
     local counts = {}
     for _, mod in ipairs(self.modules) do
@@ -271,7 +241,7 @@ function MR:GetSelectedExpansionKey(forAltBoard)
         return "midnight"
     end
 
-    local key = forAltBoard and self.db.profile.altBoardSelectedExpansion or self.db.profile.selectedExpansion
+    local key = forAltBoard and self.db.profile.altBoardSelectedExpansion or "midnight"
     if key and self.expansions[key] then
         return key
     end
@@ -285,23 +255,17 @@ function MR:SetSelectedExpansionKey(key, forAltBoard)
         key = "midnight"
     end
 
-    if forAltBoard then
-        self.db.profile.altBoardSelectedExpansion = key
-        if self.altBoardFrame and self.altBoardFrame:IsShown() then
-            if self.RequestWarbandBoardRefresh then
-                self:RequestWarbandBoardRefresh(true)
-            elseif self.RefreshWarbandBoard then
-                self:RefreshWarbandBoard()
-            end
-        end
+    if not forAltBoard then
         return
     end
 
-    self.db.profile.selectedExpansion = key
-    self._orderedModulesCache = nil
-    self._orderedAllModulesCache = nil
-    if self.RefreshUI then
-        self:RefreshUI()
+    self.db.profile.altBoardSelectedExpansion = key
+    if self.altBoardFrame and self.altBoardFrame:IsShown() then
+        if self.RequestWarbandBoardRefresh then
+            self:RequestWarbandBoardRefresh(true)
+        elseif self.RefreshWarbandBoard then
+            self:RefreshWarbandBoard()
+        end
     end
 end
 
@@ -309,7 +273,7 @@ function MR:GetVisibleExpansionModules(expansionKey)
     expansionKey = expansionKey or self:GetSelectedExpansionKey()
     local result = {}
     for _, mod in ipairs(self.modules) do
-        if self:GetModuleExpansionKey(mod) == expansionKey then
+        if mod.allExpansions or self:GetModuleExpansionKey(mod) == expansionKey then
             result[#result + 1] = mod
         end
     end
@@ -569,29 +533,6 @@ function MR:RegisterPatch(def)
 end
 
 
-function MR:GetProfessionKnowledgePosition()
-    if not self.db then
-        return nil
-    end
-    if self:IsCharacterWindowLayoutEnabled() then
-        return tonumber(self.db.char and self.db.char.professionKnowledgePosition)
-    end
-    return tonumber(self.db.profile and self.db.profile.professionKnowledgePosition)
-end
-
-function MR:SetProfessionKnowledgePosition(position)
-    if not self.db then
-        return
-    end
-    position = math.max(0, math.floor((tonumber(position) or 0) + 0.5))
-    if self:IsCharacterWindowLayoutEnabled() then
-        self.db.char.professionKnowledgePosition = position
-    else
-        self.db.profile.professionKnowledgePosition = position
-    end
-    self._orderedAllModulesCache = nil
-end
-
 function MR:GetOrderedModules(expansionKey)
     if expansionKey == "all" then
         if self._orderedAllModulesCache then
@@ -599,15 +540,19 @@ function MR:GetOrderedModules(expansionKey)
         end
 
         local normalModules, professionBlocks, trailing = {}, {}, {}
+        local seenModules = {}
         for _, expansion in ipairs(self:GetSelectableExpansions()) do
             for _, mod in ipairs(self:GetOrderedModules(expansion.key)) do
-                if mod.profSkillLine then
+                if not seenModules[mod.key] and mod.profSkillLine then
                     professionBlocks[expansion.key] = professionBlocks[expansion.key] or {}
                     professionBlocks[expansion.key][#professionBlocks[expansion.key] + 1] = mod
-                elseif mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")) then
+                    seenModules[mod.key] = true
+                elseif not seenModules[mod.key] and (mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_"))) then
                     trailing[#trailing + 1] = mod
-                else
+                    seenModules[mod.key] = true
+                elseif not seenModules[mod.key] then
                     normalModules[#normalModules + 1] = mod
+                    seenModules[mod.key] = true
                 end
             end
         end
@@ -617,21 +562,12 @@ function MR:GetOrderedModules(expansionKey)
                 professionModules[#professionModules + 1] = mod
             end
         end
-        local position = self:GetProfessionKnowledgePosition()
-        if position == nil then
-            position = #normalModules
-        end
-        position = math.max(0, math.min(math.floor(position), #normalModules))
         local result = {}
-        for index = 0, #normalModules do
-            if index == position then
-                for _, mod in ipairs(professionModules) do
-                    result[#result + 1] = mod
-                end
-            end
-            if index < #normalModules then
-                result[#result + 1] = normalModules[index + 1]
-            end
+        for _, mod in ipairs(normalModules) do
+            result[#result + 1] = mod
+        end
+        for _, mod in ipairs(professionModules) do
+            result[#result + 1] = mod
         end
         for _, mod in ipairs(trailing) do
             result[#result + 1] = mod
@@ -690,10 +626,43 @@ function MR:GetOrderedModules(expansionKey)
     for _, mod in ipairs(modules) do
         if seen[mod.key] then table.insert(result, mod) end
     end
-    result = ApplyPinnedModuleOrder(result)
     if expansionKey == self:GetSelectedExpansionKey() then
         self._orderedModulesCache = result
     end
+    return result
+end
+
+function MR:GetOrderedMainModules(expansionKey)
+    local result = {}
+    local seen = {}
+    local source = expansionKey and self:GetOrderedModules(expansionKey) or self:GetOrderedModules("all")
+    local stories = {}
+
+    for _, mod in ipairs(source) do
+        if mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")) then
+            stories[#stories + 1] = mod
+        elseif not mod.profSkillLine and not seen[mod.key] then
+            result[#result + 1] = mod
+            seen[mod.key] = true
+        end
+    end
+
+    for _, expansion in ipairs(self:GetSelectableExpansions()) do
+        for _, mod in ipairs(self:GetOrderedModules(expansion.key)) do
+            if mod.profSkillLine and not seen[mod.key] then
+                result[#result + 1] = mod
+                seen[mod.key] = true
+            end
+        end
+    end
+
+    for _, mod in ipairs(stories) do
+        if not seen[mod.key] then
+            result[#result + 1] = mod
+            seen[mod.key] = true
+        end
+    end
+
     return result
 end
 
@@ -880,20 +849,34 @@ function MR:SetAutoEnableNewModules(enabled)
     end
 end
 
-function MR:GetStoryCampaignsEnabledPreference()
+function MR:GetStoryCampaignsEnabledPreference(expansionKey)
     if not self.db then
         return nil
     end
     local settings = self:IsCharacterWindowLayoutEnabled() and self.db.char or self.db.profile
-    return settings and settings.storyCampaignsEnabled
+    if not settings then
+        return nil
+    end
+    expansionKey = expansionKey or self:GetSelectedExpansionKey()
+    settings.storyCampaignExpansionEnabled = settings.storyCampaignExpansionEnabled or {}
+    local value = settings.storyCampaignExpansionEnabled[expansionKey]
+    if value == nil and expansionKey == "midnight" then
+        value = settings.storyCampaignsEnabled
+    end
+    return value
 end
 
-function MR:SetStoryCampaignsEnabledPreference(enabled)
+function MR:SetStoryCampaignsEnabledPreference(enabled, expansionKey)
     if not self.db then
         return
     end
     local settings = self:IsCharacterWindowLayoutEnabled() and self.db.char or self.db.profile
-    settings.storyCampaignsEnabled = enabled and true or false
+    expansionKey = expansionKey or self:GetSelectedExpansionKey()
+    settings.storyCampaignExpansionEnabled = settings.storyCampaignExpansionEnabled or {}
+    settings.storyCampaignExpansionEnabled[expansionKey] = enabled and true or false
+    if expansionKey == "midnight" then
+        settings.storyCampaignsEnabled = enabled and true or false
+    end
 end
 
 function MR:ShouldHideProfessionModuleInMain(mod)

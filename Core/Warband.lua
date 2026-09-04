@@ -2,8 +2,6 @@ local _, ns = ...
 local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
-local DAY_SECONDS = 24 * 60 * 60
-
 local function ParseCharacterKey(charKey)
     if type(charKey) ~= "string" then
         return "Unknown", ""
@@ -835,8 +833,8 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                     or {})
                 or sharedModuleStates
 
-            for _, mod in ipairs(self.modules) do
-                if IsAltBoardModule(mod) and (mod.key == "custom_tasks" or self:GetModuleExpansionKey(mod) == selectedExpansion) then
+            for _, mod in ipairs(self:GetOrderedMainModules(selectedExpansion)) do
+                if IsAltBoardModule(mod) and (mod.key == "custom_tasks" or mod.profSkillLine or self:GetModuleExpansionKey(mod) == selectedExpansion) then
                     local moduleSettings = type(moduleStates) == "table" and moduleStates[mod.key] or nil
                     local professionModuleStates = type(charData.professionModuleStates) == "table" and charData.professionModuleStates or nil
                     local professionSettings = mod.profSkillLine and professionModuleStates and professionModuleStates[mod.key] or nil

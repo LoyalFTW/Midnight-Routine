@@ -125,7 +125,6 @@ local DEFAULTS = {
         characterWindowLayout = false,
         autoEnableNewModules = true,
         knownModules = {},
-        selectedExpansion   = "midnight",
         altBoardSelectedExpansion = "midnight",
         altBoardHiddenCharacters = {},
         altBoardCharacterNotes = {},
@@ -139,6 +138,7 @@ local DEFAULTS = {
         concentrationTrackerHiddenCharacters = {},
         expansionModuleStates = {},
         expansionModuleOrder = {},
+        storyCampaignExpansionEnabled = {},
         patchStates = {},
     },
     char = {
@@ -170,6 +170,7 @@ local DEFAULTS = {
         mediaSettings = {},
         expansionModuleStates = {},
         expansionModuleOrder = {},
+        storyCampaignExpansionEnabled = {},
     },
     global = {
         customTasks = {},

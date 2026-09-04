@@ -34,9 +34,6 @@ local WBStartDragVisual = Warband.WBStartDragVisual
 local WBStopDragVisual = Warband.WBStopDragVisual
 local WBMarkDragTarget = Warband.WBMarkDragTarget
 local WBUpdateDragTargetFromCursor = Warband.WBUpdateDragTargetFromCursor
-local GetExpansionDisplayInfo = Warband.GetExpansionDisplayInfo
-local GetExpansionDisplayLabel = Warband.GetExpansionDisplayLabel
-local CycleExpansion = Warband.CycleExpansion
 local BuildExpansionDropdown = Warband.BuildExpansionDropdown
 local WBConcentrationText = Warband.WBConcentrationText
 local WBConcentrationCurrent = Warband.WBConcentrationCurrent
@@ -434,7 +431,6 @@ function MR:PopulateConcentrationTrackerConfigFrame(f)
     local yOff = -28
     local pad = 8
     local cfgFs = (ns.GetFontSize and ns.GetFontSize()) or (MR.db and MR.db.profile and MR.db.profile.fontSize) or 9
-    local contentW = (f:GetWidth() or 300) - (pad * 2)
     body:SetSize(f:GetWidth() or 300, 1)
 
     local function Gap(h) yOff = OptionsGap(body, yOff, h) end

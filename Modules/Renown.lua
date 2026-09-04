@@ -1359,11 +1359,10 @@ PopulateRenownConfig = function(f)
         local rows = _facRows
         if #rows == 0 then return end
 
-        local cx, cy = GetCursorPosition()
+        local _, cy = GetCursorPosition()
         local scale  = body:GetEffectiveScale()
-        local bLeft  = body:GetLeft()
         local bTop   = body:GetTop()
-        if not bLeft or not bTop then return end
+        if not bTop then return end
         local localY = bTop - cy / scale
 
         dragGhost:ClearAllPoints()

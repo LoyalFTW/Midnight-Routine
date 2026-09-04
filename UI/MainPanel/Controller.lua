@@ -870,7 +870,7 @@ function MR:BuildUI()
     titleCount:SetPoint("RIGHT", warbandBtn, "LEFT", -6, 0)
     title:ClearAllPoints()
     title:SetPoint("LEFT", titleBar, "LEFT", 12, 0)
-    title:SetPoint("RIGHT", titleCount, "LEFT", -8, 0)
+    title:SetPoint("RIGHT", titleCount, "LEFT", -7, 0)
     title:SetJustifyH("LEFT")
 
     local function RefreshMainHeaderChrome()
@@ -1173,7 +1173,6 @@ function MR:RefreshUI()
     local statsStarted = profiling and debugprofilestop() or nil
     self._moduleStatsCache = BuildModuleStatsCache(self)
     if statsStarted then statsElapsed = debugprofilestop() - statsStarted end
-    local expansionInfo = ns.GetExpansionDisplayInfo(false)
     local refreshMain = self.frame and self.frame:IsShown()
     local mainStarted = profiling and refreshMain and debugprofilestop() or nil
 
@@ -1191,9 +1190,6 @@ function MR:RefreshUI()
         end
         if self.UpdateMainCharacterBar then
             self:UpdateMainCharacterBar()
-        end
-        if self.expansionDropdown and self.expansionDropdown.Update then
-            self.expansionDropdown:Update()
         end
         ApplyMainFrameLayout(self.frame)
         self.widgets = self.widgets or {}
@@ -1216,7 +1212,7 @@ function MR:RefreshUI()
         self._visibleModsBuffer = visibleMods
         local visibleModCount = 0
         local lastVisibleExpansionKey
-        for _, mod in ipairs(MR:GetOrderedModules("all")) do
+        for _, mod in ipairs(MR:GetOrderedMainModules()) do
             local modVisible = not mod.isVisible or mod:isVisible()
             if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
                 local stats = GetModuleStats(self, mod)
@@ -1449,9 +1445,6 @@ function MR:ApplySharedMediaSettings()
     end
     if self.RefreshCustomTaskDialogThemes then
         self:RefreshCustomTaskDialogThemes()
-    end
-    if self.expansionDropdown and self.expansionDropdown.ApplyFonts then
-        self.expansionDropdown:ApplyFonts()
     end
     if self.altBoardFrame then
         local frame = self.altBoardFrame

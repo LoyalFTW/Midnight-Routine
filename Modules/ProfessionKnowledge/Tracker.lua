@@ -258,12 +258,6 @@ local function EntryName(entry)
     return entry.label or "|cffaaaaaa...|r"
 end
 
-local function ProgressText(entry)
-    local current, required = Progress(entry)
-    if required > 1 then return current .. "/" .. required end
-    return current > 0 and (L["Done"] or "Done") or L["ProfKnowledge_StatusPending"]
-end
-
 local function SectionStats(section)
     local done, total, kpDone, kpTotal = 0, 0, 0, 0
     for _, entry in ipairs(section.entries) do
@@ -275,17 +269,6 @@ local function SectionStats(section)
         end
     end
     return done, total, kpDone, kpTotal
-end
-
-local function SectionHeaderCounts(section)
-    local done, trackable = 0, 0
-    for _, entry in ipairs(section.entries) do
-        if IsEntryVisible(entry) and (entry.questID or entry.questIDs or entry.spellID) then
-            trackable = trackable + 1
-            if IsDone(entry) then done = done + 1 end
-        end
-    end
-    return done, trackable, #section.entries
 end
 
 local function ProfessionStats(profession)
@@ -453,19 +436,6 @@ local function GetProfessionTaskProgress(mod, row)
     end
 
     return current, nil, current and current > 0
-end
-
-local function GetProfessionTaskProgressText(mod, row)
-    local current, max, done = GetProfessionTaskProgress(mod, row)
-    if max then
-        return string.format("%d/%d", current or 0, max)
-    end
-
-    if row.max == 0 or row.noMax then
-        return tostring(current or 0)
-    end
-
-    return done and (L["Done"] or "Done") or (L["ProfKnowledge_StatusPending"] or "Pending")
 end
 
 local function GetProfessionTaskRows(profession, filterFn)

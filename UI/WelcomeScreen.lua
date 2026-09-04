@@ -191,15 +191,6 @@ local function BuildWelcomeScreen()
             or (L["Welcome_AutoEnableOff"] or "New modules require opt-in"))
     end)
 
-    local function MakeDivider(parent, y)
-        local d = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-        d:SetPoint("TOPLEFT",  parent, "TOPLEFT",   8, y)
-        d:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -8, y)
-        d:SetHeight(1)
-        d:SetBackdrop(MakeBackdrop(false))
-        d:SetBackdropColor(0.16, 0.78, 0.75, 0.25)
-        return d
-    end
     local footer = CreateFrame("Frame", nil, f, "BackdropTemplate")
     footer:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
     footer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
@@ -648,17 +639,3 @@ function MR:MaybeShowWelcomeScreen()
     end)
 end
 
-function MR:DismissFirstTimeGlow()
-    if self.db and self.db.profile and not self.db.profile.firstSeen then
-        self.db.profile.firstSeen = true
-    end
-
-    if self._firstSeenGlowTimer then
-        self._firstSeenGlowTimer:Cancel()
-        self._firstSeenGlowTimer = nil
-    end
-
-    if self.cfgShine then
-        self.cfgShine:Stop()
-    end
-end

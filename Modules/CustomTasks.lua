@@ -527,6 +527,9 @@ function MR:GetCustomTasksTitle()
     end
 
     local savedTitle = TrimText(self.db.char.customTasksTitle)
+    if savedTitle == "" and type(self.db.char.customTasksTitles) == "table" then
+        savedTitle = TrimText(self.db.char.customTasksTitles.midnight)
+    end
     if savedTitle == "" then
         return L["CustomTasks_Title"] or "Custom Tasks"
     end
@@ -1253,6 +1256,7 @@ end
 
 MR:RegisterModule({
     key = CUSTOM_MODULE_KEY,
+    allExpansions = true,
     label = L["CustomTasks_Title"] or "Custom Tasks",
     labelColor = "#b07cff",
     defaultOpen = true,

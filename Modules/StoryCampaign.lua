@@ -115,23 +115,42 @@ local function ScanCampaign(mod)
     return dirty
 end
 
-local function AreStoryCampaignsEnabled()
+local function ResolveStoryExpansionKey(name, zoneName)
+    local text = ((name or "") .. " " .. (zoneName or "")):lower()
+    local dragonflightInfo = MR.GetExpansionInfo and MR:GetExpansionInfo("dragonflight") or nil
+    local dragonflightLabel = dragonflightInfo and tostring(dragonflightInfo.label or ""):lower() or ""
+    local twwInfo = MR.GetExpansionInfo and MR:GetExpansionInfo("tww") or nil
+    local twwLabel = twwInfo and tostring(twwInfo.label or ""):lower() or ""
+    if (dragonflightLabel ~= "" and text:find(dragonflightLabel, 1, true))
+        or text:find("dragonflight", 1, true) or text:find("dragon isles", 1, true) or text:find("zskera", 1, true) then
+        return "dragonflight"
+    end
+    if (twwLabel ~= "" and text:find(twwLabel, 1, true))
+        or text:find("war within", 1, true) or text:find("khaz algar", 1, true) or text:find("dorn", 1, true)
+        or text:find("hallowfall", 1, true) or text:find("azj", 1, true) or text:find("undermine", 1, true)
+        or text:find("k'aresh", 1, true) then
+        return "tww"
+    end
+    return "midnight"
+end
+
+local function AreStoryCampaignsEnabled(expansionKey)
     local charDB = MR.db and MR.db.char
     if not charDB then
         return true
     end
-    local savedPreference = MR.GetStoryCampaignsEnabledPreference and MR:GetStoryCampaignsEnabledPreference()
+    local savedPreference = MR.GetStoryCampaignsEnabledPreference and MR:GetStoryCampaignsEnabledPreference(expansionKey)
     if savedPreference ~= nil then
         return savedPreference ~= false
     end
 
-    local storage = MR.GetActiveModuleStorage and MR:GetActiveModuleStorage() or charDB.modules
+    local storage = MR.GetActiveModuleStorage and MR:GetActiveModuleStorage(expansionKey) or charDB.modules
     local sawDisabled = false
     for key, state in pairs(storage or {}) do
         if type(key) == "string" and key:match("^story_campaign_") and type(state) == "table" then
             if state.enabled == true then
                 if MR.SetStoryCampaignsEnabledPreference then
-                    MR:SetStoryCampaignsEnabledPreference(true)
+                    MR:SetStoryCampaignsEnabledPreference(true, expansionKey)
                 end
                 return true
             elseif state.enabled == false then
@@ -142,7 +161,7 @@ local function AreStoryCampaignsEnabled()
 
     if sawDisabled then
         if MR.SetStoryCampaignsEnabledPreference then
-            MR:SetStoryCampaignsEnabledPreference(false)
+            MR:SetStoryCampaignsEnabledPreference(false, expansionKey)
         end
         return false
     end
@@ -171,7 +190,6 @@ TryRegisterCampaigns = function()
         end
         return
     end
-    local storyCampaignsEnabled = AreStoryCampaignsEnabled()
     local didRegister = false
     local registeredAny = false
     for _, campaignId in ipairs(ids) do
@@ -189,6 +207,8 @@ TryRegisterCampaigns = function()
                 local mapId = info and info.uiMapID
                 local mapInfo = mapId and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapId)
                 local zoneName = mapInfo and mapInfo.name
+                local expansionKey = ResolveStoryExpansionKey(name, zoneName)
+                local storyCampaignsEnabled = AreStoryCampaignsEnabled(expansionKey)
                 local label = zoneName and (L["Story_StoryPrefix"] .. zoneName .. " - " .. name) or (L["Story_StoryPrefix"] .. name)
                 local rows = {}
                 for _, chapterId in ipairs(chapterIds) do
@@ -202,6 +222,7 @@ TryRegisterCampaigns = function()
                 end
                 local mod = {
                     key = "story_campaign_" .. campaignId,
+                    expansionKey = expansionKey,
                     label = label,
                     labelColor = "#ffff99",
                     configGroup = "story",

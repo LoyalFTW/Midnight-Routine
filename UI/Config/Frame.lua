@@ -47,7 +47,6 @@ local OptionsBtn = ns.OptionsBtn
 local OptionsSlider = ns.OptionsSlider
 local OptionsColorSwatch = ns.OptionsColorSwatch
 local ApplyBackgroundTexture    = ns.ApplyBackgroundTexture
-local hex                       = ns.Hex
 local GetMainHeaderPosition     = ns.GetMainHeaderPosition
 local IsAnimatedMinimizeEnabled = ns.IsAnimatedMinimizeEnabled
 local ApplyMainFrameLayout      = ns.ApplyMainFrameLayout
@@ -376,7 +375,7 @@ function MR:BuildConfigFrame()
     end
 
     local tbar = TitleBar(f, 22)
-    tbar:SetBackdropColor(0.06, 0.10, 0.20, 1)
+    tbar:SetBackdropColor(0.035, 0.075, 0.145, 1)
     tbar:SetScript("OnDragStart", function() f:StartMoving() end)
     tbar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
 
@@ -384,10 +383,17 @@ function MR:BuildConfigFrame()
     ttitle:SetFont(ns.FONT_HEADERS, 11, GetFontFlags())
     ttitle:SetText(L["Config_Title"])
     ttitle:SetPoint("LEFT", tbar, "LEFT", 8, 0)
+    ttitle:SetTextColor(1.00, 0.56, 0.08)
     f.titleText = ttitle
     f.titleBar = tbar
 
-    local closeBtn = CloseButton(tbar, function() f:Hide() end)
+    local titleEdge = tbar:CreateTexture(nil, "ARTWORK")
+    titleEdge:SetPoint("BOTTOMLEFT", tbar, "BOTTOMLEFT", 0, 0)
+    titleEdge:SetPoint("BOTTOMRIGHT", tbar, "BOTTOMRIGHT", 0, 0)
+    titleEdge:SetHeight(1)
+    titleEdge:SetColorTexture(0.10, 0.24, 0.30, 0.85)
+
+    CloseButton(tbar, function() f:Hide() end)
 
     local scroll = CreateFrame("ScrollFrame", nil, f)
     scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -22)

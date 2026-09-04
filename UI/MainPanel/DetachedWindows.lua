@@ -354,7 +354,7 @@ function MR:RefreshVisibleDetachedFrames()
     end
     local allowShowing = not self._instanceFramesHidden and not self:IsManagedWindowsBundleHidden()
 
-    for _, mod in ipairs(MR:GetOrderedModules("all")) do
+    for _, mod in ipairs(MR:GetOrderedMainModules()) do
         local modVisible = not mod.isVisible or mod:isVisible()
         local detached = MR:IsModuleDetached(mod.key)
         local frame = self.detachedFrames[mod.key]

@@ -1,12 +1,10 @@
-local addonName, ns = ...
+local _, ns = ...
 local MR = ns.MR
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
 local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
-local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 
 local function CanImportLegacyCustomTaskProgress(self, rowKey)
     local taskId = type(rowKey) == "string" and tonumber(rowKey:match("^shared_task_(%d+)")) or nil

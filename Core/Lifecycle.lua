@@ -7,7 +7,6 @@ local DeepCopy = Core.DeepCopy
 local MergeMissing = Core.MergeMissing
 local RestoreDefaults = Core.RestoreDefaults
 local IsTableEmpty = Core.IsTableEmpty
-local MODULES_WITH_OPTIONAL_CURRENCY_COMPLETION = Core.optionalCurrencyModules
 local DEFAULTS = Core.defaults
 local STATIC_TURN_IN_COMPLETIONS = assert(Core.staticTurnInCompletions, "Core settings must load first")
 local TURN_IN_COMPLETIONS = assert(Core.turnInCompletions, "Core settings must load first")

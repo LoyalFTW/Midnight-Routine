@@ -563,7 +563,7 @@ function MR:RefreshMainPanelSectionsOnly()
     self._visibleModsBuffer = visibleMods
     local visibleModCount = 0
     local lastVisibleExpansionKey
-    for _, mod in ipairs(MR:GetOrderedModules("all")) do
+    for _, mod in ipairs(MR:GetOrderedMainModules()) do
         local modVisible = not mod.isVisible or mod:isVisible()
         if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
             local stats = GetModuleStats(self, mod)
