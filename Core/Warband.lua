@@ -756,13 +756,32 @@ function MR:GetMainAltViewCharacterInfo()
     }
 end
 
+local function GetCharacterModuleSettings(self, charData, mod)
+    if mod.profSkillLine then
+        local storage = type(charData.professionModuleStates) == "table" and charData.professionModuleStates or nil
+        return storage and storage[mod.key] or nil
+    end
+
+    local expansionKey = self:GetModuleExpansionKey(mod)
+    if self:IsCharacterWindowLayoutEnabled() then
+        local buckets = type(charData.expansionModuleStates) == "table" and charData.expansionModuleStates or nil
+        local storage = buckets and buckets[expansionKey]
+            or (expansionKey == "midnight" and type(charData.modules) == "table" and charData.modules)
+        return storage and storage[mod.key] or nil
+    end
+
+    local buckets = type(self.db.profile.expansionModuleStates) == "table" and self.db.profile.expansionModuleStates or nil
+    local storage = buckets and buckets[expansionKey]
+        or (expansionKey == "midnight" and type(self.db.profile.modules) == "table" and self.db.profile.modules)
+    return storage and storage[mod.key] or nil
+end
+
 function MR:GetWarbandWeeklyData(showHiddenOverride)
     if not (self and self.db and self.db.sv and self.db.sv.char) then
         return {}
     end
 
     local results = {}
-    local selectedExpansion = self:GetSelectedExpansionKey(true)
     local currentKey = self:GetCurrentCharacterKey()
     local resetAt = self.GetLastResetTimestamp and self:GetLastResetTimestamp() or 0
     local hiddenChars = (self.db and self.db.profile and self.db.profile.altBoardHiddenCharacters) or {}
@@ -772,16 +791,6 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
     else
         showHidden = showHidden == true
     end
-    local useCharacterLayout = self:IsCharacterWindowLayoutEnabled()
-    local sharedModuleStateBuckets = (not useCharacterLayout)
-        and type(self.db.profile.expansionModuleStates) == "table"
-        and self.db.profile.expansionModuleStates
-        or nil
-    local sharedModuleStates = sharedModuleStateBuckets and sharedModuleStateBuckets[selectedExpansion]
-        or ((not useCharacterLayout and selectedExpansion == "midnight" and type(self.db.profile.modules) == "table")
-            and self.db.profile.modules)
-        or {}
-
     for charKey, charData in pairs(self.db.sv.char) do
         if type(charData) == "table" and type(charData.progress) == "table" then
             local name, realm = ParseCharacterKey(charKey)
@@ -823,27 +832,12 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                 activeRows = 0,
             }
 
-            local moduleStateBuckets = useCharacterLayout
-                and type(charData.expansionModuleStates) == "table"
-                and charData.expansionModuleStates
-                or nil
-            local moduleStates = useCharacterLayout
-                and ((moduleStateBuckets and moduleStateBuckets[selectedExpansion])
-                    or ((selectedExpansion == "midnight") and type(charData.modules) == "table" and charData.modules)
-                    or {})
-                or sharedModuleStates
-
-            for _, mod in ipairs(self:GetOrderedMainModules(selectedExpansion)) do
-                if IsAltBoardModule(mod) and (mod.key == "custom_tasks" or mod.profSkillLine or self:GetModuleExpansionKey(mod) == selectedExpansion) then
-                    local moduleSettings = type(moduleStates) == "table" and moduleStates[mod.key] or nil
-                    local professionModuleStates = type(charData.professionModuleStates) == "table" and charData.professionModuleStates or nil
-                    local professionSettings = mod.profSkillLine and professionModuleStates and professionModuleStates[mod.key] or nil
-                    local effectiveSettings = professionSettings or moduleSettings
-                    local moduleEnabled = not (effectiveSettings and effectiveSettings.enabled == false)
-                    if mod.profSkillLine then
-                        moduleEnabled = not (effectiveSettings and effectiveSettings.enabled == false and effectiveSettings.professionDisabled == true)
-                    end
-                    local moduleVisible = moduleEnabled and (not mod.isVisible or mod:isVisible())
+            for _, mod in ipairs(self:GetOrderedMainModules()) do
+                if IsAltBoardModule(mod) then
+                    local effectiveSettings = GetCharacterModuleSettings(self, charData, mod)
+                    local moduleEnabled = self:GetWarbandCharacterModuleState(charKey, mod)
+                    local isSavedAltStory = not snapshot.isCurrent and type(mod.key) == "string" and mod.key:match("^story_campaign_") ~= nil
+                    local moduleVisible = moduleEnabled and (not mod.isVisible or isSavedAltStory or mod:isVisible())
                     local modProgress = charData.progress[mod.key] or {}
                     local knowsProfession = (not mod.profSkillLine)
                         or (snapshot.isCurrent and self.HasProfessionForModule and self:HasProfessionForModule(mod.profSkillLine))
@@ -976,9 +970,8 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
                 end)
             end
 
-            local hasConcentration = type(snapshot.concentration) == "table" and #snapshot.concentration > 0
             local matchesHiddenFilter = snapshot.isCurrent or (showHidden and hidden) or ((not showHidden) and (not hidden))
-            if (snapshot.isCurrent or snapshot.totalRows > 0 or hasConcentration) and matchesHiddenFilter then
+            if matchesHiddenFilter then
                 table.insert(results, snapshot)
             end
         end
@@ -1007,6 +1000,99 @@ function MR:GetWarbandWeeklyData(showHiddenOverride)
     end)
 
     return results
+end
+
+function MR:GetWarbandCharacterModuleState(charKey, mod)
+    local charData = self.db and self.db.sv and self.db.sv.char and self.db.sv.char[charKey]
+    if type(charData) ~= "table" or type(mod) ~= "table" then
+        return false, false, false, false
+    end
+
+    local available = self:IsModuleAvailable(mod)
+    local learned = true
+    if mod.profSkillLine then
+        local professions = type(charData.professions) == "table" and charData.professions or nil
+        local concentration = type(charData.professionConcentration) == "table" and charData.professionConcentration or nil
+        learned = (charKey == self:GetCurrentCharacterKey() and self.HasProfessionForModule and self:HasProfessionForModule(mod.profSkillLine))
+            or (professions and professions[mod.profSkillLine] == true)
+            or ((not charData.professionsScanned) and concentration and concentration[mod.profSkillLine] ~= nil)
+            or false
+    end
+
+    local shared = not self:IsCharacterWindowLayoutEnabled() and not mod.profSkillLine
+    local settings = GetCharacterModuleSettings(self, charData, mod)
+    local enabled = available and learned
+    if enabled and not self:IsPatchEnabled(mod.patchKey, mod.key) then
+        enabled = false
+        for _, row in ipairs(mod.rows or {}) do
+            if self:GetRowPatchKey(mod, row) ~= mod.patchKey and self:IsPatchEnabled(self:GetRowPatchKey(mod, row), mod.key) then
+                enabled = true
+                break
+            end
+        end
+    end
+    if enabled and settings == nil and not self:ShouldAutoEnableNewModules() and not self:IsModuleKnown(mod.key) then
+        enabled = false
+    elseif enabled and settings == nil and mod.defaultEnabled == false then
+        enabled = false
+    elseif enabled and mod.profSkillLine then
+        enabled = not (settings and settings.enabled == false and settings.professionDisabled == true)
+    elseif enabled then
+        enabled = not (settings and settings.enabled == false)
+    end
+
+    return enabled, available, learned, shared
+end
+
+function MR:SetWarbandCharacterModuleEnabled(charKey, modKey, enabled, skipRefresh)
+    local charData = self.db and self.db.sv and self.db.sv.char and self.db.sv.char[charKey]
+    local mod = self.moduleByKey and self.moduleByKey[modKey]
+    if type(charData) ~= "table" or type(mod) ~= "table" or not self:IsModuleAvailable(mod) then
+        return false
+    end
+
+    local storage
+    local expansionKey = self:GetModuleExpansionKey(mod)
+    if mod.profSkillLine then
+        charData.professionModuleStates = charData.professionModuleStates or {}
+        storage = charData.professionModuleStates
+    elseif self:IsCharacterWindowLayoutEnabled() then
+        charData.expansionModuleStates = charData.expansionModuleStates or {}
+        if expansionKey == "midnight" then
+            charData.modules = charData.modules or {}
+            charData.expansionModuleStates[expansionKey] = charData.modules
+        else
+            charData.expansionModuleStates[expansionKey] = charData.expansionModuleStates[expansionKey] or {}
+        end
+        storage = charData.expansionModuleStates[expansionKey]
+    else
+        self.db.profile.expansionModuleStates = self.db.profile.expansionModuleStates or {}
+        if expansionKey == "midnight" then
+            self.db.profile.modules = self.db.profile.modules or {}
+            self.db.profile.expansionModuleStates[expansionKey] = self.db.profile.modules
+        else
+            self.db.profile.expansionModuleStates[expansionKey] = self.db.profile.expansionModuleStates[expansionKey] or {}
+        end
+        storage = self.db.profile.expansionModuleStates[expansionKey]
+    end
+
+    storage[modKey] = storage[modKey] or {}
+    storage[modKey].enabled = enabled and true or false
+    if mod.profSkillLine then
+        storage[modKey].professionManual = enabled and true or nil
+        storage[modKey].professionDisabled = enabled and nil or true
+    end
+    if enabled and charKey == self:GetCurrentCharacterKey() and self.PrimeModuleData then
+        self:PrimeModuleData(mod)
+    end
+    self._moduleStatsCache = nil
+    if not skipRefresh and self.RequestUIRefresh then
+        self:RequestUIRefresh(0.01)
+    end
+    if not skipRefresh and self.RequestWarbandBoardRefresh then
+        self:RequestWarbandBoardRefresh(true)
+    end
+    return true
 end
 
 function MR:IsAltBoardCharacterHidden(charKey)

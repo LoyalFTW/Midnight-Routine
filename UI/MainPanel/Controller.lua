@@ -563,6 +563,10 @@ function MR:BuildUI()
             end
         end
         MR._mainFrameDragging = false
+        local configFrame = MR.GetConfigFrame and MR:GetConfigFrame()
+        if configFrame and configFrame:IsShown() and MR.PositionConfigFrame then
+            MR:PositionConfigFrame(configFrame)
+        end
     end)
     if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(f, titleBar) end
 
@@ -976,6 +980,9 @@ function MR:BuildUI()
         local configFrame = MR.GetConfigFrame and MR:GetConfigFrame()
         if configFrame and configFrame:IsShown() then
             MR:PopulateConfigFrame(configFrame)
+            if MR.PositionConfigFrame then
+                MR:PositionConfigFrame(configFrame)
+            end
         end
     end
     local function ResizeMainFrame(_, elapsed)

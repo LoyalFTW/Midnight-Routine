@@ -40,6 +40,12 @@ function ns.AttachScrollList(scroll, content, track, opts)
 
     local lastNotifiedScroll
     local function UpdateScrollBar()
+        if not scroll:IsShown() then
+            track:Hide()
+            thumb:Hide()
+            return
+        end
+
         local viewHeight = scroll:GetHeight()
         local contentHeight = GetContentHeight()
         local maxScroll = math.max(contentHeight - viewHeight, 0)
@@ -141,6 +147,12 @@ function ns.AttachScrollList(scroll, content, track, opts)
     scroll:SetScript("OnSizeChanged", UpdateScrollBar)
     scroll:SetScript("OnScrollRangeChanged", UpdateScrollBar)
     scroll:SetScript("OnVerticalScroll", UpdateScrollBar)
+    scroll:HookScript("OnShow", UpdateScrollBar)
+    scroll:HookScript("OnHide", function()
+        track:Hide()
+        thumb:Hide()
+    end)
+    UpdateScrollBar()
 
     return UpdateScrollBar, thumb, trackBg, thumbTex
 end

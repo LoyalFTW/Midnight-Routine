@@ -650,83 +650,34 @@ function Config.BuildModulesPage(ctx)
 
     local function BuildProfessionGroupHeader()
         local ROW_H = math.max(42, moduleHeaderFs + moduleSubFs + 17)
-        local headerFr = ns.AcquireFrame(body, "modulesFrame14", "Frame", "BackdropTemplate")
-        headerFr:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
-        headerFr:SetSize(contentW, ROW_H)
-        headerFr:SetBackdrop(MakeBackdrop())
-        headerFr:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
-        headerFr:SetBackdropBorderColor(0.24, 0.76, 0.70, 1)
-
-        local groupToggle = ns.AcquireFrame(headerFr, "modulesFrame15", "CheckButton", "UICheckButtonTemplate")
-        groupToggle:SetSize(18, 18)
-        groupToggle:SetPoint("LEFT", headerFr, "LEFT", 1, 0)
-        groupToggle:SetChecked(professionModuleTotal > 0 and professionEnabled >= professionModuleTotal)
-        groupToggle:SetScript("OnClick", function(control)
-            local enabled = control:GetChecked() and true or false
-            for _, professionMod in ipairs(_allMods) do
-                if professionMod.profSkillLine and IsProfessionModuleKnownForConfig(professionMod) then
-                    MR:SetModuleEnabled(professionMod.key, enabled, true)
-                end
-            end
-            MR:RefreshUI()
-            RebuildExpandedState()
-        end)
-
-        local badge = ns.AcquireFrame(headerFr, "modulesFrame16", "Frame", "BackdropTemplate")
-        badge:SetSize(28, 24)
-        badge:SetPoint("LEFT", groupToggle, "RIGHT", 2, 0)
-        badge:SetBackdrop(MakeBackdrop())
-        badge:SetBackdropColor(0.06, 0.17, 0.18, 0.95)
-        badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
-
-        local badgeText = ns.AcquireFontString(badge, "modulesText31", "OVERLAY")
-        badgeText:SetFont(ns.FONT_HEADERS, moduleHeaderFs, GetFontFlags())
-        badgeText:SetPoint("CENTER")
-        badgeText:SetText("PK")
-        badgeText:SetTextColor(0.60, 1.00, 0.90)
-
-        local arrowBtn = ns.AcquireFrame(headerFr, "modulesFrame17", "Button")
-        arrowBtn:SetSize(24, 24)
-        arrowBtn:SetPoint("RIGHT", headerFr, "RIGHT", -4, 0)
-
-        local arrowLbl = ns.AcquireFontString(arrowBtn, "modulesText32", "OVERLAY")
-        arrowLbl:SetFont(ns.FONT_HEADERS, 14, GetFontFlags())
-        arrowLbl:SetPoint("CENTER", arrowBtn, "CENTER", 0, 1)
-        arrowLbl:SetText(professionGroupOpen and "v" or ">")
-        arrowLbl:SetTextColor(0.45, 0.75, 0.70)
-
-        local lbl = ns.AcquireFontString(headerFr, "modulesText33", "OVERLAY")
-        lbl:SetFont(ns.FONT_HEADERS, moduleHeaderFs, GetFontFlags())
-        lbl:SetPoint("TOPLEFT", badge, "TOPRIGHT", 8, -1)
-        lbl:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
-        lbl:SetJustifyH("LEFT")
         local professionTitle = (L["ProfKnowledge_Title"] or "Profession Knowledge"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        lbl:SetText(professionTitle)
-        lbl:SetTextColor(0.88, 1.00, 0.94)
-
-        local sub = ns.AcquireFontString(headerFr, "modulesText34", "OVERLAY")
-        sub:SetFont(ns.FONT_ROWS, moduleSubFs, GetFontFlags())
-        sub:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -1)
-        sub:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
-        sub:SetJustifyH("LEFT")
-        sub:SetText(string.format(L["ProfKnowledge_LearnedProfessions"] or "Learned professions %d/%d", professionKnown, professionTotal))
-        sub:SetTextColor(0.58, 0.80, 0.78, 0.95)
-
-        local function ToggleProfessionGroup()
-            MR._cfgExpanded[professionExpandedKey] = not professionGroupOpen
-            arrowLbl:SetText(MR._cfgExpanded[professionExpandedKey] and "v" or ">")
-            RebuildExpandedState()
-        end
-
-        headerFr:EnableMouse(true)
-        headerFr:SetScript("OnMouseUp", ToggleProfessionGroup)
-        arrowBtn:SetScript("OnClick", ToggleProfessionGroup)
-        arrowBtn:SetScript("OnEnter", function()
-            arrowLbl:SetTextColor(1, 1, 1)
-        end)
-        arrowBtn:SetScript("OnLeave", function()
-            arrowLbl:SetTextColor(0.45, 0.75, 0.70)
-        end)
+        Config.CreateProfessionGroupControl({
+            parent = body,
+            x = 4,
+            y = yOff,
+            width = contentW,
+            height = ROW_H,
+            headerFontSize = moduleHeaderFs,
+            subFontSize = moduleSubFs,
+            title = professionTitle,
+            subtitle = string.format(L["ProfKnowledge_LearnedProfessions"] or "Learned professions %d/%d", professionKnown, professionTotal),
+            expanded = professionGroupOpen,
+            moduleCount = professionModuleTotal,
+            allEnabled = professionModuleTotal > 0 and professionEnabled >= professionModuleTotal,
+            onSetEnabled = function(enabled)
+                for _, professionMod in ipairs(_allMods) do
+                    if professionMod.profSkillLine and IsProfessionModuleKnownForConfig(professionMod) then
+                        MR:SetModuleEnabled(professionMod.key, enabled, true)
+                    end
+                end
+                MR:RefreshUI()
+                RebuildExpandedState()
+            end,
+            onToggleExpanded = function()
+                MR._cfgExpanded[professionExpandedKey] = not professionGroupOpen
+                RebuildExpandedState()
+            end,
+        })
 
         yOff = yOff - ROW_H - 3
     end

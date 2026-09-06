@@ -84,6 +84,83 @@ end
 
 Config.CreateGrip = CreateGrip
 
+function Config.CreateProfessionGroupControl(spec)
+    local frame = ns.AcquireFrame(spec.parent, "controlFrame9", "Frame", "BackdropTemplate")
+    frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 4, spec.y)
+    frame:SetSize(spec.width, spec.height)
+    frame:SetBackdrop(MakeBackdrop())
+    frame:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
+    frame:SetBackdropBorderColor(0.24, 0.76, 0.70, 1)
+
+    local groupToggle = ns.AcquireFrame(frame, "controlFrame10", "CheckButton", "UICheckButtonTemplate")
+    groupToggle:SetSize(18, 18)
+    groupToggle:SetPoint("LEFT", frame, "LEFT", 1, 0)
+    groupToggle:SetChecked(spec.allEnabled == true)
+    groupToggle:SetEnabled((spec.moduleCount or 0) > 0)
+    groupToggle:SetAlpha((spec.moduleCount or 0) > 0 and 1 or 0.45)
+    groupToggle:SetScript("OnClick", function(control)
+        if spec.onSetEnabled then
+            spec.onSetEnabled(control:GetChecked() and true or false)
+        end
+    end)
+
+    local badge = ns.AcquireFrame(frame, "controlFrame11", "Frame", "BackdropTemplate")
+    badge:SetSize(28, 24)
+    badge:SetPoint("LEFT", groupToggle, "RIGHT", 2, 0)
+    badge:SetBackdrop(MakeBackdrop())
+    badge:SetBackdropColor(0.06, 0.17, 0.18, 0.95)
+    badge:SetBackdropBorderColor(0.28, 0.82, 0.74, 0.95)
+
+    local badgeText = ns.AcquireFontString(badge, "controlText17", "OVERLAY")
+    badgeText:SetFont(ns.FONT_HEADERS, spec.headerFontSize, GetFontFlags())
+    badgeText:SetPoint("CENTER")
+    badgeText:SetText("PK")
+    badgeText:SetTextColor(0.60, 1.00, 0.90)
+
+    local arrowBtn = ns.AcquireFrame(frame, "controlFrame12", "Button")
+    arrowBtn:SetSize(24, 24)
+    arrowBtn:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
+
+    local arrowLbl = ns.AcquireFontString(arrowBtn, "controlText18", "OVERLAY")
+    arrowLbl:SetFont(ns.FONT_HEADERS, 14, GetFontFlags())
+    arrowLbl:SetPoint("CENTER", arrowBtn, "CENTER", 0, 1)
+    arrowLbl:SetText(spec.expanded and "v" or ">")
+    arrowLbl:SetTextColor(0.45, 0.75, 0.70)
+
+    local label = ns.AcquireFontString(frame, "controlText19", "OVERLAY")
+    label:SetFont(ns.FONT_HEADERS, spec.headerFontSize, GetFontFlags())
+    label:SetPoint("TOPLEFT", badge, "TOPRIGHT", 8, -1)
+    label:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
+    label:SetJustifyH("LEFT")
+    label:SetText(spec.title)
+    label:SetTextColor(0.88, 1.00, 0.94)
+
+    local sub = ns.AcquireFontString(frame, "controlText20", "OVERLAY")
+    sub:SetFont(ns.FONT_ROWS, spec.subFontSize, GetFontFlags())
+    sub:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -1)
+    sub:SetPoint("RIGHT", arrowBtn, "LEFT", -6, 0)
+    sub:SetJustifyH("LEFT")
+    sub:SetText(spec.subtitle)
+    sub:SetTextColor(0.58, 0.80, 0.78, 0.95)
+
+    local function ToggleExpanded()
+        if spec.onToggleExpanded then
+            spec.onToggleExpanded()
+        end
+    end
+
+    frame:EnableMouse(true)
+    frame:SetScript("OnMouseUp", ToggleExpanded)
+    arrowBtn:SetScript("OnClick", ToggleExpanded)
+    arrowBtn:SetScript("OnEnter", function()
+        arrowLbl:SetTextColor(1, 1, 1)
+    end)
+    arrowBtn:SetScript("OnLeave", function()
+        arrowLbl:SetTextColor(0.45, 0.75, 0.70)
+    end)
+    return frame
+end
+
 local function CreateExpandButton(parent, expanded, onToggle)
     local isExpanded = expanded == true
     local button = ns.AcquireFrame(parent, "controlFrame2", "Button")
@@ -219,15 +296,33 @@ function Config.CreateModuleControl(spec)
         end
     end
 
-    local grip = CreateGrip(frame, spec.height, spec.available, spec.onDragStart, spec.onDragCommit)
+    local grip
+    if not spec.simple then
+        grip = CreateGrip(frame, spec.height, spec.available, spec.onDragStart, spec.onDragCommit)
+    end
     local checkbox = ns.AcquireFrame(frame, "controlFrame5", "CheckButton", "UICheckButtonTemplate")
     checkbox:SetSize(20, 20)
-    checkbox:SetPoint("LEFT", grip, "RIGHT", 2, 0)
-    checkbox:SetChecked(MR:IsModuleEnabled(moduleKey))
+    if grip then
+        checkbox:SetPoint("LEFT", grip, "RIGHT", 2, 0)
+    else
+        checkbox:SetPoint("LEFT", frame, "LEFT", 5, 0)
+    end
+    local moduleEnabled
+    if spec.isEnabled then
+        moduleEnabled = spec.isEnabled()
+    end
+    if moduleEnabled == nil then
+        moduleEnabled = MR:IsModuleEnabled(moduleKey)
+    end
+    checkbox:SetChecked(moduleEnabled)
     checkbox:SetEnabled(spec.available)
     checkbox:SetAlpha(spec.available and 1 or 0.45)
     checkbox:SetScript("OnClick", function(control)
-        MR:SetModuleEnabled(moduleKey, control:GetChecked(), true)
+        if spec.setEnabled then
+            spec.setEnabled(control:GetChecked())
+        else
+            MR:SetModuleEnabled(moduleKey, control:GetChecked(), true)
+        end
         if spec.onEnabledChanged then
             spec.onEnabledChanged()
         else
@@ -235,14 +330,21 @@ function Config.CreateModuleControl(spec)
         end
     end)
 
-    local expand = CreateExpandButton(frame, spec.expanded, spec.onToggleExpanded)
-    local hide = CreateHideCompleteButton(frame, moduleKey, expand)
-    local color = CreateModuleColorControls(frame, spec, hide)
+    local color
+    if not spec.simple then
+        local expand = CreateExpandButton(frame, spec.expanded, spec.onToggleExpanded)
+        local hide = CreateHideCompleteButton(frame, moduleKey, expand)
+        color = CreateModuleColorControls(frame, spec, hide)
+    end
 
     local label = ns.AcquireFontString(frame, "controlText11", "OVERLAY")
     label:SetFont(ns.FONT_ROWS, spec.fontSize, GetFontFlags())
     label:SetPoint("LEFT", checkbox, "RIGHT", 2, 0)
-    label:SetPoint("RIGHT", color, "LEFT", -2, 0)
+    if color then
+        label:SetPoint("RIGHT", color, "LEFT", -2, 0)
+    else
+        label:SetPoint("RIGHT", frame, "RIGHT", -8, 0)
+    end
     label:SetJustifyH("LEFT")
     label:SetText(spec.label)
     local labelColor = MR:GetHeaderColor(moduleKey) or mod.labelColor

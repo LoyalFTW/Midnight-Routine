@@ -133,6 +133,34 @@ end
 function MR:GetConfigFrame()
     return cfgFrame
 end
+
+function MR:PositionConfigFrame(frame)
+    frame = frame or cfgFrame
+    local mainFrame = self.frame
+    if not frame or not mainFrame or not UIParent then return end
+
+    local mainLeft = mainFrame:GetLeft()
+    local mainRight = mainFrame:GetRight()
+    local screenLeft = UIParent:GetLeft()
+    local screenRight = UIParent:GetRight()
+    if not mainLeft or not mainRight or not screenLeft or not screenRight then return end
+
+    local uiScale = UIParent:GetEffectiveScale()
+    local mainScale = mainFrame:GetEffectiveScale()
+    local frameScale = frame:GetEffectiveScale()
+    local leftSpace = (mainLeft * mainScale / uiScale) - screenLeft
+    local rightSpace = screenRight - (mainRight * mainScale / uiScale)
+    local requiredSpace = (frame:GetWidth() * frameScale / uiScale) + 4
+    local placeRight = rightSpace >= requiredSpace or rightSpace >= leftSpace
+
+    frame:ClearAllPoints()
+    if placeRight then
+        frame:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 4, 0)
+    else
+        frame:SetPoint("TOPRIGHT", mainFrame, "TOPLEFT", -4, 0)
+    end
+end
+
 function MR:ToggleConfig()
     if cfgFrame and cfgFrame:IsShown() then cfgFrame:Hide() return end
     if not cfgFrame then cfgFrame = self:BuildConfigFrame() end
@@ -140,6 +168,7 @@ function MR:ToggleConfig()
         self:RefreshStoryCampaignRegistration()
     end
     self:PopulateConfigFrame(cfgFrame)
+    self:PositionConfigFrame(cfgFrame)
     cfgFrame:Show()
 end
 
@@ -152,6 +181,7 @@ function MR:EnsureConfigShown()
         cfgFrame = self:BuildConfigFrame()
     end
     self:PopulateConfigFrame(cfgFrame)
+    self:PositionConfigFrame(cfgFrame)
     cfgFrame:Show()
 end
 

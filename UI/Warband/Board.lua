@@ -40,8 +40,6 @@ local WBStartDragVisual = Warband.WBStartDragVisual
 local WBStopDragVisual = Warband.WBStopDragVisual
 local WBMarkDragTarget = Warband.WBMarkDragTarget
 local WBUpdateDragTargetFromCursor = Warband.WBUpdateDragTargetFromCursor
-local GetExpansionDisplayInfo = Warband.GetExpansionDisplayInfo
-local BuildExpansionDropdown = Warband.BuildExpansionDropdown
 local WBConcentrationText = Warband.WBConcentrationText
 local WBConcentrationCurrent = Warband.WBConcentrationCurrent
 local WBConcentrationDailyGain = Warband.WBConcentrationDailyGain
@@ -361,6 +359,146 @@ local function EnsureWarbandDetailCard(frame, index)
     return card
 end
 
+local function IsBoardModule(mod)
+    if not mod or not mod.key then return false end
+    return mod.resetType == "weekly" or mod.key == "custom_tasks" or mod.key:match("^story_campaign_") ~= nil
+end
+
+local function PopulateWarbandModuleView(frame, selected)
+    local Config = ns.ConfigInternal
+    if not (Config and Config.CreateModuleControl) then
+        return
+    end
+
+    local modules = MR:GetOrderedMainModules()
+    local contentWidth = math.max((frame.moduleScroll:GetWidth() or 520) - 8, 320)
+    local moduleHeight = math.max(26, GetFontSize() + 13)
+    local moduleHeaderFs = math.max(7, GetFontSize() - 1)
+    local moduleSubFs = math.max(7, GetFontSize() - 3)
+    local widgetPool = ns.StartWidgetPool(frame.moduleContent)
+    local rowIndex = 0
+    local yOff = -4
+    local professionModules = {}
+    local professionEnabled = 0
+    local professionTotal = 0
+    local professionKnown = 0
+    local charData = MR.db and MR.db.sv and MR.db.sv.char and MR.db.sv.char[selected.key]
+    local savedProfessions = charData and type(charData.professions) == "table" and charData.professions or nil
+
+    for _, expansion in ipairs(ns.AllExpansions or {}) do
+        for _, profession in ipairs(expansion.professions or {}) do
+            professionTotal = professionTotal + 1
+            if (selected.isCurrent and MR.HasProfessionForModule and MR:HasProfessionForModule(profession.skillLine))
+                or (savedProfessions and savedProfessions[profession.skillLine] == true) then
+                professionKnown = professionKnown + 1
+            end
+        end
+    end
+
+    for _, mod in ipairs(modules) do
+        if mod.profSkillLine and IsBoardModule(mod) then
+            local enabled, _, learned = MR:GetWarbandCharacterModuleState(selected.key, mod)
+            if learned then
+                professionModules[#professionModules + 1] = mod
+                if enabled then
+                    professionEnabled = professionEnabled + 1
+                end
+            end
+        end
+    end
+
+    MR._cfgExpanded = MR._cfgExpanded or {}
+    local professionExpandedKey = "__professions"
+    local professionGroupOpen = MR._cfgExpanded[professionExpandedKey] == true
+
+    local function RenderModule(mod)
+        rowIndex = rowIndex + 1
+        local currentMod = mod
+        local enabled, available = MR:GetWarbandCharacterModuleState(selected.key, mod)
+        local label = WBClean(mod.label or mod.key)
+        if not available then
+            label = label .. "  |cff667788" .. (L["AltBoard_ModuleUnavailable"] or "Not available in this version") .. "|r"
+        end
+        Config.CreateModuleControl({
+            parent = frame.moduleContent,
+            module = currentMod,
+            x = currentMod.profSkillLine and 8 or 4,
+            y = yOff,
+            width = currentMod.profSkillLine and (contentWidth - 12) or (contentWidth - 8),
+            height = moduleHeight,
+            fontSize = moduleHeaderFs,
+            label = label,
+            available = available,
+            emphasized = currentMod.profSkillLine ~= nil,
+            story = currentMod.configGroup == "story" or currentMod.key:match("^story_campaign_") ~= nil,
+            rowIndex = rowIndex,
+            simple = true,
+            isEnabled = function()
+                return enabled
+            end,
+            setEnabled = function(value)
+                MR:SetWarbandCharacterModuleEnabled(selected.key, currentMod.key, value)
+            end,
+        })
+        yOff = yOff - moduleHeight - 1
+    end
+
+    local professionGroupRendered = false
+    for _, mod in ipairs(modules) do
+        if IsBoardModule(mod) then
+            if mod.profSkillLine then
+                if not professionGroupRendered then
+                    professionGroupRendered = true
+                    local groupHeight = math.max(42, moduleHeaderFs + moduleSubFs + 17)
+                    local professionTitle = (L["ProfKnowledge_Title"] or "Profession Knowledge"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                    Config.CreateProfessionGroupControl({
+                        parent = frame.moduleContent,
+                        x = 4,
+                        y = yOff,
+                        width = contentWidth - 8,
+                        height = groupHeight,
+                        headerFontSize = moduleHeaderFs,
+                        subFontSize = moduleSubFs,
+                        title = professionTitle,
+                        subtitle = string.format(L["ProfKnowledge_LearnedProfessions"] or "Learned professions %d/%d", professionKnown, professionTotal),
+                        expanded = professionGroupOpen,
+                        moduleCount = #professionModules,
+                        allEnabled = #professionModules > 0 and professionEnabled >= #professionModules,
+                        onSetEnabled = function(value)
+                            for _, professionMod in ipairs(professionModules) do
+                                MR:SetWarbandCharacterModuleEnabled(selected.key, professionMod.key, value, true)
+                            end
+                            MR:RequestUIRefresh(0.01)
+                            MR:RequestWarbandBoardRefresh(true)
+                        end,
+                        onToggleExpanded = function()
+                            MR._cfgExpanded[professionExpandedKey] = not professionGroupOpen
+                            MR:RefreshWarbandBoardSelection()
+                        end,
+                    })
+                    yOff = yOff - groupHeight - 3
+                    if professionGroupOpen then
+                        for _, professionMod in ipairs(professionModules) do
+                            RenderModule(professionMod)
+                        end
+                    end
+                end
+            else
+                RenderModule(mod)
+            end
+        end
+    end
+
+    ns.FinishWidgetPool(widgetPool)
+    frame.moduleContent:SetWidth(contentWidth)
+    frame.moduleContent:SetHeight(math.max(1, -yOff + 4))
+    frame.moduleScope:SetText(MR:IsCharacterWindowLayoutEnabled()
+        and (L["AltBoard_ModuleScopeCharacter"] or "Module visibility for this character")
+        or (L["AltBoard_ModuleScopeShared"] or "Shared layout: changes apply to every character"))
+    frame.moduleCharacter:SetText(selected.name .. (selected.realm ~= "" and ("  |cff667788" .. selected.realm .. "|r") or ""))
+    if frame.moduleScrollUpdate then frame.moduleScrollUpdate() end
+end
+
 local function EnsureWarbandConcentrationChip(frame, index)
     local chips = GetWidgetCache(frame, "heroConcentrationWidgets")
     local chip = chips[index]
@@ -424,16 +562,12 @@ function MR:RefreshWarbandBoard(reuseData)
     if not frame then return end
     self._warbandBoardLastRefreshAt = GetTime and GetTime() or 0
     frame:SetScale(self.db.profile.scale or 1)
-    local expansionInfo = GetExpansionDisplayInfo(true)
     local activeView = WBGetAltBoardView()
 
     if frame.titleText then
         frame.titleText:SetText(L["AltBoard_Title"] or "Alt Weekly Board")
     end
     WBRefreshAltBoardTabs(frame)
-    if frame.expansionDropdown and frame.expansionDropdown.Update then
-        frame.expansionDropdown:Update()
-    end
 
     if frame.summarySub then
         frame.summarySub:ClearAllPoints()
@@ -518,9 +652,9 @@ function MR:RefreshWarbandBoard(reuseData)
     end
 
     if #data <= 1 then
-        frame.summarySub:SetText(string.format("%s  |  %s", expansionInfo.shortLabel or expansionInfo.label or expansionInfo.key, WBAltLoginPrompt()))
+        frame.summarySub:SetText(WBAltLoginPrompt())
     else
-        frame.summarySub:SetText(string.format("%s  |  " .. (L["AltBoard_CharactersTracked"] or "%d characters tracked"), expansionInfo.shortLabel or expansionInfo.label or expansionInfo.key, #data))
+        frame.summarySub:SetText(string.format(L["AltBoard_CharactersTracked"] or "%d characters tracked", #data))
     end
 
     if frame.showHiddenBtn and frame.showHiddenBtn._label then
@@ -560,6 +694,7 @@ function MR:RefreshWarbandBoard(reuseData)
         if frame.hero then frame.hero:Hide() end
         if frame.concentrationPane then frame.concentrationPane:Hide() end
         if frame.detailScroll then frame.detailScroll:Hide() end
+        if frame.modulePane then frame.modulePane:Hide() end
         if frame.overviewScroll then frame.overviewScroll:Show() end
         if frame.overviewEmptyLabel then
             frame.overviewEmptyLabel:SetPoint("TOPLEFT", frame.overviewContent, "TOPLEFT", 8, -6)
@@ -600,9 +735,14 @@ function MR:RefreshWarbandBoard(reuseData)
         btn._meta:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
         btn._meta:SetText(GetCharacterDetailsText(entry))
         btn._note:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
-        btn._note:SetText(entry.note or "")
-        btn._note:SetTextColor(0.46, 0.78, 0.72)
-        btn._note:SetShown(entry.note ~= nil and entry.note ~= "")
+        local statusText = WBStatusText(entry)
+        if entry.note and entry.note ~= "" then
+            statusText = entry.note .. "  |  " .. statusText
+        end
+        local str, stg, stb = WBStatusColor(entry)
+        btn._note:SetText(statusText)
+        btn._note:SetTextColor(str, stg, stb)
+        btn._note:Show()
 
         local hideBtn = btn._hideBtn
         hideBtn:SetBackdropColor(0.035, 0.060, 0.090, 0.88)
@@ -629,6 +769,22 @@ function MR:RefreshWarbandBoard(reuseData)
         frame.leftScrollUpdate()
     end
 
+    if activeView == "modules" then
+        if frame.hero then frame.hero:Hide() end
+        if frame.concentrationPane then frame.concentrationPane:Hide() end
+        if frame.detailScroll then frame.detailScroll:Hide() end
+        if frame.overviewScroll then frame.overviewScroll:Hide() end
+        if frame.modulePane then frame.modulePane:Show() end
+        PopulateWarbandModuleView(frame, selected)
+        frame.summaryValue:SetText("")
+        frame.summarySub:SetText(MR:IsCharacterWindowLayoutEnabled()
+            and (L["AltBoard_ModuleScopeCharacter"] or "Module visibility for this character")
+            or (L["AltBoard_ModuleScopeShared"] or "Shared layout: changes apply to every character"))
+        return
+    end
+
+    if frame.modulePane then frame.modulePane:Hide() end
+
     if activeView == "concentration" then
         if frame.hero then frame.hero:Hide() end
         if frame.concentrationPane then frame.concentrationPane:Hide() end
@@ -637,8 +793,7 @@ function MR:RefreshWarbandBoard(reuseData)
 
         local totalCharacters, totalProfessions = WBPopulateConcentrationOverview(frame, data)
         frame.summarySub:SetText(string.format(
-            "%s  |  " .. (L["AltBoard_ConcentrationOverviewSub"] or "%d professions across %d characters"),
-            expansionInfo.shortLabel or expansionInfo.label or expansionInfo.key,
+            L["AltBoard_ConcentrationOverviewSub"] or "%d professions across %d characters",
             totalProfessions,
             totalCharacters
         ))
@@ -746,7 +901,7 @@ function MR:RefreshWarbandBoard(reuseData)
     local orderIndex = frame._detailOrderIndex or {}
     frame._detailOrderIndex = orderIndex
     wipe(orderIndex)
-    for idx, mod in ipairs(MR:GetOrderedModules(MR:GetSelectedExpansionKey(true))) do
+    for idx, mod in ipairs(MR:GetOrderedMainModules()) do
         orderIndex[mod.key] = idx
     end
     table.sort(selected.modules, function(a, b)
@@ -922,12 +1077,6 @@ function MR:ToggleWarbandBoard()
 
         CloseButton(titleBar, function() frame:Hide() end)
 
-        local expansionDropdown = BuildExpansionDropdown(frame, true, {
-            width = 160,
-            height = 18,
-        })
-        expansionDropdown:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -42, -(headerHeight + 6))
-
         local leftPane = CreateFrame("Frame", nil, frame, "BackdropTemplate")
         leftPane:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -(headerHeight + 34))
         leftPane:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 14, 14)
@@ -1070,7 +1219,7 @@ function MR:ToggleWarbandBoard()
 
         local function CreateAltBoardTab(label, viewKey)
             local btn = CreateFrame("Button", nil, tabBar, "BackdropTemplate")
-            btn:SetSize(136, 23)
+            btn:SetSize(104, 23)
             btn:SetBackdrop(MakeBackdrop())
             btn:SetScript("OnClick", function()
                 WBSetAltBoardView(viewKey)
@@ -1099,12 +1248,15 @@ function MR:ToggleWarbandBoard()
         local characterTab = CreateAltBoardTab(L["AltBoard_TabCharacter"] or "Character", "character")
         characterTab:SetPoint("LEFT", tabBar, "LEFT", 0, 0)
 
+        local modulesTab = CreateAltBoardTab(L["AltBoard_TabModules"] or "Modules", "modules")
+        modulesTab:SetPoint("LEFT", characterTab, "RIGHT", 6, 0)
+
         local concentrationTab = CreateAltBoardTab(L["AltBoard_TabConcentration"] or "Concentration", "concentration")
-        concentrationTab:SetPoint("LEFT", characterTab, "RIGHT", 8, 0)
+        concentrationTab:SetPoint("LEFT", modulesTab, "RIGHT", 6, 0)
 
         local concentrationTrackerBtn = CreateFrame("Button", nil, tabBar, "BackdropTemplate")
-        concentrationTrackerBtn:SetSize(144, 23)
-        concentrationTrackerBtn:SetPoint("LEFT", concentrationTab, "RIGHT", 8, 0)
+        concentrationTrackerBtn:SetSize(134, 23)
+        concentrationTrackerBtn:SetPoint("RIGHT", tabBar, "RIGHT", 0, 0)
         concentrationTrackerBtn:SetBackdrop(MakeBackdrop())
         concentrationTrackerBtn:SetBackdropColor(0.024, 0.050, 0.080, 0.90)
         concentrationTrackerBtn:SetBackdropBorderColor(0.12, 0.25, 0.30, 0.75)
@@ -1295,6 +1447,62 @@ function MR:ToggleWarbandBoard()
         overviewEmptyLabel:SetTextColor(0.68, 0.74, 0.84)
         overviewEmptyLabel:Hide()
 
+        local modulePane = CreateFrame("Frame", nil, rightPane, "BackdropTemplate")
+        modulePane:SetPoint("TOPLEFT", tabBar, "BOTTOMLEFT", 0, -12)
+        modulePane:SetPoint("BOTTOMRIGHT", rightPane, "BOTTOMRIGHT", -10, 10)
+        modulePane:SetBackdrop(MakeBackdrop())
+        WBApplySurface(modulePane, "soft")
+        modulePane:Hide()
+
+        local moduleAccent = modulePane:CreateTexture(nil, "ARTWORK")
+        moduleAccent:SetPoint("TOPLEFT", modulePane, "TOPLEFT", 0, 0)
+        moduleAccent:SetPoint("TOPRIGHT", modulePane, "TOPRIGHT", 0, 0)
+        moduleAccent:SetHeight(2)
+        moduleAccent:SetColorTexture(0.16, 0.78, 0.68, 0.92)
+
+        local moduleCharacter = modulePane:CreateFontString(nil, "OVERLAY")
+        moduleCharacter:SetFont(ns.FONT_HEADERS, math.max(12, GetFontSize() + 2), GetFontFlags())
+        moduleCharacter:SetPoint("TOPLEFT", modulePane, "TOPLEFT", 14, -11)
+        moduleCharacter:SetPoint("RIGHT", modulePane, "RIGHT", -160, 0)
+        moduleCharacter:SetJustifyH("LEFT")
+        moduleCharacter:SetTextColor(0.94, 0.98, 1.00)
+
+        local moduleScope = modulePane:CreateFontString(nil, "OVERLAY")
+        moduleScope:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        moduleScope:SetPoint("TOPLEFT", moduleCharacter, "BOTTOMLEFT", 0, -6)
+        moduleScope:SetPoint("RIGHT", modulePane, "RIGHT", -160, 0)
+        moduleScope:SetJustifyH("LEFT")
+        moduleScope:SetTextColor(0.55, 0.74, 0.75)
+
+        local moduleSettingsBtn = CreateFrame("Button", nil, modulePane, "BackdropTemplate")
+        moduleSettingsBtn:SetSize(132, 24)
+        moduleSettingsBtn:SetPoint("TOPRIGHT", modulePane, "TOPRIGHT", -12, -14)
+        moduleSettingsBtn:SetBackdrop(MakeBackdrop())
+        WBStylePillButton(moduleSettingsBtn, false)
+        moduleSettingsBtn._label = moduleSettingsBtn:CreateFontString(nil, "OVERLAY")
+        moduleSettingsBtn._label:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
+        moduleSettingsBtn._label:SetPoint("CENTER", moduleSettingsBtn, "CENTER", 0, 0)
+        moduleSettingsBtn._label:SetText(L["AltBoard_OpenModuleSettings"] or "Advanced settings")
+        moduleSettingsBtn:SetScript("OnClick", function()
+            MR._cfgPage = "modules"
+            MR:EnsureConfigShown()
+        end)
+        moduleSettingsBtn:SetScript("OnEnter", function(selfBtn)
+            WBStylePillButton(selfBtn, true)
+            ns.ShowTooltip(selfBtn, { text = L["AltBoard_ModuleSettingsTooltip"] or "Open row visibility, colors, ordering, and other module settings. Character-only advanced options apply to the character you are logged into." })
+        end)
+        moduleSettingsBtn:SetScript("OnLeave", function(selfBtn)
+            WBStylePillButton(selfBtn, false)
+            ns.HideOwnedTooltip(selfBtn)
+        end)
+
+        local moduleScroll, moduleContent, moduleScrollUpdate = WBCreateScrollArea(
+            modulePane,
+            { "TOPLEFT", modulePane, "TOPLEFT", 10, -62 },
+            { "BOTTOMRIGHT", modulePane, "BOTTOMRIGHT", -12, 10 }
+        )
+        moduleContent:SetSize(520, 1)
+
         frame.charButtons = {}
         frame.charRail = charRail
         frame.leftScroll = leftScroll
@@ -1308,9 +1516,15 @@ function MR:ToggleWarbandBoard()
         frame.overviewScrollUpdate = overviewScrollUpdate
         frame.overviewContent = overviewContent
         frame.overviewEmptyLabel = overviewEmptyLabel
+        frame.modulePane = modulePane
+        frame.moduleScroll = moduleScroll
+        frame.moduleContent = moduleContent
+        frame.moduleScrollUpdate = moduleScrollUpdate
+        frame.moduleCharacter = moduleCharacter
+        frame.moduleScope = moduleScope
+        frame.moduleSettingsBtn = moduleSettingsBtn
         frame.summaryValue = summaryValue
         frame.summarySub = summarySub
-        frame.expansionDropdown = expansionDropdown
         frame.hero = hero
         frame.heroConcentrationWidgets = {}
         frame.concentrationPane = concentrationPane
@@ -1333,6 +1547,7 @@ function MR:ToggleWarbandBoard()
         frame.tabBar = tabBar
         frame.altTabs = {
             character = characterTab,
+            modules = modulesTab,
             concentration = concentrationTab,
         }
         frame.rightPane = rightPane

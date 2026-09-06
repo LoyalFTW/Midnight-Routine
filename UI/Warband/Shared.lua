@@ -169,6 +169,9 @@ local function WBStatusText(entry)
     if entry.stale then
         return L["AltBoard_NeedsLogin"] or "Needs login after reset"
     end
+    if (entry.totalRows or 0) == 0 then
+        return L["AltBoard_NoModulesShown"] or "No weekly modules shown"
+    end
     if (entry.doneRows or 0) >= (entry.totalRows or 0) and (entry.totalRows or 0) > 0 then
         return L["AltBoard_EverythingDone"] or "Everything done"
     end
@@ -556,12 +559,15 @@ end
 
 local function WBGetAltBoardView()
     local view = MR and MR.db and MR.db.profile and MR.db.profile.altBoardView
-    return view == "concentration" and "concentration" or "character"
+    if view == "concentration" or view == "modules" then
+        return view
+    end
+    return "character"
 end
 
 local function WBSetAltBoardView(view)
     if MR and MR.db and MR.db.profile then
-        MR.db.profile.altBoardView = (view == "concentration") and "concentration" or "character"
+        MR.db.profile.altBoardView = (view == "concentration" or view == "modules") and view or "character"
     end
 end
 
