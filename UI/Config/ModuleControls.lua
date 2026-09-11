@@ -161,11 +161,15 @@ function Config.CreateProfessionGroupControl(spec)
     return frame
 end
 
-local function CreateExpandButton(parent, expanded, onToggle)
+local function CreateExpandButton(parent, expanded, onToggle, anchor)
     local isExpanded = expanded == true
     local button = ns.AcquireFrame(parent, "controlFrame2", "Button")
     button:SetSize(18, 18)
-    button:SetPoint("RIGHT", parent, "RIGHT", -3, 0)
+    if anchor then
+        button:SetPoint("RIGHT", anchor, "LEFT", -3, 0)
+    else
+        button:SetPoint("RIGHT", parent, "RIGHT", -3, 0)
+    end
 
     local label = ns.AcquireFontString(button, "controlText9", "OVERLAY")
     label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
@@ -188,6 +192,35 @@ local function CreateExpandButton(parent, expanded, onToggle)
     end)
     button:SetScript("OnLeave", function()
         ApplyState(false)
+        ns.HideOwnedTooltip(button)
+    end)
+    return button
+end
+
+local function CreateManageButton(parent, onManage)
+    if not onManage then return nil end
+    local button = ns.AcquireFrame(parent, "controlFrame6", "Button", "BackdropTemplate")
+    button:SetSize(18, 16)
+    button:SetPoint("RIGHT", parent, "RIGHT", -3, 0)
+    button:SetBackdrop(MakeBackdrop())
+    button:SetBackdropColor(0.03, 0.06, 0.08, 0.92)
+    button:SetBackdropBorderColor(0.18, 0.36, 0.40, 0.85)
+
+    local label = ns.AcquireFontString(button, "controlText12", "OVERLAY")
+    label:SetFont(ns.FONT_HEADERS, 9, GetFontFlags())
+    label:SetPoint("CENTER", button, "CENTER", 0, 2)
+    label:SetText("...")
+    label:SetTextColor(0.70, 0.88, 0.84)
+
+    button:SetScript("OnClick", onManage)
+    button:SetScript("OnEnter", function()
+        button:SetBackdropBorderColor(0.30, 0.82, 0.72, 1)
+        label:SetTextColor(1, 1, 1)
+        ns.ShowTooltip(button, { text = L["CustomTasks_ManageCategoryShort"] or "Rename or remove category" })
+    end)
+    button:SetScript("OnLeave", function()
+        button:SetBackdropBorderColor(0.18, 0.36, 0.40, 0.85)
+        label:SetTextColor(0.70, 0.88, 0.84)
         ns.HideOwnedTooltip(button)
     end)
     return button
@@ -332,7 +365,8 @@ function Config.CreateModuleControl(spec)
 
     local color
     if not spec.simple then
-        local expand = CreateExpandButton(frame, spec.expanded, spec.onToggleExpanded)
+        local manage = CreateManageButton(frame, spec.onManage)
+        local expand = CreateExpandButton(frame, spec.expanded, spec.onToggleExpanded, manage)
         local hide = CreateHideCompleteButton(frame, moduleKey, expand)
         color = CreateModuleColorControls(frame, spec, hide)
     end

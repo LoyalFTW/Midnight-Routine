@@ -516,11 +516,11 @@ local function EnsureWarbandConcentrationChip(frame, index)
     chip._dot:SetPoint("LEFT", chip, "LEFT", 8, 0)
     chip._label = chip:CreateFontString(nil, "OVERLAY")
     chip._label:SetPoint("LEFT", chip._dot, "RIGHT", 6, 0)
-    chip._label:SetPoint("RIGHT", chip, "RIGHT", -68, 0)
+    chip._label:SetPoint("RIGHT", chip, "RIGHT", -92, 0)
     chip._label:SetJustifyH("LEFT")
     chip._value = chip:CreateFontString(nil, "OVERLAY")
     chip._value:SetPoint("RIGHT", chip, "RIGHT", -8, 0)
-    chip._value:SetWidth(52)
+    chip._value:SetWidth(76)
     chip._value:SetJustifyH("RIGHT")
 
     chip:SetScript("OnMouseDown", function(selfChip, button)
@@ -685,7 +685,7 @@ function MR:RefreshWarbandBoard(reuseData)
         HideUnusedWidgets(frame.charButtons, 0, ResetSelectableWidget)
         HideUnusedWidgets(frame._detailCards, 0, ResetCachedWidget)
         if frame.concentrationPane then
-            frame.concentrationPane:SetHeight(42)
+            frame.concentrationPane:SetHeight(44)
         end
         if frame.concentrationStatus then
             frame.concentrationStatus:SetText(WBAltLoginPrompt())
@@ -815,25 +815,21 @@ function MR:RefreshWarbandBoard(reuseData)
     if frame.heroNoteBox and not frame.heroNoteBox:HasFocus() then
         frame.heroNoteBox:SetText(selected.note or "")
     end
-    frame.heroStatus:ClearAllPoints()
-    frame.heroStatus:SetPoint("BOTTOMLEFT", frame.hero, "BOTTOMLEFT", 14, 12)
     frame.heroStatus:SetText("")
 
     local showHiddenCharacters = MR.db and MR.db.profile and MR.db.profile.altBoardShowHidden == true
     local concentrationEntries = (not showHiddenCharacters) and type(selected.concentration) == "table" and selected.concentration or nil
-    local concentrationHeight = 42
+    local concentrationHeight = 44
     if concentrationEntries and #concentrationEntries > 0 and frame.concentrationPane then
-        local contentWidth = math.max((frame.concentrationPane:GetWidth() or 520) - 28, 200)
-        local columns = math.max(1, math.min(4, #concentrationEntries))
-        if contentWidth >= 520 then
-            columns = math.max(columns, math.min(3, #concentrationEntries))
-        end
-        local gap = 8
-        while columns > 1 and ((columns * 168) + ((columns - 1) * gap)) > contentWidth do
+        local labelWidth = 112
+        local contentWidth = math.max((frame.concentrationPane:GetWidth() or 520) - 28 - labelWidth, 150)
+        local columns = math.max(1, math.min(3, #concentrationEntries))
+        local gap = 6
+        while columns > 1 and ((columns * 150) + ((columns - 1) * gap)) > contentWidth do
             columns = columns - 1
         end
-        local chipWidth = math.max(168, math.floor((contentWidth - ((columns - 1) * gap)) / columns))
-        local rowHeight = 26
+        local chipWidth = math.max(150, math.floor((contentWidth - ((columns - 1) * gap)) / columns))
+        local rowHeight = 24
         local usedRows = math.max(1, math.ceil(#concentrationEntries / columns))
         frame.concentrationPane._orderChips = frame.concentrationPane._orderChips or {}
         wipe(frame.concentrationPane._orderChips)
@@ -844,8 +840,8 @@ function MR:RefreshWarbandBoard(reuseData)
             local valueText = WBConcentrationText(concentrationEntry)
             local col = (index - 1) % columns
             local row = math.floor((index - 1) / columns)
-            local xOffset = 14 + (col * (chipWidth + gap))
-            local yOffset = -34 - (row * (rowHeight + gap))
+            local xOffset = 14 + labelWidth + (col * (chipWidth + gap))
+            local yOffset = -10 - (row * (rowHeight + gap))
 
             local chip = EnsureWarbandConcentrationChip(frame, index)
             chip._entry = concentrationEntry
@@ -874,10 +870,9 @@ function MR:RefreshWarbandBoard(reuseData)
 
         HideUnusedWidgets(frame.heroConcentrationWidgets, #concentrationEntries, ResetCachedWidget)
 
-        concentrationHeight = 34 + (usedRows * rowHeight) + (math.max(0, usedRows - 1) * gap) + 10
+        concentrationHeight = 20 + (usedRows * rowHeight) + (math.max(0, usedRows - 1) * gap)
     else
         HideUnusedWidgets(frame.heroConcentrationWidgets, 0, ResetCachedWidget)
-        frame.heroStatus:SetText(selected.stale and (L["AltBoard_AwaitingRefresh"] or "Awaiting refresh") or "")
         if frame.concentrationStatus then
             frame.concentrationStatus:SetText(selected.stale and (L["AltBoard_AwaitingRefresh"] or "Awaiting refresh") or WBAltLoginPrompt())
             frame.concentrationStatus:SetTextColor(selected.stale and 0.95 or 0.68, selected.stale and 0.50 or 0.74, selected.stale and 0.25 or 0.84)
@@ -1287,7 +1282,7 @@ function MR:ToggleWarbandBoard()
         local hero = CreateFrame("Frame", nil, rightPane, "BackdropTemplate")
         hero:SetPoint("TOPLEFT", tabBar, "BOTTOMLEFT", 0, -14)
         hero:SetPoint("TOPRIGHT", tabBar, "BOTTOMRIGHT", 0, -14)
-        hero:SetHeight(92)
+        hero:SetHeight(62)
         hero:SetBackdrop(MakeBackdrop())
         WBApplySurface(hero, "raised")
 
@@ -1299,29 +1294,31 @@ function MR:ToggleWarbandBoard()
 
         local heroName = hero:CreateFontString(nil, "OVERLAY")
         heroName:SetFont(ns.FONT_HEADERS, math.max(13, GetFontSize() + 3), GetFontFlags())
-        heroName:SetPoint("TOPLEFT", hero, "TOPLEFT", 18, -15)
+        heroName:SetPoint("TOPLEFT", hero, "TOPLEFT", 14, -10)
         heroName:SetPoint("RIGHT", hero, "RIGHT", -244, 0)
+        heroName:SetJustifyH("LEFT")
         heroName:SetTextColor(0.96, 0.99, 1.00)
 
         local heroMeta = hero:CreateFontString(nil, "OVERLAY")
         heroMeta:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        heroMeta:SetPoint("TOPLEFT", heroName, "BOTTOMLEFT", 0, -8)
+        heroMeta:SetPoint("TOPLEFT", heroName, "BOTTOMLEFT", 0, -4)
         heroMeta:SetPoint("RIGHT", heroName, "RIGHT", 0, 0)
+        heroMeta:SetJustifyH("LEFT")
         heroMeta:SetTextColor(0.70, 0.78, 0.86)
 
         local heroStatus = hero:CreateFontString(nil, "OVERLAY")
-        heroStatus:SetFont(ns.FONT_ROWS, math.max(10, GetFontSize()), GetFontFlags())
-        heroStatus:SetPoint("BOTTOMLEFT", hero, "BOTTOMLEFT", 18, 14)
+        heroStatus:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+        heroStatus:SetPoint("BOTTOMLEFT", hero, "BOTTOMLEFT", 14, 8)
 
         local heroNoteLabel = hero:CreateFontString(nil, "OVERLAY")
         heroNoteLabel:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        heroNoteLabel:SetPoint("TOPLEFT", hero, "TOPRIGHT", -226, -15)
+        heroNoteLabel:SetPoint("TOPLEFT", hero, "TOPRIGHT", -226, -9)
         heroNoteLabel:SetText(L["AltBoard_NoteLabel"] or "Note / tag")
         heroNoteLabel:SetTextColor(0.62, 0.74, 0.80)
 
         local heroNoteBox = CreateFrame("EditBox", nil, hero, "BackdropTemplate")
-        heroNoteBox:SetSize(210, 24)
-        heroNoteBox:SetPoint("TOPLEFT", heroNoteLabel, "BOTTOMLEFT", 0, -6)
+        heroNoteBox:SetSize(210, 22)
+        heroNoteBox:SetPoint("TOPLEFT", heroNoteLabel, "BOTTOMLEFT", 0, -3)
         heroNoteBox:SetAutoFocus(false)
         heroNoteBox:SetFont(ns.FONT_ROWS, math.max(9, GetFontSize()), GetFontFlags())
         heroNoteBox:SetTextColor(0.92, 0.96, 1.00)
@@ -1366,7 +1363,7 @@ function MR:ToggleWarbandBoard()
         local concentrationPane = CreateFrame("Frame", nil, rightPane, "BackdropTemplate")
         concentrationPane:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", 0, -10)
         concentrationPane:SetPoint("TOPRIGHT", hero, "BOTTOMRIGHT", 0, -10)
-        concentrationPane:SetHeight(42)
+        concentrationPane:SetHeight(44)
         concentrationPane:SetBackdrop(MakeBackdrop())
         WBApplySurface(concentrationPane, "soft")
 
@@ -1377,14 +1374,16 @@ function MR:ToggleWarbandBoard()
         concentrationAccent:SetColorTexture(0.50, 0.42, 0.72, 0.95)
 
         local concentrationTitle = concentrationPane:CreateFontString(nil, "OVERLAY")
-        concentrationTitle:SetFont(ns.FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
-        concentrationTitle:SetPoint("TOPLEFT", concentrationPane, "TOPLEFT", 14, -10)
+        concentrationTitle:SetFont(ns.FONT_HEADERS, math.max(9, GetFontSize()), GetFontFlags())
+        concentrationTitle:SetPoint("LEFT", concentrationPane, "LEFT", 14, 0)
+        concentrationTitle:SetWidth(102)
+        concentrationTitle:SetJustifyH("LEFT")
         concentrationTitle:SetText(WBConcentrationLabel())
         concentrationTitle:SetTextColor(0.78, 0.76, 0.92)
 
         local concentrationStatus = concentrationPane:CreateFontString(nil, "OVERLAY")
         concentrationStatus:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        concentrationStatus:SetPoint("TOPLEFT", concentrationTitle, "BOTTOMLEFT", 0, -8)
+        concentrationStatus:SetPoint("LEFT", concentrationTitle, "RIGHT", 10, 0)
         concentrationStatus:SetPoint("RIGHT", concentrationPane, "RIGHT", -12, 0)
         concentrationStatus:SetJustifyH("LEFT")
         concentrationStatus:SetTextColor(0.70, 0.78, 0.88)

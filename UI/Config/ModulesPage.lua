@@ -1196,6 +1196,11 @@ function Config.BuildModulesPage(ctx)
                 onToggleExpanded = function()
                     ToggleModuleExpanded(key)
                 end,
+                onManage = currentMod.customTaskCategoryModule and function()
+                    if MR.ShowCustomTaskCategoryDialog then
+                        MR:ShowCustomTaskCategoryDialog(currentMod.customTaskResetType, currentMod.customTaskCategory)
+                    end
+                end or nil,
                 onEnabledChanged = isStoryConfigModule and function()
                     MR:RefreshUI()
                     if MR.RequestConfigRepopulate then

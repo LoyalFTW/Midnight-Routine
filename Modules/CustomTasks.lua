@@ -1545,12 +1545,7 @@ local function SyncCustomTaskCategoryModules(rows)
     local filtered = {}
     for _, row in ipairs(rows) do
         local separate = row.category and MR:IsCustomTaskCategorySeparateModule(row.configGroup, row.category)
-        if row.categoryHeader and separate then
-            local entry = MR:GetCustomTaskCategoryModuleEntry(row.configGroup, row.category, false)
-            row.hideInMain = true
-            row.separateModuleKey = GetCategoryModuleKey(entry)
-            filtered[#filtered + 1] = row
-        elseif not (not row.control and row.progressModuleKey == CUSTOM_MODULE_KEY) then
+        if not (row.categoryHeader and separate) and not (not row.control and row.progressModuleKey == CUSTOM_MODULE_KEY) then
             filtered[#filtered + 1] = row
         end
     end
