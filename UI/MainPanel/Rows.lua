@@ -1170,11 +1170,12 @@ local function GetMainRowWidgetKind(mod, row)
 
     local kind = "normal"
     local isProfessionRow = mod and mod.profSkillLine
+    local professionCountEntry = isProfessionRow and row.professionKnowledgeEntry and row.professionKnowledgeEntry.mode == "count"
     local isCurrencyRow = mod and (mod.key == "currencies" or mod.key == "pvp_currencies") and row.currencyId
     if isProfessionRow then kind = kind .. ":profession" end
     if isCurrencyRow then kind = kind .. ":currency" end
     if row.zone and row.x and row.y and not row.hideCoordText and not isProfessionRow then kind = kind .. ":coords" end
-    if (type(row.kpTotal) == "number" and row.kpTotal > 0) or row.vaultLabel then kind = kind .. ":detail" end
+    if (not professionCountEntry and type(row.kpTotal) == "number" and row.kpTotal > 0) or row.vaultLabel then kind = kind .. ":detail" end
     if row.encounterIds and row.taskId then kind = kind .. ":difficulty" end
     return kind
 end
@@ -1523,8 +1524,9 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     local hasNumericMax = type(row.max) == "number" and row.max > 0
     local isCurrencyRow = row.currencyId and hasNumericMax and not row.noMax
     local isProfessionRow = mod and mod.profSkillLine
+    local professionCountEntry = isProfessionRow and row.professionKnowledgeEntry and row.professionKnowledgeEntry.mode == "count"
     local hasCoordText = hasWaypoint and not row.hideCoordText and not isProfessionRow
-    local hasKnowledgeText = type(row.kpTotal) == "number" and row.kpTotal > 0
+    local hasKnowledgeText = not professionCountEntry and type(row.kpTotal) == "number" and row.kpTotal > 0
     local availableRightWidth = math.max(colW - (PADDING + 32) - math.max(40, GetFontSize() * 4), 0)
     if hasCoordText and (hasKnowledgeText and 168 or 128) > availableRightWidth then
         hasCoordText = false
@@ -1580,7 +1582,12 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
     SetWidthIfChanged(rowFrame._count, 0)
 
     local countText, countTextColor = GetMainFrameRowCount(row)
-    if isProfessionRow then
+    if professionCountEntry then
+        local current = tonumber(done) or 0
+        local required = tonumber(row.max) or 1
+        countText = string.format("%d/%d", current, required)
+        countTextColor = { countColor(current, required) }
+    elseif isProfessionRow then
         countText, countTextColor = nil, nil
     end
     if countText then

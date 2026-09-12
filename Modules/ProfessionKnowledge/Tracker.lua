@@ -1606,6 +1606,13 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         elseif row.key == "prof_catchup" then
             valueText:SetText(tostring(task.current or 0))
             valueText:SetTextColor(rr, rg, rb, 0.95)
+        elseif row.professionKnowledgeEntry and row.professionKnowledgeEntry.mode == "count" then
+            valueText:SetText(string.format("%d/%d", task.current or 0, task.max or maxValue))
+            if ns.CountColor then
+                valueText:SetTextColor(ns.CountColor(task.current or 0, task.max or maxValue))
+            else
+                valueText:SetTextColor(rr, rg, rb, 0.95)
+            end
         elseif task.done then
             valueText:SetText(L["Done"] or "Done")
             valueText:SetTextColor(0.32, 0.80, 0.50, 0.95)
@@ -3234,7 +3241,10 @@ eventFrame:SetScript("OnEvent", function(_, event, addonName)
         end
         eventFrame:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_LOGIN" then
-        if MR.db and MR.GetManagedWindowOpen and MR:GetManagedWindowOpen("gatheringLocOpen") then
+        if MR.db
+            and MR.GetManagedWindowOpen
+            and MR:GetManagedWindowOpen("gatheringLocOpen")
+            and not (MR.IsManagedWindowsBundleHidden and MR:IsManagedWindowsBundleHidden()) then
             MR:ShowGatheringLocations()
         end
         eventFrame:UnregisterEvent("PLAYER_LOGIN")

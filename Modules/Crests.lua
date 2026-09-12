@@ -212,6 +212,7 @@ function MR:RefreshCurrenciesModule(refreshUI)
 
     RefreshCrestItemLabels()
     MR._moduleStatsCache = nil
+    MR._trackingRowIndexesDirty = true
     if refreshUI ~= false and MR.RefreshUI then
         MR:RefreshUI()
     end

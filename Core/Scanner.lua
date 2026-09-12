@@ -198,6 +198,47 @@ local function UpdateItemProgressForRow(self, progress, mod, row)
     return WriteProgress(progress, mod.key, row.key, value, self.db.char.manualOverrides)
 end
 
+local function AddIndexedRow(index, id, mod, row)
+    if not id then return end
+    local entries = index[id]
+    if not entries then
+        entries = {}
+        index[id] = entries
+    end
+    entries[#entries + 1] = { mod = mod, row = row }
+end
+
+local function RebuildTrackingRowIndexes(self)
+    local indexes = {
+        quests = {},
+        currencies = {},
+        items = {},
+    }
+    for _, mod in ipairs(self.modules) do
+        for _, row in ipairs(mod.rows or {}) do
+            for _, questId in ipairs(row.questIds or {}) do
+                AddIndexedRow(indexes.quests, questId, mod, row)
+            end
+            AddIndexedRow(indexes.currencies, row.currencyId, mod, row)
+            if not row.noItemProgress then
+                AddIndexedRow(indexes.items, row.itemId, mod, row)
+            end
+        end
+    end
+    self._trackingRowIndexes = indexes
+    self._trackingRowIndexesDirty = nil
+    return indexes
+end
+
+local function GetIndexedRows(self, kind, id)
+    if id == nil then return nil end
+    local indexes = self._trackingRowIndexes
+    if not indexes or self._trackingRowIndexesDirty then
+        indexes = RebuildTrackingRowIndexes(self)
+    end
+    return indexes[kind][id] or {}
+end
+
 function MR:PrimeModuleData(mod)
     if not (mod and self.db and self.db.char and self.db.char.progress) then
         return false
@@ -363,12 +404,22 @@ function MR:RefreshCurrencyProgress(currencyId, refreshUI)
 
     local progress = self.db.char.progress
     local dirty = false
+    local indexedRows = GetIndexedRows(self, "currencies", currencyId)
 
-    for _, mod in ipairs(self.modules) do
-        if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
-            for _, row in ipairs(mod.rows) do
-                if row.currencyId and (currencyId == nil or row.currencyId == currencyId) then
-                    if UpdateCurrencyProgressForRow(self, progress, mod, row) then
+    if indexedRows then
+        for _, entry in ipairs(indexedRows) do
+            local mod, row = entry.mod, entry.row
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                if UpdateCurrencyProgressForRow(self, progress, mod, row) then
+                    dirty = true
+                end
+            end
+        end
+    else
+        for _, mod in ipairs(self.modules) do
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                for _, row in ipairs(mod.rows) do
+                    if row.currencyId and UpdateCurrencyProgressForRow(self, progress, mod, row) then
                         dirty = true
                     end
                 end
@@ -393,34 +444,36 @@ function MR:RefreshQuestProgress(questId, refreshUI)
 
     local progress = self.db.char.progress
     local dirty = false
+    local indexedRows = GetIndexedRows(self, "quests", questId)
 
-    for _, mod in ipairs(self.modules) do
-        if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
-            for _, row in ipairs(mod.rows) do
-                if row.questIds then
-                    local shouldUpdate = questId == nil
-                    if not shouldUpdate then
-                        for _, qid in ipairs(row.questIds) do
-                            if qid == questId then
-                                shouldUpdate = true
-                                break
-                            end
-                        end
-                    end
+    local function UpdateRow(mod, row)
+        if row.turnInTracked and row.allowQuestFlagBackfill then
+            local progressModuleKey = row.progressModuleKey or mod.key
+            local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(progressModuleKey, row.key)) or progress
+            local currentValue = progressBucket[progressModuleKey] and progressBucket[progressModuleKey][row.key] or 0
+            if currentValue <= 0 and UpdateQuestProgressForRow(self, progress, mod, row) then
+                dirty = true
+            end
+        elseif not row.turnInTracked then
+            if UpdateQuestProgressForRow(self, progress, mod, row) then
+                dirty = true
+            end
+        end
+    end
 
-                    if shouldUpdate then
-                        if row.turnInTracked and row.allowQuestFlagBackfill then
-                            local progressModuleKey = row.progressModuleKey or mod.key
-                            local progressBucket = (self.GetProgressBucket and self:GetProgressBucket(progressModuleKey, row.key)) or progress
-                            local currentValue = progressBucket[progressModuleKey] and progressBucket[progressModuleKey][row.key] or 0
-                            if currentValue <= 0 and UpdateQuestProgressForRow(self, progress, mod, row) then
-                                dirty = true
-                            end
-                        elseif not row.turnInTracked then
-                            if UpdateQuestProgressForRow(self, progress, mod, row) then
-                                dirty = true
-                            end
-                        end
+    if indexedRows then
+        for _, entry in ipairs(indexedRows) do
+            local mod, row = entry.mod, entry.row
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                UpdateRow(mod, row)
+            end
+        end
+    else
+        for _, mod in ipairs(self.modules) do
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                for _, row in ipairs(mod.rows) do
+                    if row.questIds then
+                        UpdateRow(mod, row)
                     end
                 end
             end
@@ -444,12 +497,22 @@ function MR:RefreshItemProgress(itemId, refreshUI)
 
     local progress = self.db.char.progress
     local dirty = false
+    local indexedRows = GetIndexedRows(self, "items", itemId)
 
-    for _, mod in ipairs(self.modules) do
-        if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
-            for _, row in ipairs(mod.rows) do
-                if row.itemId and not row.noItemProgress and (itemId == nil or row.itemId == itemId) then
-                    if UpdateItemProgressForRow(self, progress, mod, row) then
+    if indexedRows then
+        for _, entry in ipairs(indexedRows) do
+            local mod, row = entry.mod, entry.row
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                if UpdateItemProgressForRow(self, progress, mod, row) then
+                    dirty = true
+                end
+            end
+        end
+    else
+        for _, mod in ipairs(self.modules) do
+            if self:IsModuleEnabled(mod.key) or mod.customTaskCategoryModule then
+                for _, row in ipairs(mod.rows) do
+                    if row.itemId and not row.noItemProgress and UpdateItemProgressForRow(self, progress, mod, row) then
                         dirty = true
                     end
                 end
@@ -558,7 +621,12 @@ local function RunScanPass(self)
             end
         end
     end
-    local concentrationChanged = self:RefreshProfessionConcentration()
+    local now = GetTime and GetTime() or 0
+    local concentrationChanged = false
+    if not self._lastProfessionConcentrationRefreshAt
+        or (now - self._lastProfessionConcentrationRefreshAt) > 1 then
+        concentrationChanged = self:RefreshProfessionConcentration()
+    end
 
     local progress = self.db.char.progress
 
@@ -632,7 +700,6 @@ local function RunScanPass(self)
     end
 
     if dirty then self:RequestDataRefresh() end
-    if self.SyncAllRareKills then self:SyncAllRareKills() end
     if self.RefreshRares  then self:RefreshRares()  end
     if self.RefreshRenown then self:RefreshRenown() end
 end
@@ -680,8 +747,13 @@ function MR:Scan()
         return
     end
 
-    if self._scanSuppressedUntil and GetTime() < self._scanSuppressedUntil then
-        return
+    if self._scanSuppressedUntil then
+        local remaining = self._scanSuppressedUntil - GetTime()
+        if remaining > 0 then
+            self:RequestScan(remaining + 0.1)
+            return
+        end
+        self._scanSuppressedUntil = nil
     end
 
     self._scanCount = (self._scanCount or 0) + 1

@@ -1649,6 +1649,7 @@ function MR:RefreshCustomTasksModule()
     mod.label = self:GetCustomTasksTitle()
     self._moduleStatsCache = nil
     self._orderedModulesCache = nil
+    self._trackingRowIndexesDirty = true
 end
 
 function MR:RefreshEncounterProgress(encounterId, refreshUI, difficultyId)

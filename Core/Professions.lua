@@ -324,6 +324,8 @@ function MR:RefreshProfessionConcentration()
         return false
     end
 
+    self._lastProfessionConcentrationRefreshAt = GetTime and GetTime() or 0
+
     local previous = self.db.char.professionConcentration
     local concentration = {}
     for skillLineID, currencyID in pairs(PROFESSION_CONCENTRATION_CURRENCIES) do

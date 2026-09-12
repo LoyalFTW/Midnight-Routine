@@ -294,6 +294,7 @@ function MR:RegisterModule(def)
     self.moduleByKey[def.key] = def
     self._orderedModulesCache = nil
     self._orderedAllModulesCache = nil
+    self._trackingRowIndexesDirty = true
 
     if self.RebuildTurnInCompletions then
         self:RebuildTurnInCompletions()

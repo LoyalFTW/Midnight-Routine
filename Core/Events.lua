@@ -51,10 +51,7 @@ function MR:OnEnteringWorld()
         or self:GetManagedWindowOpen("gatheringLocOpen")
         or self:GetManagedWindowOpen("concentrationTrackerOpen")
     )
-    if trackingSurfaceRequested then
-        self:RefreshPlayerProfessions()
-        self:RefreshProfessionConcentration()
-    else
+    if not trackingSurfaceRequested then
         self:MarkBackgroundDataDirty()
     end
 
@@ -125,6 +122,10 @@ function MR:OnEnteringWorld()
         self._enteringWorldRefreshTimer = nil
         self:CheckWeeklyReset()
         self:CheckDailyReset()
+        if not self._raresInitialSyncComplete and self.SyncAllRareKills then
+            self._raresInitialSyncComplete = true
+            self:SyncAllRareKills(true)
+        end
         if self:HasVisibleMainTrackingSurface()
             or (self.gatheringLocationsFrame and self.gatheringLocationsFrame:IsShown()) then
             self:RefreshPlayerProfessions()
@@ -214,7 +215,6 @@ function MR:OnDelveLootReady()
 end
 
 function MR:OnQuestDataChanged()
-    self:OnRareProgressChanged()
     if not self:HasVisibleMainTrackingSurface() then
         self:MarkBackgroundDataDirty()
         return
@@ -264,8 +264,10 @@ function MR:OnRareProgressChanged()
 end
 
 function MR:OnQuestTurnedIn(_, questID)
+    local rareChanged = self.SyncRareQuestCompletion and self:SyncRareQuestCompletion(questID)
     if self.ShouldSuspendBackgroundWorkInCurrentInstance and self:ShouldSuspendBackgroundWorkInCurrentInstance() then
         self:ScanAutoUpdateInstanceRows(questID, nil)
+        if rareChanged and self.RefreshRares then self:RefreshRares() end
         return
     end
     local dirty = false
@@ -281,8 +283,7 @@ function MR:OnQuestTurnedIn(_, questID)
             self:RequestProfessionKnowledgeSurfaceRefresh()
         end
     end
-    if self.SyncAllRareKills then self:SyncAllRareKills() end
-    if self.RefreshRares then self:RefreshRares() end
+    if rareChanged and self.RefreshRares then self:RefreshRares() end
 end
 
 function MR:OnQuestAccepted(_, questID)

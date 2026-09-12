@@ -251,6 +251,7 @@ local function GetCurrentDayKey()
 end
 
 local RARE_BY_NPC_ID = {}
+local RARE_BY_QUEST_ID = {}
 local RARES_BY_ZONE_AND_NPC = {}
 local RARE_CRITERIA_COMPLETION = {}
 
@@ -265,6 +266,9 @@ for _, zone in ipairs(ZONES) do
     local raresByNPC = {}
     RARES_BY_ZONE_AND_NPC[zone] = raresByNPC
     for _, rare in ipairs(zone.rares) do
+        if rare[2] then
+            RARE_BY_QUEST_ID[rare[2]] = rare
+        end
         if rare[6] then
             raresByNPC[rare[6]] = rare
             RARE_BY_NPC_ID[rare[6]] = rare
@@ -309,6 +313,9 @@ local function ResolveRareQuestIDs(zone)
             if not rare[2] then
                 local cacheKey = GetRareQuestCacheKey(zone, index, rare)
                 rare[2] = profile.rareQuestIDs[cacheKey]
+                if rare[2] then
+                    RARE_BY_QUEST_ID[rare[2]] = rare
+                end
             end
         end
     end
@@ -346,6 +353,7 @@ local function ResolveRareQuestIDs(zone)
                     end
                     if rareIndex then
                         rare[2] = questID
+                        RARE_BY_QUEST_ID[questID] = rare
                         if profile then
                             profile.rareQuestIDs[GetRareQuestCacheKey(zone, rareIndex, rare)] = questID
                         end
@@ -375,6 +383,15 @@ local function SyncRareKillRecord(questId)
     elseif rec.d ~= dayKey then
         char.raresKills[key].d = dayKey
     end
+end
+
+function MR:SyncRareQuestCompletion(questId)
+    questId = tonumber(questId)
+    if not questId or not RARE_BY_QUEST_ID[questId] then
+        return false
+    end
+    SyncRareKillRecord(questId)
+    return true
 end
 
 local function GetRareKillStatus(questId)
