@@ -86,7 +86,7 @@ jobs:
 
           toc.write_text(toc_text, encoding="utf-8")
 
-          archive = Path(os.environ["RUNNER_TEMP"]) / f"RoutineData-{version}.zip"
+          archive = root.parent / f"RoutineData-{version}.zip"
           with ZipFile(archive, "w", ZIP_DEFLATED) as package:
               for path in sorted(root.rglob("*")):
                   if path.is_file() and not any(part.startswith(".") for part in path.relative_to(root).parts):
@@ -100,19 +100,20 @@ jobs:
               output.write(f"ADDON_VERSION={version}\nADDON_ARCHIVE={archive}\n")
           PY
 
-      - name: Publish RoutineData to addon sites
+      - name: Publish RoutineData to addon sites and GitHub
         uses: BigWigsMods/packager@master
         with:
           args: >-
             -t RoutineData -m RoutineData/.pkgmeta
-            -r "${{ runner.temp }}/routinedata-package" -c -e
+            -r "${{ runner.temp }}/routinedata-package" -o -c -e
             -n "RoutineData-${{ env.ADDON_VERSION }}:${{ env.ADDON_VERSION }}"
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish RoutineData release
+      - name: Set RoutineData release details
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -122,10 +123,5 @@ jobs:
           if [[ "$ADDON_VERSION" == *-* ]]; then
             prerelease+=(--prerelease)
           fi
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "$ADDON_ARCHIVE" --clobber
-          else
-            gh release create "$TAG" "$ADDON_ARCHIVE" --verify-tag \
-              --title "RoutineData $ADDON_VERSION" \
-              --notes-file RoutineData/CHANGELOG.md --latest=false "${prerelease[@]}"
-          fi
+          gh release edit "$TAG" --title "RoutineData $ADDON_VERSION" \
+            --notes-file RoutineData/CHANGELOG.md --latest=false "${prerelease[@]}"
