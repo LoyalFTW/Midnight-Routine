@@ -1,0 +1,131 @@
+name: Release RoutineData
+
+on:
+  push:
+    tags:
+      - "dv*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-routinedata-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Prepare RoutineData release
+        run: |
+          git config core.worktree "$GITHUB_WORKSPACE"
+          ln -s "$GITHUB_WORKSPACE/.git" RoutineData/.git
+
+      - name: Validate addon-site publishing settings
+        env:
+          HAS_CF_TOKEN: ${{ secrets.CF_API_KEY != '' }}
+          HAS_WOWI_TOKEN: ${{ secrets.WOWI_API_TOKEN != '' }}
+          HAS_WAGO_TOKEN: ${{ secrets.WAGO_API_TOKEN != '' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          toc = Path("RoutineData/RoutineData.toc").read_text(encoding="utf-8")
+          metadata = dict(re.findall(r"(?m)^## ([^:\r\n]+):[ \t]*([^\r\n]*)", toc))
+          targets = [
+              ("CurseForge", "CF_API_KEY", "X-Curse-Project-ID", "HAS_CF_TOKEN", r"[1-9][0-9]*"),
+              ("WoWInterface", "WOWI_API_TOKEN", "X-WoWI-ID", "HAS_WOWI_TOKEN", r"[1-9][0-9]*"),
+              ("Wago", "WAGO_API_TOKEN", "X-Wago-ID", "HAS_WAGO_TOKEN", r"[A-Za-z0-9]+"),
+          ]
+          configured = 0
+          for site, secret, field, flag, pattern in targets:
+              project = metadata.get(field, "").strip()
+              if not project:
+                  continue
+              if not re.fullmatch(pattern, project):
+                  raise SystemExit(f"Set {field} in RoutineData.toc to RoutineData's {site} project ID")
+              if os.environ.get(flag, "false").lower() != "true":
+                  raise SystemExit(f"Add the {secret} repository secret for {site}")
+              configured += 1
+          if configured == 0:
+              raise SystemExit("Add RoutineData's addon-site project IDs to RoutineData.toc")
+          PY
+
+      - name: Fetch libraries and stage RoutineData
+        uses: BigWigsMods/packager@master
+        with:
+          args: -t RoutineData -m RoutineData/.pkgmeta -r "${{ runner.temp }}/routinedata-package" -z -d
+
+      - name: Package RoutineData
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          tag = os.environ["TAG"]
+          version = tag.removeprefix("d")
+          if not re.fullmatch(r"v\d+\.\d+\.\d+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?", version):
+              raise SystemExit("Use a tag such as dv0.1.0 or dv0.1.0-beta.1")
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "routinedata-package" / "RoutineData"
+          toc = root / "RoutineData.toc"
+          toc_text, count = re.subn(r"(?m)^## Version:[^\r\n]*", f"## Version: {version}", toc.read_text(encoding="utf-8"))
+          if count != 1:
+              raise SystemExit("RoutineData.toc must contain exactly one Version field")
+
+          toc.write_text(toc_text, encoding="utf-8")
+
+          archive = Path(os.environ["RUNNER_TEMP"]) / f"RoutineData-{version}.zip"
+          with ZipFile(archive, "w", ZIP_DEFLATED) as package:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file() and not any(part.startswith(".") for part in path.relative_to(root).parts):
+                      name = (Path("RoutineData") / path.relative_to(root)).as_posix()
+                      if path == toc:
+                          package.writestr(name, toc_text)
+                      else:
+                          package.write(path, name)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write(f"ADDON_VERSION={version}\nADDON_ARCHIVE={archive}\n")
+          PY
+
+      - name: Publish RoutineData to addon sites
+        uses: BigWigsMods/packager@master
+        with:
+          args: >-
+            -t RoutineData -m RoutineData/.pkgmeta
+            -r "${{ runner.temp }}/routinedata-package" -c -e
+            -n "RoutineData-${{ env.ADDON_VERSION }}:${{ env.ADDON_VERSION }}"
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+
+      - name: Publish RoutineData release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=()
+          if [[ "$ADDON_VERSION" == *-* ]]; then
+            prerelease+=(--prerelease)
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$ADDON_ARCHIVE" --clobber
+          else
+            gh release create "$TAG" "$ADDON_ARCHIVE" --verify-tag \
+              --title "RoutineData $ADDON_VERSION" \
+              --notes-file RoutineData/CHANGELOG.md --latest=false "${prerelease[@]}"
+          fi

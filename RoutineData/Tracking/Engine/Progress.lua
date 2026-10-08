@@ -1,0 +1,422 @@
+local _, addonNS = ...
+local tracking = addonNS.Tracking
+local env = tracking.env
+
+tracking.installers["Progress"] = function(owner, context)
+    local ns = context.namespace
+    local MR = ns.MR
+    local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
+    local STATIC_TURN_IN_COMPLETIONS = {
+        [89268] = { mod = "s1_weekly",           row = "lost_legends"        },
+        [89289] = { mod = "s1_weekly",           row = "saltherils_soiree"   },
+        [91966] = { mod = "s1_weekly",           row = "saltherils_soiree"   },
+        [90573] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+        [90574] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+        [90575] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+        [90576] = { mod = "s1_weekly",           row = "fortify_runestones"  },
+        [93744] = { mod = "s1_weekly",           row = "unity_against_void"  },
+        [96727] = { mod = "s1_weekly",           row = "unity_against_void"  },
+        [90962] = { mod = "midnight_activities", row = "stormarion_assault"  },
+        [94835] = { mod = "pvp_weeklies",        row = "early_training"      },
+    }
+
+    local TURN_IN_COMPLETIONS = {}
+
+    Core.staticTurnInCompletions = STATIC_TURN_IN_COMPLETIONS
+    Core.turnInCompletions = TURN_IN_COMPLETIONS
+
+    function MR:GetWeeklyRewardActivityBuckets()
+        local buckets = {
+            dungeon = {},
+            raid = {},
+            world = {},
+        }
+
+        if not (C_WeeklyRewards and C_WeeklyRewards.GetActivities) then
+            return buckets
+        end
+
+        local activities = C_WeeklyRewards.GetActivities()
+        if not activities then
+            return buckets
+        end
+
+        local fallbackWorld = {}
+        for _, activity in ipairs(activities) do
+            if activity.type == 1 then
+                table.insert(buckets.dungeon, activity)
+            elseif activity.type == 3 then
+                table.insert(buckets.raid, activity)
+            elseif activity.type == 6 then
+                table.insert(buckets.world, activity)
+            elseif activity.type == 4 then
+                table.insert(fallbackWorld, activity)
+            end
+        end
+
+        if #buckets.world == 0 then
+            buckets.world = fallbackWorld
+        end
+
+        return buckets
+    end
+
+
+    local DeepCopy = Core.DeepCopy
+
+    local function CanImportLegacyCustomTaskProgress(self, rowKey)
+        local taskId = type(rowKey) == "string" and tonumber(rowKey:match("^shared_task_(%d+)")) or nil
+        local task = taskId and env.getSharedCustomTask(taskId) or nil
+        if not task then
+            return false
+        end
+        if task.resetType == "none" then
+            return true
+        end
+
+        local region = (GetCurrentRegion and GetCurrentRegion()) or 1
+        local stampPrefix = task.resetType == "daily" and "lastCustomTaskDailyResetAt_" or "lastCustomTaskWeeklyResetAt_"
+        return not (self.db and self.db.global and tonumber(self.db.global[stampPrefix .. tostring(region)]))
+    end
+
+    local function ResolveCharacterSource(self, charKey)
+        local saved = charKey and self:GetCharacters()
+        return saved and saved[charKey] or env.getViewSource()
+    end
+
+    function MR:GetProgress(moduleKey, rowKey, charKey)
+        if moduleKey == "custom_tasks" and env.isAccountWideCustomTask(rowKey) then
+            local progress = self.db and self.db.global and self.db.global.customTaskProgress
+            local m = progress and progress[moduleKey]
+            if m and m[rowKey] ~= nil then
+                return m[rowKey]
+            end
+
+            local taskId = type(rowKey) == "string" and rowKey:match("^shared_task_(%d+)")
+            local legacyKey = taskId and CanImportLegacyCustomTaskProgress(self, rowKey) and ("task_" .. taskId) or nil
+            local legacyValue = legacyKey and m and m[legacyKey] or nil
+            if legacyValue ~= nil then
+                return legacyValue
+            end
+
+            if not CanImportLegacyCustomTaskProgress(self, rowKey) then
+                return 0
+            end
+
+            local source = ResolveCharacterSource(self, charKey)
+            local function readLocalProgress(localProgress)
+                local localModule = localProgress and localProgress[moduleKey]
+                return localModule and (localModule[rowKey] or (legacyKey and localModule[legacyKey])) or nil
+            end
+            local selectedValue = readLocalProgress(source and source.progress)
+            local currentValue = readLocalProgress(self.db and self.db.char and self.db.char.progress)
+            local localValue = selectedValue
+            if currentValue ~= nil and (localValue == nil or (tonumber(currentValue) or 0) > (tonumber(localValue) or 0)) then
+                localValue = currentValue
+            end
+            if localValue ~= nil then
+                local globalProgress = self.db and self.db.global and self.db.global.customTaskProgress
+                if globalProgress then
+                    globalProgress[moduleKey] = globalProgress[moduleKey] or {}
+                    globalProgress[moduleKey][rowKey] = localValue
+                end
+                return localValue
+            end
+
+            return 0
+        end
+
+        local source = ResolveCharacterSource(self, charKey) or self.db.char
+        local progress = source and source.progress or self.db.char.progress
+        local m = progress and progress[moduleKey]
+        return m and m[rowKey] or 0
+    end
+
+    function MR:GetRowTierAccent(mod, row, charKey)
+        if not (mod and row and row.liveTierLabelKey) then
+            return nil, nil
+        end
+
+        local source = ResolveCharacterSource(self, charKey) or self.db.char
+        local modProgress = source and source.progress and source.progress[mod.key]
+        if not modProgress then
+            return nil, nil
+        end
+        return modProgress[row.liveTierLabelKey], row.liveTierColorKey and modProgress[row.liveTierColorKey] or nil
+    end
+
+    function MR:IsRowVisibleForCharacter(mod, row, charData)
+        if row and row.relatedWeekly and env.shouldHideRelatedWhenComplete(mod and mod.key) then
+            charData = charData or env.getViewSource() or self.db.char
+            local weekly = row.relatedWeekly
+            local progress = charData and charData.progress and charData.progress[weekly.moduleKey]
+            if (tonumber(progress and progress[weekly.rowKey]) or 0) >= weekly.max
+                or (charData == self.db.char and row.relatedWeeklyComplete) then
+                return false
+            end
+        end
+        if not row or not row.isVisible then
+            return true
+        end
+
+        if mod and (mod.key == "darkmoon_faire" or (type(row.key) == "string" and row.key:match("_dmf$"))) then
+            return row.isVisible() == true
+        end
+
+        charData = charData or env.getViewSource() or (self.db and self.db.char)
+        if type(charData) == "table" and self.db and charData ~= self.db.char then
+            local visibility = charData.rowVisibility
+            local moduleVisibility = type(visibility) == "table" and mod and visibility[mod.key] or nil
+            local savedVisible
+            if type(moduleVisibility) == "table" then
+                savedVisible = moduleVisibility[row.key]
+            end
+            if savedVisible ~= nil then
+                return savedVisible == true
+            end
+
+            local progress = type(charData.progress) == "table" and mod and charData.progress[mod.key] or nil
+            if type(progress) == "table" and (tonumber(progress[row.key]) or 0) > 0 then
+                return true
+            end
+        end
+
+        return row.isVisible() == true
+    end
+
+    function MR:GetProgressBucket(moduleKey, rowKey)
+        if moduleKey == "custom_tasks" and env.isAccountWideCustomTask(rowKey) then
+            self.db.global.customTaskProgress = self.db.global.customTaskProgress or {}
+            return self.db.global.customTaskProgress
+        end
+
+        return self.db.char.progress
+    end
+
+    function MR:GetManualOverrideBucket(moduleKey, rowKey)
+        if moduleKey == "custom_tasks" and env.isAccountWideCustomTask(rowKey) then
+            self.db.global.customTaskManualOverrides = self.db.global.customTaskManualOverrides or {}
+            return self.db.global.customTaskManualOverrides
+        end
+
+        return self.db.char.manualOverrides
+    end
+
+    local function IsDefaultProgressValue(value)
+        return type(value) == "number" and value == 0
+    end
+
+    local function RemoveEmptyProgressBucket(progress, modKey)
+        if progress[modKey] and next(progress[modKey]) == nil then
+            progress[modKey] = nil
+        end
+    end
+
+    local function SetProgressValue(progress, modKey, rowKey, val)
+        if IsDefaultProgressValue(val) then
+            local bucket = progress[modKey]
+            if not bucket or bucket[rowKey] == nil then
+                RemoveEmptyProgressBucket(progress, modKey)
+                return false
+            end
+            bucket[rowKey] = nil
+            RemoveEmptyProgressBucket(progress, modKey)
+            return true
+        end
+
+        if not progress[modKey] then progress[modKey] = {} end
+        if progress[modKey][rowKey] == val then return false end
+        progress[modKey][rowKey] = val
+        return true
+    end
+
+    local function PruneProgressStore(progress)
+        if type(progress) ~= "table" then
+            return false
+        end
+
+        local dirty = false
+        for modKey, bucket in pairs(progress) do
+            if type(bucket) == "table" then
+                for rowKey, value in pairs(bucket) do
+                    if IsDefaultProgressValue(value) then
+                        bucket[rowKey] = nil
+                        dirty = true
+                    end
+                end
+                if next(bucket) == nil then
+                    progress[modKey] = nil
+                    dirty = true
+                end
+            end
+        end
+
+        return dirty
+    end
+
+    ns.CoreData = {
+        DeepCopy = DeepCopy,
+        SetProgressValue = SetProgressValue,
+        PruneProgressStore = PruneProgressStore,
+    }
+
+    function MR:SetProgress(moduleKey, rowKey, value, maxVal, bypassInstanceSuspend)
+        local progressBucket = self.GetProgressBucket and self:GetProgressBucket(moduleKey, rowKey) or self.db.char.progress
+        if env.shouldSuspend() and not bypassInstanceSuspend then
+            if not progressBucket[moduleKey] then
+                progressBucket[moduleKey] = {}
+            end
+            if moduleKey == "custom_tasks" and type(rowKey) == "string" and rowKey:match("^shared_task_") then
+                local taskId = rowKey:match("^shared_task_(%d+)")
+                if taskId then
+                    progressBucket[moduleKey]["task_" .. taskId] = nil
+                end
+            end
+            SetProgressValue(progressBucket, moduleKey, rowKey, math.max(0, math.min(value, maxVal)))
+            return
+        end
+
+        if env.shouldDefer("refreshUI") then
+            env.queueDeferredProgressUpdate(moduleKey, rowKey, value, maxVal)
+            return
+        end
+
+        if not progressBucket[moduleKey] then
+            progressBucket[moduleKey] = {}
+        end
+        if moduleKey == "custom_tasks" and type(rowKey) == "string" and rowKey:match("^shared_task_") then
+            local taskId = rowKey:match("^shared_task_(%d+)")
+            if taskId then
+                progressBucket[moduleKey]["task_" .. taskId] = nil
+            end
+        end
+        SetProgressValue(progressBucket, moduleKey, rowKey, math.max(0, math.min(value, maxVal)))
+        tracking:Fire("UIRefreshRequested")
+        local mod = self.moduleByKey and self.moduleByKey[moduleKey]
+        if mod and mod.profSkillLine then
+            tracking:Fire("KnowledgeSurfacesChanged")
+        end
+    end
+
+
+    function MR:BumpProgress(moduleKey, rowKey, delta, maxVal, bypassInstanceSuspend)
+        local current = self:GetProgress(moduleKey, rowKey)
+        self:SetProgress(moduleKey, rowKey, current + delta, maxVal, bypassInstanceSuspend)
+    end
+
+    function MR:GetManualOverride(modKey, rowKey, charKey)
+        if modKey == "custom_tasks" and env.isAccountWideCustomTask(rowKey) then
+            local m = self.db and self.db.global and self.db.global.customTaskManualOverrides
+            local modOverrides = m and m[modKey]
+            if modOverrides and modOverrides[rowKey] ~= nil then
+                return modOverrides[rowKey]
+            end
+
+            local taskId = type(rowKey) == "string" and rowKey:match("^shared_task_(%d+)")
+            local legacyKey = taskId and CanImportLegacyCustomTaskProgress(self, rowKey) and ("task_" .. taskId) or nil
+            local legacyValue = legacyKey and modOverrides and modOverrides[legacyKey] or nil
+            if legacyValue ~= nil then
+                return legacyValue
+            end
+
+            if not CanImportLegacyCustomTaskProgress(self, rowKey) then
+                return 0
+            end
+
+            local source = ResolveCharacterSource(self, charKey)
+            local function readLocalOverride(localOverrides)
+                local localModule = localOverrides and localOverrides[modKey]
+                return localModule and (localModule[rowKey] or (legacyKey and localModule[legacyKey])) or nil
+            end
+            local selectedValue = readLocalOverride(source and source.manualOverrides)
+            local currentValue = readLocalOverride(self.db and self.db.char and self.db.char.manualOverrides)
+            local localValue = selectedValue
+            if currentValue ~= nil and (localValue == nil or (tonumber(currentValue) or 0) > (tonumber(localValue) or 0)) then
+                localValue = currentValue
+            end
+            if localValue ~= nil then
+                local globalOverrides = self.db and self.db.global and self.db.global.customTaskManualOverrides
+                if globalOverrides then
+                    globalOverrides[modKey] = globalOverrides[modKey] or {}
+                    globalOverrides[modKey][rowKey] = localValue
+                end
+                return localValue
+            end
+
+            return 0
+        end
+
+        local source = ResolveCharacterSource(self, charKey) or self.db.char
+        local m = source and source.manualOverrides or self.db.char.manualOverrides
+        return (m and m[modKey] and m[modKey][rowKey]) or 0
+    end
+
+    function MR:SetManualOverride(modKey, rowKey, val, maxVal)
+        local overrides = self.GetManualOverrideBucket and self:GetManualOverrideBucket(modKey, rowKey) or self.db.char.manualOverrides
+        if not overrides then return end
+        if not overrides[modKey] then overrides[modKey] = {} end
+        if modKey == "custom_tasks" and type(rowKey) == "string" and rowKey:match("^shared_task_") then
+            local taskId = rowKey:match("^shared_task_(%d+)")
+            if taskId then
+                overrides[modKey]["task_" .. taskId] = nil
+            end
+        end
+        if val <= 0 then
+            overrides[modKey][rowKey] = nil
+            self:SetProgress(modKey, rowKey, 0, maxVal or 1)
+            self:Scan()
+        else
+            overrides[modKey][rowKey] = maxVal and math.min(val, maxVal) or val
+            self:SetProgress(modKey, rowKey, overrides[modKey][rowKey], maxVal)
+        end
+    end
+    function MR:RebuildTurnInCompletions()
+        wipe(TURN_IN_COMPLETIONS)
+
+        for questID, entry in pairs(STATIC_TURN_IN_COMPLETIONS) do
+            TURN_IN_COMPLETIONS[questID] = entry
+        end
+
+        for _, mod in ipairs(self.modules) do
+            for _, row in ipairs(mod.rows) do
+                if row.turnInTracked and row.questIds then
+                    for _, questID in ipairs(row.questIds) do
+                        TURN_IN_COMPLETIONS[questID] = {
+                            mod = mod.key,
+                            row = row.key,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    function MR:OnQuestTurnInCompletion(_, questID)
+        local entry = TURN_IN_COMPLETIONS[questID]
+        if not entry or not self.db then return end
+        local ch = self.db.char
+        local modProgress = ch.progress and ch.progress[entry.mod]
+        if entry.mod == "s1_weekly" and entry.row == "saltherils_soiree" then
+            if not modProgress or modProgress["soiree_active_quest"] ~= questID then
+                return
+            end
+            modProgress["soiree_completed_name"] = modProgress["soiree_active_name"]
+        elseif entry.mod == "s1_weekly" and entry.row == "unity_against_void" then
+            if modProgress then
+                modProgress["uatv_completed_branch_name"] = modProgress["uatv_branch_name"]
+            end
+        elseif entry.mod == "s1_weekly" and entry.row == "ritual_sites" then
+            if modProgress then
+                modProgress["ritual_site_completed_name"] = modProgress["ritual_site_active_name"]
+                    or modProgress["ritual_site_completed_name"]
+                modProgress["ritual_site_completed_map_id"] = modProgress["ritual_site_active_map_id"]
+                    or modProgress["ritual_site_completed_map_id"]
+            end
+        end
+        SetProgressValue(ch.progress, entry.mod, entry.row, 1)
+        tracking:Fire("StatsInvalidated")
+        if env.isModuleEnabled(entry.mod) then
+            tracking:Fire("DataRefreshRequested")
+        end
+    end
+end

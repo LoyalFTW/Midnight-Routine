@@ -1,0 +1,41 @@
+local _, addonNS = ...
+local tracking = addonNS.Tracking
+if tracking.MR.isForever then return end
+tracking.rareCatalogs = tracking.rareCatalogs or {}
+tracking.rareCatalogs[#tracking.rareCatalogs + 1] = {
+    label = "The Burning Crusade",
+    color = { 0.25, 0.78, 0.68 },
+    rares = {
+        { "Hyakiss the Lurker", nil, 350, 48.00, 36.60, 16179, catalogEntry = true, resolveQuestID = false },
+        { "Shadikith the Glider", nil, 350, 48.60, 27.80, 16180, catalogEntry = true, resolveQuestID = false },
+        { "Rokad the Ravager", nil, 350, 58.20, 19.60, 16181, catalogEntry = true, resolveQuestID = false },
+        { "Eldinarcus", nil, 94, 70.80, 47.80, 16854, catalogEntry = true, resolveQuestID = false },
+        { "Tregla", nil, 94, 62.40, 79.80, 16855, catalogEntry = true, resolveQuestID = false },
+        { "Goretooth", nil, 107, 33.20, 51.00, 17144, catalogEntry = true, resolveQuestID = false },
+        { "Blood Elf Bandit", nil, 97, 26.40, 67.20, 17591, catalogEntry = true, resolveQuestID = false },
+        { "Crusty", nil, 66, 34.40, 24.20, 18241, catalogEntry = true, resolveQuestID = false },
+        { "Mekthorg the Wild", nil, 100, 44.80, 42.80, 18677, catalogEntry = true, resolveQuestID = false },
+        { "Fulgorge", nil, 100, 27.70, 69.20, 18678, catalogEntry = true, resolveQuestID = false },
+        { "Vorakem Doomspeaker", nil, 100, 38.60, 31.00, 18679, catalogEntry = true, resolveQuestID = false },
+        { "Marticar", nil, 102, 18.20, 31.40, 18680, catalogEntry = true, resolveQuestID = false },
+        { "Coilfang Emissary", nil, 102, 25.40, 37.60, 18681, catalogEntry = true, resolveQuestID = false },
+        { "Bog Lurker", nil, 102, 22.60, 26.80, 18682, catalogEntry = true, resolveQuestID = false },
+        { "Voidhunter Yar", nil, 107, 39.80, 69.40, 18683, catalogEntry = true, resolveQuestID = false },
+        { "Bro'Gaz the Clanless", nil, 107, 25.80, 52.60, 18684, catalogEntry = true, resolveQuestID = false },
+        { "Okrek", nil, 108, 30.40, 43.40, 18685, catalogEntry = true, resolveQuestID = false },
+        { "Doomsayer Jurim", nil, 108, 36.40, 42.60, 18686, catalogEntry = true, resolveQuestID = false },
+        { "Crippler", nil, 108, 38.80, 67.40, 18689, catalogEntry = true, resolveQuestID = false },
+        { "Morcrush", nil, 105, 61.80, 22.60, 18690, catalogEntry = true, resolveQuestID = false },
+        { "Hemathion", nil, 105, 29.40, 49.20, 18692, catalogEntry = true, resolveQuestID = false },
+        { "Speaker Mar'grom", nil, 105, 39.20, 56.60, 18693, catalogEntry = true, resolveQuestID = false },
+        { "Collidus the Warp-Watcher", nil, 104, 55.00, 70.40, 18694, catalogEntry = true, resolveQuestID = false },
+        { "Ambassador Jerrikar", nil, 104, 29.80, 52.60, 18695, catalogEntry = true, resolveQuestID = false },
+        { "Kraator", nil, 104, 31.40, 44.80, 18696, catalogEntry = true, resolveQuestID = false },
+        { "Chief Engineer Lorthander", nil, 109, 25.80, 42.40, 18697, catalogEntry = true, resolveQuestID = false },
+        { "Ever-Core the Punisher", nil, 109, 19.80, 70.00, 18698, catalogEntry = true, resolveQuestID = false },
+        { "Nuramoc", nil, 109, 25.00, 80.20, 20932, catalogEntry = true, resolveQuestID = false },
+        { "Hawkbane", nil, 108, 76.20, 81.00, 21724, catalogEntry = true, resolveQuestID = false },
+        { "Fenissa the Assassin", nil, 106, 15.40, 50.20, 22060, catalogEntry = true, resolveQuestID = false },
+        { "Dr. Whitherlimb", nil, 95, 29.40, 88.40, 22062, catalogEntry = true, resolveQuestID = false },
+    },
+}

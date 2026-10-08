@@ -1,0 +1,32 @@
+## Interface: 120007, 120100, 16001
+## Title: |cff2ae7c6Routine|r Data
+## Notes: Tracks items across your characters and shows who owns what in tooltips. Data layer for Routine.
+## Author: Azro
+## Version: @project-version@
+## SavedVariables: RoutineDataDB
+## IconTexture: Interface\AddOns\RoutineData\Media\Icon
+## X-Curse-Project-ID: 1733527
+## X-Wago-ID: ZKbqyy61
+## Category-enUS: Routine
+
+Libs/LibStub/LibStub.lua
+Libs/CallbackHandler-1.0/CallbackHandler-1.0.xml
+Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua
+Libs/LibDBIcon-1.0/lib.xml
+Libs/AceLocale-3.0/AceLocale-3.0.lua
+
+Locales/Localization.xml
+
+Tracking/Tracking.xml
+
+Core.lua
+API.lua
+Gold.lua
+Capture.lua
+Currencies.lua
+Import.lua
+Tooltip.lua
+Rares.lua
+Broker.lua
+Options.lua
+Commands.lua
