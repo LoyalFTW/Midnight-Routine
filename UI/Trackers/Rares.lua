@@ -52,6 +52,7 @@ local GetCurrentZoneKey = rareTracker.GetCurrentZoneKey
 local GetCurrentDayKey = rareTracker.GetCurrentDayKey
 local SyncRareKillRecord = rareTracker.SyncRareKillRecord
 local GetRareTrackedKillStatus = rareTracker.GetRareTrackedKillStatus
+local IsRareQuestCompleted = rareTracker.IsRareQuestCompleted
 local GetStoredRareKillStatus = rareTracker.GetStoredRareKillStatus
 local BetterKillStatus = rareTracker.BetterKillStatus
 local IsAchievementCriteriaCompleted = rareTracker.IsAchievementCriteriaCompleted
@@ -246,6 +247,9 @@ local raresFrame
 local raresCfgFrame
 local raresFrameCache = {}
 local collapsed   = {}
+for _, zone in ipairs(ZONES) do
+    if zone.defaultCollapsed then collapsed[zone.key] = true end
+end
 local lastZoneKey = nil
 local lastVisibleZoneMode = nil
 local hoveredWarbandHit
@@ -318,12 +322,9 @@ local function GetVisibleZones()
     local function zoneVisible(z)
         return not (db.raresHiddenZones and db.raresHiddenZones[z.key])
     end
-    if MR.isForever and not db.raresShowAllZones then
+    if not db.raresShowAllZones then
         local zone = key and ZONE_BY_KEY[key]
         return zone and zoneVisible(zone) and { zone } or {}
-    end
-    if not db.raresShowAllZones and key and ZONE_BY_KEY[key] and zoneVisible(ZONE_BY_KEY[key]) then
-        return { ZONE_BY_KEY[key] }
     end
     local result = {}
     for _, z in ipairs(ZONES) do
@@ -339,7 +340,7 @@ local function GetRaresLayoutKey()
         parts[#parts + 1] = zone.key
         for _, rare in ipairs(zone.rares) do
             local questId = rare[2]
-            local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+            local flagged = IsRareQuestCompleted(rare)
             local killStat = GetRareTrackedKillStatus(rare) or (flagged and "today") or nil
             if not (db.raresHideKilled and killStat == "today") then
                 parts[#parts + 1] = tostring(questId or (MR.isForever and rare[6]) or rare[1]) .. (MR.isForever and (":" .. rare[1]) or "")
@@ -618,7 +619,7 @@ BuildRaresFrame = function()
         local zoneIdxList  = {}
         for zIdx, rare in ipairs(zone.rares) do
             local questId = rare[2]
-            local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+            local flagged = IsRareQuestCompleted(rare)
             if flagged then SyncRareKillRecord(questId) end
             local killStat = GetRareTrackedKillStatus(rare)
                              or (flagged and "today")
@@ -678,7 +679,7 @@ BuildRaresFrame = function()
             lbl:SetText(rare[1])
 
             local questId = rare[2]
-            local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+            local flagged = IsRareQuestCompleted(rare)
             if flagged then SyncRareKillRecord(questId) end
             local killStat = GetRareTrackedKillStatus(rare)
                              or (flagged and "today") or nil
@@ -690,7 +691,7 @@ BuildRaresFrame = function()
                 hoveredWarbandHit = hit
                 lastWarbandShiftState = IsShiftKeyDown()
                 local questId = rare[2]
-                local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+                local flagged = IsRareQuestCompleted(rare)
                 if flagged then SyncRareKillRecord(questId) end
                 local killStat = GetRareTrackedKillStatus(rare)
                                  or (flagged and "today") or nil
@@ -721,7 +722,7 @@ BuildRaresFrame = function()
                 hit._mrHover = nil
                 if hoveredWarbandHit == hit then hoveredWarbandHit = nil end
                 local questId = rare[2]
-                local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+                local flagged = IsRareQuestCompleted(rare)
                 if flagged then SyncRareKillRecord(questId) end
                 local killStat = GetRareTrackedKillStatus(rare)
                                  or (flagged and "today") or nil
@@ -864,7 +865,7 @@ RefreshRaresFrame = function()
             if body and body.visibleRares then
                 for _, rare in ipairs(body.visibleRares) do
                     local questId = rare[2]
-                    local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+                    local flagged = IsRareQuestCompleted(rare)
                     if flagged then SyncRareKillRecord(questId) end
                     local killStat = GetRareTrackedKillStatus(rare)
                                      or (flagged and "today")
@@ -905,7 +906,7 @@ RefreshRaresFrame = function()
                     local zoneIdx  = body.zoneIdxList and body.zoneIdxList[i] or i
                     if dot and lbl then
                         local questId = rare[2]
-                        local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+                        local flagged = IsRareQuestCompleted(rare)
                         if flagged then SyncRareKillRecord(questId) end
                         local killStat = GetRareTrackedKillStatus(rare)
                                          or (flagged and "today") or nil

@@ -16,6 +16,33 @@ function tracking.API:CreateRareTracker(MR, zones, context)
         [2621] = "val",
         [2512] = "coiled_isle",
     }
+    local nearbyZones = {}
+
+    local function GetNearbyZoneKey(mapID, continentID)
+        if not mapID or not continentID or mapID == continentID or not C_Map.GetMapRectOnMap then return nil end
+        if IsInInstance and IsInInstance() then return nil end
+        if nearbyZones[mapID] ~= nil then return nearbyZones[mapID] or nil end
+        local minX, maxX, minY, maxY = C_Map.GetMapRectOnMap(mapID, continentID)
+        if not (minX and maxX and minY and maxY) then return nil end
+        local x, y = (minX + maxX) / 2, (minY + maxY) / 2
+        local nearest, nearestDistance
+        for candidateID, key in pairs(MAP_TO_ZONE_KEY) do
+            local info = C_Map.GetMapInfo(candidateID)
+            if info and info.mapType == 3 and info.parentMapID == continentID then
+                local left, right, top, bottom = C_Map.GetMapRectOnMap(candidateID, continentID)
+                if left and right and top and bottom then
+                    local dx = math.max(left - x, 0, x - right)
+                    local dy = math.max(top - y, 0, y - bottom)
+                    local distance = dx * dx + dy * dy
+                    if distance <= 0.0004 and (not nearestDistance or distance < nearestDistance or (distance == nearestDistance and key < nearest)) then
+                        nearest, nearestDistance = key, distance
+                    end
+                end
+            end
+        end
+        nearbyZones[mapID] = nearest or false
+        return nearest
+    end
 
     local function GetCurrentZoneKey()
         if MR.isForever then
@@ -26,6 +53,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
         end
 
         local mapID = C_Map.GetBestMapForUnit("player")
+        local currentMapID, continentID = mapID
         local checked = 0
         while mapID and checked < 10 do
             if MAP_TO_ZONE_KEY[mapID] then
@@ -33,6 +61,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
             end
 
             local info = C_Map.GetMapInfo(mapID)
+            if info and info.mapType == 2 then continentID = mapID end
             if not info or not info.parentMapID or info.parentMapID == 0 then
                 break
             end
@@ -41,7 +70,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
             checked = checked + 1
         end
 
-        return nil
+        return GetNearbyZoneKey(currentMapID, continentID)
     end
 
     local function GetCurrentDayKey()
@@ -70,12 +99,17 @@ function tracking.API:CreateRareTracker(MR, zones, context)
     end
 
     for _, zone in ipairs(ZONES) do
+        for _, mapID in ipairs(zone.mapIDs or {}) do
+            MAP_TO_ZONE_KEY[mapID] = MAP_TO_ZONE_KEY[mapID] or zone.key
+        end
         local raresByNPC = {}
         RARES_BY_ZONE_AND_NPC[zone] = raresByNPC
         for _, rare in ipairs(zone.rares) do
+            if rare[3] then MAP_TO_ZONE_KEY[rare[3]] = MAP_TO_ZONE_KEY[rare[3]] or zone.key end
             if rare[2] then
                 RARE_BY_QUEST_ID[rare[2]] = rare
             end
+            for _, questID in ipairs(rare.questIDs or {}) do RARE_BY_QUEST_ID[questID] = rare end
             if rare[6] then
                 raresByNPC[rare[6]] = rare
                 RARE_BY_NPC_ID[rare[6]] = rare
@@ -85,7 +119,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
 
     local function ResolveRareQuestIDs(zone)
         if MR.isForever then return false end
-        if not zone then
+        if not zone or zone.resolveQuestIDs == false then
             return
         end
 
@@ -94,7 +128,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
         if profile then
             profile.rareQuestIDs = profile.rareQuestIDs or {}
             for index, rare in ipairs(zone.rares) do
-                if not rare[2] then
+                if not rare[2] and rare.resolveQuestID ~= false then
                     local cacheKey = GetRareQuestCacheKey(zone, index, rare)
                     rare[2] = profile.rareQuestIDs[cacheKey]
                     if rare[2] then
@@ -107,7 +141,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
 
         local unresolvedMaps = {}
         for _, rare in ipairs(zone.rares) do
-            if not rare[2] and rare[3] then unresolvedMaps[rare[3]] = true end
+            if not rare[2] and rare[3] and rare.resolveQuestID ~= false then unresolvedMaps[rare[3]] = true end
         end
         if not next(unresolvedMaps) or not (C_TaskQuest and C_TaskQuest.GetQuestsForPlayerByMapID) then
             return changed
@@ -124,7 +158,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
                 if info.x and info.y then
                     local nearestDistance
                     for _, candidate in ipairs(zone.rares) do
-                        if not candidate[2] and candidate[3] == mapID and candidate[4] and candidate[5] then
+                        if not candidate[2] and candidate.resolveQuestID ~= false and candidate[3] == mapID and candidate[4] and candidate[5] then
                             local dx = candidate[4] - info.x * 100
                             local dy = candidate[5] - info.y * 100
                             local distance = dx * dx + dy * dy
@@ -181,12 +215,27 @@ function tracking.API:CreateRareTracker(MR, zones, context)
         return false
     end
 
+    local function IsRareQuestCompleted(rare)
+        if not rare then return false end
+        if rare.questIDs then
+            for _, questID in ipairs(rare.questIDs) do
+                local completed = C_QuestLog.IsQuestFlaggedCompleted(questID)
+                if rare.questAny and completed then return true end
+                if not rare.questAny and not completed then return false end
+            end
+            return not rare.questAny
+        end
+        return rare[2] and C_QuestLog.IsQuestFlaggedCompleted(rare[2]) or false
+    end
+
     function MR:SyncRareQuestCompletion(questId)
         questId = tonumber(questId)
         if not questId or not RARE_BY_QUEST_ID[questId] then
             return false
         end
-        return SyncRareKillRecord(questId) == true
+        local rare = RARE_BY_QUEST_ID[questId]
+        if rare.questIDs and not IsRareQuestCompleted(rare) then return false end
+        return SyncRareKillRecord(rare[2] or questId) == true
     end
 
     local function GetRareKillStatus(questId)
@@ -304,8 +353,17 @@ function tracking.API:CreateRareTracker(MR, zones, context)
             local char = MR.db and MR.db.char
             return char and char.raresKills and rare and char.raresKills["npc:" .. tostring(rare[6])] ~= nil or false
         end
-        if not achievementId or not criteriaIndex then
+        if rare and rare.achievementID and rare.criteriaID then
+            local getter = rare.criteriaID < 100 and GetAchievementCriteriaInfo or GetAchievementCriteriaInfoByID
+            if type(getter) == "function" then
+                local ok, _, _, completed = pcall(getter, rare.achievementID, rare.criteriaID)
+                if ok then return completed == true end
+            end
             return false
+        end
+        if (rare and rare.catalogEntry) or not achievementId or not criteriaIndex then
+            local char = MR.db and MR.db.char
+            return char and char.raresKills and rare and char.raresKills["npc:" .. tostring(rare[6])] ~= nil or false
         end
 
         local byNPC = RARE_CRITERIA_BY_NPC[achievementId]
@@ -329,7 +387,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
         for i, rare in ipairs(zone.rares) do
             local name    = rare[1]
             local questId = rare[2]
-            local flagged = questId and C_QuestLog.IsQuestFlaggedCompleted(questId) or false
+            local flagged = IsRareQuestCompleted(rare)
             if flagged then SyncRareKillRecord(questId) end
             local killStatus = GetRareTrackedKillStatus(rare)
                                or (flagged and "today")
@@ -353,6 +411,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
             RARES_BY_ZONE_AND_NPC[zone] = byNPC
             for _, rare in ipairs(zone.rares) do
                 if rare[2] then RARE_BY_QUEST_ID[rare[2]] = rare end
+                for _, questID in ipairs(rare.questIDs or {}) do RARE_BY_QUEST_ID[questID] = rare end
                 if rare[6] then
                     byNPC[rare[6]] = rare
                     RARE_BY_NPC_ID[rare[6]] = rare
@@ -368,7 +427,7 @@ function tracking.API:CreateRareTracker(MR, zones, context)
             if resolveQuestIDs and ResolveRareQuestIDs(zone) then changed = true end
             for _, rare in ipairs(zone.rares) do
                 local questId = rare[2]
-                if questId and C_QuestLog.IsQuestFlaggedCompleted(questId) then
+                if questId and IsRareQuestCompleted(rare) then
                     if SyncRareKillRecord(questId) then changed = true end
                 end
             end
@@ -413,6 +472,7 @@ end
         ResolveRareQuestIDs = ResolveRareQuestIDs,
         SyncRareKillRecord = SyncRareKillRecord,
         GetRareTrackedKillStatus = GetRareTrackedKillStatus,
+        IsRareQuestCompleted = IsRareQuestCompleted,
         GetStoredRareKillStatus = GetStoredRareKillStatus,
         BetterKillStatus = BetterKillStatus,
         IsAchievementCriteriaCompleted = IsAchievementCriteriaCompleted,

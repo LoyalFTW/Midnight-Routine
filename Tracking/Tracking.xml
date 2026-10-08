@@ -11,6 +11,20 @@
     <Script file="Engine/Progress.lua"/>
     <Script file="Engine/Warband.lua"/>
     <Script file="Engine/ProfessionKnowledge.lua"/>
+    <Script file="Data/Rares/Midnight.lua"/>
+    <Script file="Data/Rares/WarWithin.lua"/>
+    <Script file="Data/Rares/Dragonflight.lua"/>
+    <Script file="Data/Rares/Shadowlands.lua"/>
+    <Script file="Data/Rares/BattleForAzeroth.lua"/>
+    <Script file="Data/Rares/Legion.lua"/>
+    <Script file="Data/Rares/Warlords.lua"/>
+    <Script file="Data/Rares/Mists.lua"/>
+    <Script file="Data/Rares/Cataclysm.lua"/>
+    <Script file="Data/Rares/Wrath.lua"/>
+    <Script file="Data/Rares/BurningCrusade.lua"/>
+    <Script file="Data/Rares/Vanilla.lua"/>
+    <Script file="Data/Rares/Events.lua"/>
+    <Script file="Data/RareCatalog.lua"/>
     <Script file="Data/Rares.lua"/>
     <Script file="Data/Renown.lua"/>
 </Ui>

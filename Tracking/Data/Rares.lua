@@ -2,6 +2,7 @@ local _, addonNS = ...
 local tracking = addonNS.Tracking
 
 function tracking.API:CreateRareCatalog(MR, L)
+if MR.isForever then return {} end
 local ZONES = {
     {
         key      = "eversong",
@@ -154,7 +155,5 @@ local ZONES = {
     } or nil,
 }
 
-if MR.isForever then ZONES = {} end
-
-return ZONES
+return self:AppendRareCatalog(MR, L, ZONES)
 end
