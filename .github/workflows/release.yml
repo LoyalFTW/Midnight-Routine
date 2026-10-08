@@ -28,10 +28,13 @@ jobs:
             git tag --delete "$tag"
           done
 
+      - name: Generate folder release notes
+        run: python3 .github/scripts/release-notes.py Routine
+
       - name: Package and Upload
         uses: BigWigsMods/packager@master # v2
         with:
-          args: -t Routine -m Routine/.pkgmeta
+          args: -t Routine -m "${{ env.RELEASE_PKGMETA }}"
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}

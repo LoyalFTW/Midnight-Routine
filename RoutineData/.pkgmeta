@@ -2,8 +2,6 @@ package-as: RoutineData
 
 enable-nolib-creation: no
 
-manual-changelog: CHANGELOG.md
-
 externals:
   Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
   Libs/LibDBIcon-1.0: https://repos.wowace.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0

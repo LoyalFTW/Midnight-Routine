@@ -25,6 +25,12 @@ jobs:
         run: |
           git config core.worktree "$GITHUB_WORKSPACE"
           ln -s "$GITHUB_WORKSPACE/.git" RoutineData/.git
+          git tag --list 'v*' | while IFS= read -r tag; do
+            git tag --delete "$tag"
+          done
+
+      - name: Generate folder release notes
+        run: python3 .github/scripts/release-notes.py RoutineData
 
       - name: Validate addon-site publishing settings
         env:
@@ -61,7 +67,7 @@ jobs:
       - name: Fetch libraries and stage RoutineData
         uses: BigWigsMods/packager@master
         with:
-          args: -t RoutineData -m RoutineData/.pkgmeta -r "${{ runner.temp }}/routinedata-package" -z -d
+          args: -t RoutineData -m "${{ env.RELEASE_PKGMETA }}" -r "${{ runner.temp }}/routinedata-package" -z -d
 
       - name: Package RoutineData
         env:
@@ -104,7 +110,7 @@ jobs:
         uses: BigWigsMods/packager@master
         with:
           args: >-
-            -t RoutineData -m RoutineData/.pkgmeta
+            -t RoutineData -m "${{ env.RELEASE_PKGMETA }}"
             -r "${{ runner.temp }}/routinedata-package" -o -c -e
             -n "RoutineData-${{ env.ADDON_VERSION }}:${{ env.ADDON_VERSION }}"
         env:
@@ -124,4 +130,4 @@ jobs:
             prerelease+=(--prerelease)
           fi
           gh release edit "$TAG" --title "RoutineData $ADDON_VERSION" \
-            --notes-file RoutineData/CHANGELOG.md --latest=false "${prerelease[@]}"
+            --latest=false "${prerelease[@]}"
