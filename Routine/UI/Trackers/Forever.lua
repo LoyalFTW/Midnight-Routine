@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 if not ns.MR.isForever then return end
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine", true)
 local F = ns.Forever

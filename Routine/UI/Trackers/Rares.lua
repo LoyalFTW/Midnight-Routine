@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 if ns.MR.isForever and ns.Forever.hideRares then return end
 local MR = ns.MR
 
@@ -75,7 +76,7 @@ local function GetCharacterTooltipName(charKey, charData, currentKey)
 end
 
 local function GetWarbandRareStatuses(rare, expanded)
-    local svChars = MR.db and MR.db.sv and MR.db.sv.char
+    local svChars = MR:GetCharacters()
     local questKey = rare and rare[2] and tostring(rare[2]) or nil
     local npcKey = rare and rare[6] and ("npc:" .. tostring(rare[6])) or nil
     if type(svChars) ~= "table" or not (questKey or npcKey) then
@@ -168,6 +169,61 @@ local function AddWarbandRareTooltipLines(tip, rare)
     if not expanded and total > shown then
         tip:AddLine(L["Rares_Tooltip_HoldShiftFullList"] or "Hold Shift for full list", 0.55, 0.55, 0.60)
     end
+end
+
+local rareByNpcID, indexedZones, indexedZoneCount
+
+local function GetRareByNpcID(npcID)
+    local zones = MR.isForever and ns.Forever.GetRareZones() or ZONES
+    if not rareByNpcID or indexedZones ~= zones or indexedZoneCount ~= #zones then
+        rareByNpcID, indexedZones, indexedZoneCount = {}, zones, #zones
+        for _, zone in ipairs(zones) do
+            for zoneIdx, rare in ipairs(zone.rares) do
+                if rare[6] then
+                    rareByNpcID[rare[6]] = { rare = rare, zone = zone, zoneIdx = zoneIdx }
+                end
+            end
+        end
+    end
+    return rareByNpcID[npcID]
+end
+
+local function AddUnitRareTooltipLines(tooltip, entry)
+    local rare = entry.rare
+    local flagged = IsRareQuestCompleted(rare)
+    if flagged then SyncRareKillRecord(rare[2]) end
+    local killStat = GetRareTrackedKillStatus(rare) or (flagged and "today") or nil
+
+    tooltip:AddLine(" ")
+    if killStat == "today" then
+        tooltip:AddLine(L["Rares_Tooltip_KilledToday"], 0.20, 0.85, 0.45)
+    elseif killStat == "week" then
+        tooltip:AddLine(L["Rares_Tooltip_KilledWeek"], 0.85, 0.65, 0.10)
+    elseif IsAchievementCriteriaCompleted(entry.zone.achievId, entry.zoneIdx, rare) then
+        tooltip:AddLine(L["Rares_Tooltip_EverKilled"], 0.88, 0.70, 0.12)
+    else
+        tooltip:AddLine(L["Rares_Tooltip_NotKilled"], 0.50, 0.50, 0.50)
+    end
+    AddWarbandRareTooltipLines(tooltip, rare)
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
+        if tooltip ~= GameTooltip or not (MR.db and MR.db.profile.raresUnitTooltip ~= false) then return end
+        pcall(function()
+            local npcID = data and data.guid and MR:GetRareNPCIDFromGUID(data.guid)
+            local entry = npcID and GetRareByNpcID(npcID)
+            if entry then AddUnitRareTooltipLines(tooltip, entry) end
+        end)
+    end)
+
+    local shiftWatcher = CreateFrame("Frame")
+    shiftWatcher:RegisterEvent("MODIFIER_STATE_CHANGED")
+    shiftWatcher:SetScript("OnEvent", function()
+        if GameTooltip:IsShown() and GameTooltip.RefreshData and select(2, GameTooltip:GetUnit()) then
+            GameTooltip:RefreshData()
+        end
+    end)
 end
 
 local function GetZoneColor(zone)
@@ -1071,6 +1127,9 @@ PopulateRaresConfig = function(f)
         Check(L["Config_HideKilled"],
             function() return db.raresHideKilled end,
             function(v) db.raresHideKilled = v; RebuildRaresFrame() end)
+        Check(L["Config_RaresUnitTooltip"],
+            function() return db.raresUnitTooltip ~= false end,
+            function(v) db.raresUnitTooltip = v and true or false end)
         Check(L["Config_RaresShowAllZones"],
             function() return db.raresShowAllZones end,
             function(v)

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 if ns.MR.isForever and ns.Forever.hideProfessions then return end
 local MR = ns.MR
 

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 
 local function ApplyButtonBase(button)
     button:SetSize(16, 16)

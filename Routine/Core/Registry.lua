@@ -1,4 +1,5 @@
 local addonName, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")

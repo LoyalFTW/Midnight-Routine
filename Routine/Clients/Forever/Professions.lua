@@ -1,4 +1,5 @@
 local _, addonNS = ...
+if addonNS.Inactive then return end
 local tracking = addonNS.Tracking
 
 tracking.installers["ForeverProfessions"] = function(owner, context)

@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 
 local LDB     = LibStub("LibDataBroker-1.1")
@@ -49,6 +50,56 @@ function MR:DismissFirstTimeGlow()
     StopGlow()
 end
 
+local MAX_LISTED_CHARACTERS = 5
+
+local function FormatMoney(copper)
+    return GetMoneyString and GetMoneyString(copper, true) or tostring(copper)
+end
+
+local ACCENT = { 0.165, 0.906, 0.776 }
+local CURRENT_MARKER = "|TInterface\\Buttons\\UI-CheckBox-Check:12:12:0:-1|t "
+
+local function CharacterGoldName(entry, currentKey)
+    local name, realm = MR:ParseCharacterKey(entry.key)
+    local color = entry.classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[entry.classFile]
+    local text = color and color:WrapTextInColorCode(name) or name
+    if realm ~= "" and realm ~= GetRealmName() then
+        text = text .. " |cff8c8c99" .. realm .. "|r"
+    end
+    if entry.key == currentKey then
+        text = CURRENT_MARKER .. text
+    end
+    return text
+end
+
+local function AddGoldLines(tt)
+    local api = _G.RoutineData and _G.RoutineData.API
+    local entries = api and api.GetGoldRanking and api.GetGoldRanking() or {}
+    if #entries == 0 then
+        return
+    end
+
+    local currentKey = MR:GetCurrentCharacterKey()
+    local limit = IsShiftKeyDown() and #entries or MAX_LISTED_CHARACTERS
+    local total = 0
+    for _, entry in ipairs(entries) do
+        total = total + entry.gold
+    end
+
+    tt:AddLine(" ")
+    tt:AddDoubleLine(L["Minimap_GoldHeader"], string.format(L["Minimap_GoldCount"], #entries),
+        ACCENT[1], ACCENT[2], ACCENT[3], 0.55, 0.55, 0.60)
+    for index, entry in ipairs(entries) do
+        if index > limit then break end
+        tt:AddDoubleLine(CharacterGoldName(entry, currentKey), FormatMoney(entry.gold), 1, 1, 1, 1, 1, 1)
+    end
+    if #entries > limit then
+        tt:AddLine(string.format(L["Minimap_GoldMore"], #entries - limit), 0.55, 0.55, 0.60)
+    end
+    tt:AddLine(" ")
+    tt:AddDoubleLine(L["Minimap_GoldTotal"], FormatMoney(total), ACCENT[1], ACCENT[2], ACCENT[3], 1, 1, 1)
+end
+
 local minimapObject = LDB:NewDataObject("MidnightRoutine", {
     type = "launcher",
     text = "MidnightRoutine",
@@ -66,15 +117,29 @@ local minimapObject = LDB:NewDataObject("MidnightRoutine", {
 
     OnTooltipShow = function(tt)
         local owner = tt.GetOwner and tt:GetOwner() or nil
-        if ns.ApplyTooltipPosition and owner then
+        if ns.ApplyTooltipPosition and owner and not ns.IsDefaultTooltipPosition() then
             ns.ApplyTooltipPosition(tt, owner)
         end
         tt:AddLine(L["Title"], 1, 1, 1)
         tt:AddLine(L["Minimap_LeftClick"],  0.8, 0.8, 0.8)
         tt:AddLine(L["Minimap_RightClick"],     0.8, 0.8, 0.8)
         tt:AddLine(L["Minimap_HideHint"], 0.5, 0.5, 0.5)
+        if MR.db and MR.db.profile.minimapShowGold ~= false then
+            AddGoldLines(tt)
+        end
     end,
 })
+
+local shiftWatcher = CreateFrame("Frame")
+shiftWatcher:RegisterEvent("MODIFIER_STATE_CHANGED")
+shiftWatcher:SetScript("OnEvent", function()
+    local button = LDBIcon:GetMinimapButton(LDB_NAME)
+    if button and GameTooltip:IsShown() and GameTooltip:GetOwner() == button then
+        GameTooltip:ClearLines()
+        minimapObject.OnTooltipShow(GameTooltip)
+        GameTooltip:Show()
+    end
+end)
 
 local function StyleMinimapButton()
     if not LDBIcon:IsRegistered(LDB_NAME) then

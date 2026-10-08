@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 
 function ns.GetWidgetCache(owner, key)
     local cache = owner and owner[key]

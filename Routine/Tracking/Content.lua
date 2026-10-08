@@ -1,4 +1,5 @@
 local _, addonNS = ...
+if addonNS.Inactive then return end
 local tracking = addonNS.Tracking
 
 function tracking.API:InstallContent(owner, context)
@@ -8,6 +9,7 @@ function tracking.API:InstallContent(owner, context)
     self:InstallComponent("Resets", owner, context)
     self:InstallComponent("Events", owner, context)
     self:InstallComponent("Warband", owner, context)
+    self:InstallComponent("Banks", owner, context)
     self:InstallComponent("Activities", owner, context)
     self:InstallComponent("OmniumFolio", owner, context)
     self:InstallComponent("WeeklyTasks", owner, context)

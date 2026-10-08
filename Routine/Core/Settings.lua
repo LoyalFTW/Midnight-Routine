@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
 local MoveArrayItem = Core.MoveArrayItem

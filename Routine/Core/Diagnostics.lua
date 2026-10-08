@@ -1,4 +1,5 @@
 local addonName, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName)
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
@@ -235,11 +236,11 @@ function MR:RunSelfTest()
     end)
 
     run("Warband saved character data", function()
-        if not (self.db and self.db.sv and self.db.sv.char) then
+        if not self:GetCharacters() then
             return false, "db.sv.char missing"
         end
         local count = 0
-        for _ in pairs(self.db.sv.char) do count = count + 1 end
+        for _ in pairs(self:GetCharacters()) do count = count + 1 end
         if count == 0 then return "warn", "no characters recorded yet" end
         return true, count .. " character(s) recorded"
     end)
@@ -251,12 +252,12 @@ function MR:RunSelfTest()
     end)
 
     run("Simulated alt (fake data pipeline)", function()
-        if not (self.db and self.db.sv and self.db.sv.char) then
+        if not self:GetCharacters() then
             return false, "db.sv.char missing"
         end
 
         local fakeKey = "MRTestAlt - MRTestRealm"
-        if self.db.sv.char[fakeKey] then
+        if self:GetCharacters()[fakeKey] then
             return "warn", "a leftover test alt was already present; skipped to avoid clobbering it"
         end
 
@@ -264,7 +265,7 @@ function MR:RunSelfTest()
         local totalRows, doneRows = 0, 0
 
         local ok, err = pcall(function()
-            self.db.sv.char[fakeKey] = BuildFakeCharacterData(self)
+            self:GetCharacters()[fakeKey] = BuildFakeCharacterData(self)
 
             local function findFake(results)
                 for _, snap in ipairs(results) do
@@ -299,13 +300,13 @@ function MR:RunSelfTest()
             end
 
             self:SetMainAltViewCharacter(fakeKey)
-            if self:GetMainFrameProgressSource() ~= self.db.sv.char[fakeKey] then
+            if self:GetMainFrameProgressSource() ~= self:GetCharacters()[fakeKey] then
                 error("SetMainAltViewCharacter did not switch the progress source to the fake alt")
             end
         end)
 
         self:SetMainAltViewCharacter(restoreViewKey)
-        self.db.sv.char[fakeKey] = nil
+        self:GetCharacters()[fakeKey] = nil
         if self.db.profile and self.db.profile.altBoardHiddenCharacters then
             self.db.profile.altBoardHiddenCharacters[fakeKey] = nil
         end

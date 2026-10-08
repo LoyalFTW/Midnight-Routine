@@ -1,4 +1,5 @@
 local addonName, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Foundry = _G.Foundry_1_0
 

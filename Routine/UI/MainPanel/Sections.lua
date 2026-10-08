@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local UI = assert(ns.UIInternal, "UI/Foundation.lua must load first")
 local BuildVisibleMainModules = UI.BuildVisibleMainModules

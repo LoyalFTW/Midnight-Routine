@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Config = assert(ns.ConfigInternal, "UI/Config/Frame.lua must load first")
 local L = Config.L
@@ -453,6 +454,9 @@ function MR:PopulateConfigFrame(f)
         Checkbox(L["Config_HideMinimap"],
             function() return MR.db.profile.minimap and MR.db.profile.minimap.hide or false end,
             function(v) MR:SetMinimapHidden(v) end)
+        Checkbox(L["Config_MinimapShowGold"],
+            function() return MR.db.profile.minimapShowGold ~= false end,
+            function(v) MR.db.profile.minimapShowGold = v and true or false end)
         Checkbox(L["Config_RememberManagedWindowsVisibility"],
             function() return MR.db.profile.rememberManagedWindowsVisibility end,
             function(v)
@@ -462,6 +466,13 @@ function MR:PopulateConfigFrame(f)
                     MR:RefreshUI()
                 end
             end)
+        if not MR.isForever then
+            Gap(4); Divider()
+            SectionLabel(L["Config_SectionTooltips"])
+            Checkbox(L["Config_RaresUnitTooltip"],
+                function() return MR.db.profile.raresUnitTooltip ~= false end,
+                function(v) MR.db.profile.raresUnitTooltip = v and true or false end)
+        end
         Gap(4); Divider()
         SectionLabel(L["Config_SectionAdventureGuide"] or "ADVENTURE GUIDE")
         Checkbox(L["Config_HideAdventureGuideBossIDs"],
@@ -938,6 +949,7 @@ function MR:PopulateConfigFrame(f)
         SectionLabel(L["Config_TooltipPosition"] or "Tooltip Position")
 
         local tooltipChoices = {
+            { label = L["Config_Default"], value = "default" },
             { label = L["Config_TooltipLeft"] or "Left", value = "left" },
             { label = L["Config_TooltipRight"] or "Right", value = "right" },
             { label = L["Config_TooltipMiddle"] or "Middle", value = "middle" },
@@ -952,7 +964,7 @@ function MR:PopulateConfigFrame(f)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", 8 + (index - 1) * (tooltipBtnW + 2), tooltipY)
             btn:SetBackdrop(MakeBackdrop())
             local current = MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition") or MR.db.profile.tooltipPosition
-            local active = (current or "right") == choice.value
+            local active = (current or "default") == choice.value
 
             local lbl = ns.AcquireFontString(btn, "pagesText15", "OVERLAY")
             lbl:SetFont(ns.FONT_ROWS, math.min(cfgFs, 10), GetFontFlags())
@@ -968,17 +980,17 @@ function MR:PopulateConfigFrame(f)
                 MR:PopulateConfigFrame(f)
             end)
             btn:SetScript("OnEnter", function()
-                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "right") == choice.value
+                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "default") == choice.value
                 if not selected then
                     ApplyThemeChoiceHover(btn, lbl)
                 end
             end)
             btn:SetScript("OnLeave", function()
-                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "right") == choice.value
+                local selected = ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "default") == choice.value
                 ApplyThemeChoiceStyle(btn, lbl, selected)
             end)
             RegisterThemeChoice(btn, lbl, function()
-                return ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "right") == choice.value
+                return ((MR.GetWindowLayoutValue and MR:GetWindowLayoutValue("tooltipPosition")) or "default") == choice.value
             end)
         end
 

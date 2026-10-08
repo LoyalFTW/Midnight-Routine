@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Config = assert(ns.ConfigInternal, "UI/Config/Frame.lua must load first")
 local L = Config.L

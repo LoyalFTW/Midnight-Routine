@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local LSM = LibStub and LibStub:GetLibrary("LibSharedMedia-3.0", true)
 ns.MEDIA_DEFAULT_TOKEN = "__MIDNIGHT_DEFAULT__"
 
@@ -217,25 +218,6 @@ GetResolvedMediaSetting = function(key)
     return profile and profile[key]
 end
 
-local fontValidationFrame
-local fontValidationCache = {}
-
-local function IsFontAvailable(path)
-    if fontValidationCache[path] ~= nil then
-        return fontValidationCache[path]
-    end
-
-    if not fontValidationFrame then
-        fontValidationFrame = CreateFrame("EditBox", nil, UIParent)
-        fontValidationFrame:Hide()
-        fontValidationFrame:SetAutoFocus(false)
-    end
-
-    local ok, loaded = pcall(fontValidationFrame.SetFont, fontValidationFrame, path, 12, "")
-    fontValidationCache[path] = ok and loaded and true or false
-    return fontValidationCache[path]
-end
-
 ResolveSelectedFontPath = function(profile)
     profile = profile or GetActiveMediaProfile()
 
@@ -247,10 +229,6 @@ ResolveSelectedFontPath = function(profile)
 
     local resolved = ResolveMediaPath("font", sharedFont, fontPath, defaultFont)
     if type(resolved) ~= "string" or resolved == "" then
-        return defaultFont
-    end
-
-    if resolved ~= defaultFont and not IsFontAvailable(resolved) then
         return defaultFont
     end
 

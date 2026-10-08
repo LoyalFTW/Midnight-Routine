@@ -1,5 +1,7 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
+local tracking = ns.Tracking
 local Warband = assert(ns.WarbandBoardInternal, "UI/Warband/Shared.lua must load first")
 local L = Warband.L
 local GetWidgetCache = ns.GetWidgetCache
@@ -8,296 +10,13 @@ local SetOneAnchor = ns.SetOneAnchor
 local BANK_CELL_SIZE = 43
 local BANK_CELL_STRIDE = 46
 
-local function RefreshVisibleBankSource(source)
+tracking.RegisterCallback(MR, "BankSnapshotChanged", function(_, source)
     local frame = MR.altBoardFrame
     if frame and frame:IsShown() and frame.bankPane and frame.bankPane.bankSource == source
         and MR.db and MR.db.profile and MR.db.profile.altBoardView == "banks" then
         MR:RefreshAltBankPane(frame.bankPane)
     end
-end
-
-local function Now()
-    return (GetServerTime and GetServerTime()) or time()
-end
-
-local function Store()
-    if not (MR.db and MR.db.global) then return nil end
-    MR.db.global.altBankSnapshots = MR.db.global.altBankSnapshots or { characters = {}, bags = {}, characterGuilds = {}, characterGuildBanks = {} }
-    local store = MR.db.global.altBankSnapshots
-    store.characters = store.characters or {}
-    store.bags = store.bags or {}
-    store.characterGuilds = store.characterGuilds or {}
-    store.characterGuildBanks = store.characterGuildBanks or {}
-    return store
-end
-
-local function CurrentGuildIdentity()
-    if not GetGuildInfo then return nil end
-    local guildName, _, _, guildRealm = GetGuildInfo("player")
-    if not guildName then return nil end
-    local realm = guildRealm or (GetNormalizedRealmName and GetNormalizedRealmName()) or (GetRealmName and GetRealmName())
-    if not realm then return nil end
-    realm = realm:gsub("%s+", "")
-    return guildName, realm, realm .. ":" .. guildName
-end
-
-function MR:RefreshAltCharacterGuild()
-    local store = Store()
-    local charKey = self.GetCurrentCharacterKey and self:GetCurrentCharacterKey()
-    if not store or not charKey then return end
-    local _, _, guildKey = CurrentGuildIdentity()
-    if guildKey then
-        store.characterGuilds[charKey] = guildKey
-    elseif IsInGuild and not IsInGuild() then
-        store.characterGuilds[charKey] = false
-    else
-        return
-    end
-    RefreshVisibleBankSource("guild")
-end
-
-local function SnapshotContainer(bagID, label, icon)
-    if not (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo) then return nil end
-    local ok, slots = pcall(C_Container.GetContainerNumSlots, bagID)
-    if not ok or type(slots) ~= "number" or slots <= 0 then return nil end
-    local tab = { name = label, icon = icon, slots = slots, items = {} }
-    for slot = 1, slots do
-        local success, info = pcall(C_Container.GetContainerItemInfo, bagID, slot)
-        if success and info and info.itemID then
-            local link = info.hyperlink
-            local name = (link and link:match("%[(.-)%]")) or (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(info.itemID))
-            tab.items[slot] = {
-                id = info.itemID,
-                link = link,
-                name = name,
-                icon = info.iconFileID,
-                count = tonumber(info.stackCount) or 1,
-                quality = info.quality,
-            }
-        end
-    end
-    return tab
-end
-
-local function BankMetadata(bankType)
-    if not (C_Bank and C_Bank.FetchPurchasedBankTabData and Enum and Enum.BankType) then return nil end
-    local ok, data = pcall(C_Bank.FetchPurchasedBankTabData, bankType)
-    return ok and type(data) == "table" and data or nil
-end
-
-local function CollectBags()
-    local bagIndex = Enum and Enum.BagIndex or {}
-    local tabs = {}
-    local backpack = SnapshotContainer(bagIndex.Backpack or 0, L["AltBoard_BankBackpack"] or "Backpack")
-    if backpack then tabs[#tabs + 1] = backpack end
-    for index = 1, 5 do
-        local bagID = bagIndex["Bag_" .. index] or index
-        local tab = SnapshotContainer(bagID, string.format(L["AltBoard_BagSlot"] or "Bag %d", index))
-        if tab then tabs[#tabs + 1] = tab end
-    end
-    return tabs
-end
-
-local function CollectCharacterBank()
-    local bagIndex = Enum and Enum.BagIndex or {}
-    local tabs = {}
-    if not bagIndex.CharacterBankTab_1 then
-        local bank = SnapshotContainer(bagIndex.Bank or -1, L["AltBoard_BankMain"] or "Bank")
-        if bank then tabs[#tabs + 1] = bank end
-        for index = 1, 7 do
-            local bagID = NUM_BAG_SLOTS and (NUM_BAG_SLOTS + index)
-            if bagID then
-                local tab = SnapshotContainer(bagID, string.format(L["AltBoard_BankBag"] or "Bank bag %d", index))
-                if tab then tabs[#tabs + 1] = tab end
-            end
-        end
-    else
-        local metadata = BankMetadata(Enum and Enum.BankType and Enum.BankType.Character)
-        for index = 1, 9 do
-            local bagID = bagIndex["CharacterBankTab_" .. index]
-            if bagID then
-                local info = metadata and metadata[index]
-                local tab = SnapshotContainer(bagID, (info and info.name) or string.format(L["AltBoard_BankTab"] or "Tab %d", index), info and info.icon)
-                if tab then tabs[#tabs + 1] = tab end
-            end
-        end
-    end
-    return tabs
-end
-
-local function CollectWarbandBank()
-    if MR.isForever or not (Enum and Enum.BagIndex and Enum.BankType and Enum.BankType.Account and C_Bank) then return nil end
-    if C_PlayerInfo and C_PlayerInfo.HasAccountInventoryLock and not C_PlayerInfo.HasAccountInventoryLock() then return nil end
-    if C_Bank.FetchBankLockedReason then
-        local ok, reason = pcall(C_Bank.FetchBankLockedReason, Enum.BankType.Account)
-        if not ok or (reason ~= nil and reason ~= (Enum.BankLockedReason and Enum.BankLockedReason.None or 0)) then return nil end
-    end
-    local metadata = BankMetadata(Enum.BankType.Account)
-    local tabs = {}
-    for index = 1, 9 do
-        local bagID = Enum.BagIndex["AccountBankTab_" .. index]
-        if bagID then
-            local info = metadata and metadata[index]
-            local tab = SnapshotContainer(bagID, (info and info.name) or string.format(L["AltBoard_BankTab"] or "Tab %d", index), info and info.icon)
-            if tab then tabs[#tabs + 1] = tab end
-        end
-    end
-    return tabs
-end
-
-function MR:CaptureAltBank(source)
-    local store = Store()
-    if not store then return end
-    local tabs
-    if source == "character" then
-        tabs = CollectCharacterBank()
-        if #tabs == 0 then return end
-        local key = self:GetCurrentCharacterKey()
-        if not key then return end
-        store.characters[key] = { tabs = tabs, updatedAt = Now() }
-    elseif source == "warband" then
-        tabs = CollectWarbandBank()
-        if not tabs or #tabs == 0 then return end
-        store.warband = { tabs = tabs, updatedAt = Now() }
-    end
-    RefreshVisibleBankSource(source)
-end
-
-function MR:CaptureAltBags()
-    local store = Store()
-    if not store then return end
-    local tabs = CollectBags()
-    if #tabs == 0 then return end
-    local key = self:GetCurrentCharacterKey()
-    if not key then return end
-    store.bags[key] = { tabs = tabs, updatedAt = Now() }
-    RefreshVisibleBankSource("bags")
-end
-
-function MR:CaptureAltGuildBank()
-    local store = Store()
-    if not store or not (GetGuildInfo and GetNumGuildBankTabs and GetGuildBankTabInfo and GetGuildBankItemInfo) then return end
-    local guildName, realm, guildKey = CurrentGuildIdentity()
-    local charKey = self:GetCurrentCharacterKey()
-    if not guildKey or not charKey then return end
-    store.characterGuilds[charKey] = guildKey
-    local snapshot = store.characterGuildBanks[charKey]
-    if not snapshot or snapshot.guildKey ~= guildKey then snapshot = { tabs = {}, guildKey = guildKey } end
-    snapshot.name = guildName
-    snapshot.realm = realm
-    snapshot.money = GetGuildBankMoney and GetGuildBankMoney() or snapshot.money
-    local numTabs = GetNumGuildBankTabs() or 0
-    if numTabs == 0 then
-        RefreshVisibleBankSource("guild")
-        return
-    end
-    snapshot.numTabs = numTabs
-    local currentTab = GetCurrentGuildBankTab and GetCurrentGuildBankTab()
-    for index = 1, numTabs do
-        local name, icon, canView = GetGuildBankTabInfo(index)
-        if canView then
-            local old = snapshot.tabs[index]
-            if index == currentTab then
-                local tab = { name = name or string.format(L["AltBoard_BankTab"] or "Tab %d", index), icon = icon, slots = 98, items = {} }
-                for slot = 1, 98 do
-                    local texture, count, _, _, quality = GetGuildBankItemInfo(index, slot)
-                    if texture then
-                        local link = GetGuildBankItemLink and GetGuildBankItemLink(index, slot)
-                        tab.items[slot] = {
-                            id = link and tonumber(link:match("item:(%d+)")),
-                            link = link,
-                            name = link and link:match("%[(.-)%]"),
-                            icon = texture,
-                            count = tonumber(count) or 1,
-                            quality = quality,
-                        }
-                    end
-                end
-                snapshot.tabs[index] = tab
-            elseif not old then
-                snapshot.tabs[index] = { name = name or string.format(L["AltBoard_BankTab"] or "Tab %d", index), icon = icon, slots = 98, items = {}, uncaptured = true }
-            else
-                old.name = name or old.name
-                old.icon = icon or old.icon
-            end
-        else
-            snapshot.tabs[index] = nil
-        end
-    end
-    snapshot.updatedAt = Now()
-    store.characterGuildBanks[charKey] = snapshot
-    RefreshVisibleBankSource("guild")
-end
-
-function MR:EnableAltBankTracking()
-    local function RegisterIfValid(event, callback)
-        if not (C_EventUtils and C_EventUtils.IsEventValid) or C_EventUtils.IsEventValid(event) then
-            MR:RegisterEvent(event, callback)
-        end
-    end
-    local function CaptureOpenBank()
-        MR._altBankOpen = true
-        C_Timer.After(0.3, function()
-            if MR._altBankOpen then
-                MR:CaptureAltBank("character")
-                if not MR.isForever then MR:CaptureAltBank("warband") end
-            end
-        end)
-    end
-    self:RegisterEvent("PLAYER_ENTERING_WORLD", function()
-        C_Timer.After(1, function()
-            MR:CaptureAltBags()
-            MR:RefreshAltCharacterGuild()
-        end)
-    end)
-    RegisterIfValid("PLAYER_GUILD_UPDATE", function(_, unit)
-        if not unit or unit == "player" then MR:RefreshAltCharacterGuild() end
-    end)
-    RegisterIfValid("GUILD_ROSTER_UPDATE", function() MR:RefreshAltCharacterGuild() end)
-    self:RegisterEvent("BANKFRAME_OPENED", CaptureOpenBank)
-    self:RegisterEvent("BANKFRAME_CLOSED", function() MR._altBankOpen = nil end)
-    self:RegisterEvent("BAG_UPDATE_DELAYED", function()
-        MR:CaptureAltBags()
-        if MR._altBankOpen then
-            MR:CaptureAltBank("character")
-            if not MR.isForever then MR:CaptureAltBank("warband") end
-        end
-    end)
-    RegisterIfValid("PLAYERBANKSLOTS_CHANGED", function()
-        if MR._altBankOpen then MR:CaptureAltBank("character") end
-    end)
-    if not self.isForever then
-        RegisterIfValid("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", function()
-            if MR._altBankOpen then MR:CaptureAltBank("warband") end
-        end)
-    end
-    local function OpenGuildBank()
-        MR._altGuildBankOpen = true
-        C_Timer.After(0.4, function()
-            if MR._altGuildBankOpen then MR:CaptureAltGuildBank() end
-        end)
-    end
-    if Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.GuildBanker then
-        self:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", function(_, interactionType)
-            if interactionType == Enum.PlayerInteractionType.GuildBanker then OpenGuildBank() end
-        end)
-        self:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", function(_, interactionType)
-            if interactionType == Enum.PlayerInteractionType.GuildBanker then MR._altGuildBankOpen = nil end
-        end)
-    else
-        RegisterIfValid("GUILDBANKFRAME_OPENED", OpenGuildBank)
-        RegisterIfValid("GUILDBANKFRAME_CLOSED", function() MR._altGuildBankOpen = nil end)
-    end
-    RegisterIfValid("GUILDBANKBAGSLOTS_CHANGED", function()
-        if MR._altGuildBankOpen then MR:CaptureAltGuildBank() end
-    end)
-    RegisterIfValid("GUILDBANK_UPDATE_TABS", function()
-        if MR._altGuildBankOpen then MR:CaptureAltGuildBank() end
-    end)
-    RegisterIfValid("GUILDBANK_UPDATE_MONEY", function()
-        if MR._altGuildBankOpen then MR:CaptureAltGuildBank() end
-    end)
-end
+end)
 
 local function MakeSourceButton(parent, label, key, index)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -381,7 +100,7 @@ function MR:CreateAltBankPane(frame, rightPane, tabBar)
 end
 
 local function GetSnapshot(pane, selected)
-    local store = Store()
+    local store = MR:GetBankSnapshots()
     if not store then return nil end
     if pane.bankSource == "warband" then return store.warband end
     if pane.bankSource == "guild" then
@@ -477,7 +196,7 @@ function MR:RefreshAltBankPane(pane, selected)
         SetOneAnchor(button, "TOPLEFT", pane, "TOPLEFT", 12 + (index - 1) * (sourceWidth + 6), -12)
         Warband.WBStylePillButton(button, key == pane.bankSource)
     end
-    local store = Store()
+    local store = MR:GetBankSnapshots()
     local guildState = selected and store and store.characterGuilds[selected.key]
     local guildName = type(guildState) == "string" and guildState:match(":(.+)$")
     local snapshot = GetSnapshot(pane, selected)

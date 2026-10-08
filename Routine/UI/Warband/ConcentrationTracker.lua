@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Warband = assert(ns.WarbandBoardInternal, "UI/Warband/Shared.lua must load first")
 local WBState = Warband.state

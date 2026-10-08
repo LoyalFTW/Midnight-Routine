@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 
 local TOOLTIP_ANCHORS = {
     left = "ANCHOR_LEFT",
@@ -17,7 +18,7 @@ local function GetTooltipPosition(opts)
         if opts and opts.anchor then
             return nil, opts.anchor
         end
-        position = "right"
+        position = "default"
     end
 
     if position == "middle" then
@@ -25,6 +26,10 @@ local function GetTooltipPosition(opts)
     end
 
     return position, TOOLTIP_ANCHORS[position] or (opts and opts.anchor) or TOOLTIP_ANCHORS.right
+end
+
+function ns.IsDefaultTooltipPosition()
+    return (GetTooltipPosition()) == "default"
 end
 
 function ns.ApplyTooltipPosition(tooltip, owner, opts)

@@ -1,4 +1,5 @@
 local addonName, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Foundry = _G.Foundry_1_0
 local Core = assert(ns.CoreInternals, "Core/Foundation.lua must load first")
@@ -705,7 +706,7 @@ function MR:OnInitialize()
         self.db.profile.disabledInCombat = self.db.profile.allowUpdatesDuringCombat ~= true
         self.db.profile.allowUpdatesDuringCombat = nil
     end
-    for _, charData in pairs(self.db.sv.char or {}) do
+    for _, charData in pairs(self:GetCharacters() or {}) do
         if type(charData) == "table" then
             PruneProgressStore(charData.progress)
         end
@@ -728,6 +729,24 @@ function MR:OnInitialize()
     end
 end
 
+function MR:ResetCharacterSettings()
+    local charData = self.db and self.db.char
+    if not charData then
+        return
+    end
+
+    for key in pairs(charData) do
+        if not self:IsTrackedDataKey(key) then
+            charData[key] = nil
+        end
+    end
+    for key, value in pairs(DEFAULTS.char) do
+        if not self:IsTrackedDataKey(key) then
+            charData[key] = DeepCopy(value)
+        end
+    end
+end
+
 function MR:ResetAllSettings()
     if not self.db then
         return
@@ -738,7 +757,8 @@ function MR:ResetAllSettings()
     local firstSeen = self.db.profile and self.db.profile.firstSeen
 
     RestoreDefaults(self.db.profile, DEFAULTS.profile)
-    RestoreDefaults(self.db.char, DEFAULTS.char)
+    self:ResetCharacterSettings()
+    self:WipeTrackedData()
     self:SetFrameStrata(DEFAULTS.profile.frameStrata)
 
     self.db.char.welcomeSeen = welcomeSeen and true or false

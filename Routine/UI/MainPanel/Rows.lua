@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local UI = assert(ns.UIInternal, "UI/Foundation.lua must load first")
 local L = UI.L
@@ -1144,7 +1145,7 @@ local function GetMainRowWidgetKind(mod, row)
     if isProfessionRow then kind = kind .. ":profession" end
     if isCurrencyRow then kind = kind .. ":currency" end
     if row.zone and row.x and row.y and not row.hideCoordText and not isProfessionRow then kind = kind .. ":coords" end
-    if (not professionCountEntry and type(row.kpTotal) == "number" and row.kpTotal > 0) or row.vaultLabel then kind = kind .. ":detail" end
+    if (not professionCountEntry and type(row.kpTotal) == "number" and row.kpTotal > 0) or MR:GetRowTierAccent(mod, row) then kind = kind .. ":detail" end
     if row.encounterIds and row.taskId then kind = kind .. ":difficulty" end
     return kind
 end
@@ -1670,12 +1671,13 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         coordsText:Show()
     end
 
-    if row.vaultLabel then
+    local tierLabel, tierColor = MR:GetRowTierAccent(mod, row)
+    if tierLabel then
         local vaultText = EnsureMainRowText(rowFrame, "_vault")
         SetFontIfChanged(vaultText, FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
         SetOneAnchor(vaultText, "RIGHT", rowFrame._count, "LEFT", -4, 0)
-        vaultText:SetText(row.vaultLabel)
-        vaultText:SetTextColor(hex(row.vaultColor or "#ffffff"))
+        vaultText:SetText(tierLabel)
+        vaultText:SetTextColor(hex(tierColor or "#ffffff"))
         vaultText:Show()
     end
     local hasEncounterDiffTracking = row.encounterIds and row.taskId

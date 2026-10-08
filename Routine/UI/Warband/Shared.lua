@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 
 local L = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
@@ -917,7 +918,7 @@ local function WBGetMainAltPickerData(frame)
     if MR.GetAltBoardCharacterOrder then
         for index, charKey in ipairs(MR:GetAltBoardCharacterOrder()) do orderIndex[charKey] = index end
     end
-    local characters = MR.db and MR.db.sv and MR.db.sv.char
+    local characters = MR:GetCharacters()
     local hiddenCharacters = MR.db and MR.db.profile and MR.db.profile.altBoardHiddenCharacters or nil
     for charKey, charData in pairs(characters or {}) do
         if type(charData) == "table" and type(charData.progress) == "table" and not (hiddenCharacters and hiddenCharacters[charKey]) then

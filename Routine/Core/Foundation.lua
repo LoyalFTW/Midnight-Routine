@@ -1,4 +1,5 @@
 local addonName, ns = ...
+if ns.Inactive then return end
 
 local Foundry = _G.Foundry_1_0
 if not Foundry then
@@ -49,6 +50,7 @@ local DEFAULTS = {
         fontFlags       = "OUTLINE",
         backgroundMedia = nil,
         minimap         = { hide = false, showInCompartment = true },
+        minimapShowGold = true,
         managedWindowRestoreState = nil,
         firstSeen       = false,
         welcomeSuppressed = false,
@@ -128,7 +130,7 @@ local DEFAULTS = {
         peekOnHover         = false,
         animatedMinimize    = false,
         mainHeaderPosition  = "top",
-        tooltipPosition     = "right",
+        tooltipPosition     = "default",
         showMainCharacterBar = true,
         characterWindowLayout = false,
         autoEnableNewModules = true,

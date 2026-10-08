@@ -1,4 +1,5 @@
 local _, ns = ...
+if ns.Inactive then return end
 local MR = ns.MR
 local Warband = assert(ns.WarbandBoardInternal, "UI/Warband/Shared.lua must load first")
 local WBState = Warband.state
@@ -170,7 +171,7 @@ end
 
 local function GetTrackedCharacterGold()
     local total = 0
-    local characters = MR.db and MR.db.sv and MR.db.sv.char
+    local characters = MR:GetCharacters()
     if type(characters) ~= "table" then return total end
     for _, charData in pairs(characters) do
         if type(charData) == "table" and type(charData.progress) == "table" then
@@ -600,7 +601,7 @@ local function PopulateWarbandModuleView(frame, selected)
     local professionKnown = 0
     local selectedKey = selected.key
     local selectedIsCurrent = selected.isCurrent
-    local charData = MR.db and MR.db.sv and MR.db.sv.char and MR.db.sv.char[selectedKey]
+    local charData = MR:GetCharacter(selectedKey)
     local savedProfessions = charData and type(charData.professions) == "table" and charData.professions or nil
 
     for _, expansion in ipairs(ns.AllExpansions or {}) do
@@ -994,6 +995,7 @@ function MR:RefreshWarbandBoard(reuseData)
 
         btn._name:SetFont(ns.FONT_HEADERS, math.max(9, GetFontSize() - 1), GetFontFlags())
         btn._name:SetText(entry.name)
+        btn._name:SetTextColor(sr, sg, sb)
         btn._score:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
         local scoreText = WBMythicScoreText(entry)
         btn._score:SetText(scoreText)
