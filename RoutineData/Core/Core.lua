@@ -32,6 +32,7 @@ local DEFAULTS = {
         tooltipBags = true,
         tooltipBank = true,
         tooltipMail = true,
+        tooltipEquipped = true,
         tooltipWarband = true,
         tooltipGuild = true,
     },
@@ -132,7 +133,7 @@ function RoutineData:GetCharacterRecord(charKey, create)
     local characters = self.db.characters
     local record = characters[charKey]
     if not record and create then
-        record = { bags = {}, bank = {}, mail = {}, currencies = {}, updatedAt = {} }
+        record = { bags = {}, bank = {}, mail = {}, equipped = {}, currencies = {}, updatedAt = {} }
         characters[charKey] = record
     end
     if record and not record.currencies then record.currencies = {} end
@@ -224,7 +225,7 @@ local function SumTabs(tabs, itemID)
     return total
 end
 
--- Returns { characters = { {key, classFile, bags, bank, mail}, ... }, warband = n, guilds = { {key, name, realm, count}, ... } }
+-- Returns { characters = { {key, classFile, bags, bank, mail, equipped}, ... }, warband = n, guilds = { {key, name, realm, count}, ... } }
 -- Only characters/guilds that hold the item are listed.
 function API.GetItemCounts(itemID)
     local db = RoutineData.db
@@ -235,13 +236,15 @@ function API.GetItemCounts(itemID)
         local bags = record.bags[itemID] or 0
         local bank = record.bank[itemID] or 0
         local mail = record.mail and record.mail[itemID] or 0
-        if bags > 0 or bank > 0 or mail > 0 then
+        local equipped = record.equipped and record.equipped[itemID] or 0
+        if bags > 0 or bank > 0 or mail > 0 or equipped > 0 then
             result.characters[#result.characters + 1] = {
                 key = charKey,
                 classFile = record.classFile,
                 bags = bags,
                 bank = bank,
                 mail = mail,
+                equipped = equipped,
             }
         end
     end
@@ -308,7 +311,7 @@ function API.GetTotalItemCount(itemID)
     local counts = API.GetItemCounts(itemID)
     local total = counts.warband
     for _, entry in ipairs(counts.characters) do
-        total = total + entry.bags + entry.bank + entry.mail
+        total = total + entry.bags + entry.bank + entry.mail + entry.equipped
     end
     for _, entry in ipairs(counts.guilds) do
         total = total + entry.count

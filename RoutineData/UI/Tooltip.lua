@@ -36,22 +36,24 @@ local function AddOwnerLines(tooltip, itemID)
     local settings = RoutineData.db.settings
     local counts = API.GetItemCounts(itemID)
     local entries = {}
-    local bagTotal, bankTotal, mailTotal = 0, 0, 0
+    local bagTotal, bankTotal, mailTotal, equippedTotal = 0, 0, 0, 0
 
     for _, entry in ipairs(counts.characters) do
         entry.visibleBags = settings.tooltipBags and entry.bags or 0
         entry.visibleBank = settings.tooltipBank and entry.bank or 0
         entry.visibleMail = settings.tooltipMail and entry.mail or 0
-        entry.total = entry.visibleBags + entry.visibleBank + entry.visibleMail
+        entry.visibleEquipped = settings.tooltipEquipped and entry.equipped or 0
+        entry.total = entry.visibleBags + entry.visibleBank + entry.visibleMail + entry.visibleEquipped
         if entry.total > 0 and not RoutineData:IsCharacterHidden(entry.key) then
             entries[#entries + 1] = entry
             bagTotal = bagTotal + entry.visibleBags
             bankTotal = bankTotal + entry.visibleBank
             mailTotal = mailTotal + entry.visibleMail
+            equippedTotal = equippedTotal + entry.visibleEquipped
         end
     end
     local warband = settings.tooltipWarband and counts.warband or 0
-    local total = bagTotal + bankTotal + mailTotal + warband
+    local total = bagTotal + bankTotal + mailTotal + equippedTotal + warband
     if total > 0 then
         tooltip:AddLine(" ")
         tooltip:AddDoubleLine(L["Tooltip_Inventory"], L["Tooltip_Total"] .. ": " .. FormatCount(total), 0.35, 0.88, 0.78, 0.95, 0.85, 0.55)
@@ -63,6 +65,7 @@ local function AddOwnerLines(tooltip, itemID)
             if entry.visibleBags > 0 then detail[#detail + 1] = "|cffb5d7f3" .. L["Tooltip_Bags"] .. ": " .. FormatCount(entry.visibleBags) .. "|r" end
             if entry.visibleBank > 0 then detail[#detail + 1] = "|cffffd17a" .. L["Tooltip_Bank"] .. ": " .. FormatCount(entry.visibleBank) .. "|r" end
             if entry.visibleMail > 0 then detail[#detail + 1] = "|cffd9b8f5" .. L["Tooltip_Mail"] .. ": " .. FormatCount(entry.visibleMail) .. "|r" end
+            if entry.visibleEquipped > 0 then detail[#detail + 1] = "|cff9ee6a0" .. L["Tooltip_Equipped"] .. ": " .. FormatCount(entry.visibleEquipped) .. "|r" end
             tooltip:AddDoubleLine(OwnerLabel(entry, current), table.concat(detail, "  |cff687582·|r  "), 0.90, 0.93, 0.96, 0.90, 0.93, 0.96)
         end
         if #entries > shown then

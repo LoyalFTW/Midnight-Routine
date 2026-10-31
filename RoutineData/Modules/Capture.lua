@@ -157,6 +157,24 @@ local function CollectMail()
     return tab
 end
 
+local function CollectEquipped()
+    if not GetInventoryItemID then return nil end
+    local counts = {}
+    local function Add(slot, stacked)
+        local itemID = GetInventoryItemID("player", slot)
+        if not itemID then return end
+        local count = stacked and GetInventoryItemCount and GetInventoryItemCount("player", slot)
+        counts[itemID] = (counts[itemID] or 0) + (tonumber(count) or 1)
+    end
+    for slot = INVSLOT_FIRST_EQUIPPED or 1, INVSLOT_LAST_EQUIPPED or 19 do
+        Add(slot)
+    end
+    if INVSLOT_AMMO and INVSLOT_AMMO < (INVSLOT_FIRST_EQUIPPED or 1) then
+        Add(INVSLOT_AMMO, true)
+    end
+    return counts
+end
+
 local function CurrentGuildIdentity()
     if not GetGuildInfo then return nil end
     local guildName, _, _, guildRealm = GetGuildInfo("player")
@@ -217,6 +235,16 @@ function RoutineData:CaptureMail()
     record.updatedAt.mail = now
     self.db.snapshots.mail[charKey] = { tabs = { tab }, updatedAt = now }
     self:Fire("ItemsUpdated", charKey, "mail")
+end
+
+function RoutineData:CaptureEquipped()
+    local charKey = self:GetCurrentCharacterKey()
+    local counts = CollectEquipped()
+    if not charKey or not counts then return end
+    local record = self:GetCharacterRecord(charKey, true)
+    record.equipped = counts
+    record.updatedAt.equipped = Now()
+    self:Fire("ItemsUpdated", charKey, "equipped")
 end
 
 function RoutineData:RefreshCharacterGuild()
@@ -328,8 +356,12 @@ local handlers = {
     PLAYER_ENTERING_WORLD = function()
         C_Timer.After(1, function()
             RoutineData:CaptureBags()
+            RoutineData:CaptureEquipped()
             RoutineData:RefreshCharacterGuild()
         end)
+    end,
+    PLAYER_EQUIPMENT_CHANGED = function()
+        Debounced("equipped", function() RoutineData:CaptureEquipped() end)
     end,
     PLAYER_GUILD_UPDATE = function(unit)
         if not unit or unit == "player" then RoutineData:RefreshCharacterGuild() end
