@@ -157,6 +157,10 @@ local function CollectMail()
     return tab
 end
 
+local function LastEquippedSlot()
+    return math.max(INVSLOT_LAST_EQUIPPED or 19, tonumber(CONTAINER_BAG_OFFSET) or 0)
+end
+
 local function CollectEquipped()
     if not GetInventoryItemID then return nil end
     local counts = {}
@@ -166,7 +170,7 @@ local function CollectEquipped()
         local count = stacked and GetInventoryItemCount and GetInventoryItemCount("player", slot)
         counts[itemID] = (counts[itemID] or 0) + (tonumber(count) or 1)
     end
-    for slot = INVSLOT_FIRST_EQUIPPED or 1, INVSLOT_LAST_EQUIPPED or 19 do
+    for slot = INVSLOT_FIRST_EQUIPPED or 1, LastEquippedSlot() do
         Add(slot)
     end
     if INVSLOT_AMMO and INVSLOT_AMMO < (INVSLOT_FIRST_EQUIPPED or 1) then
@@ -353,14 +357,21 @@ local function CaptureOpenBank()
 end
 
 local handlers = {
-    PLAYER_ENTERING_WORLD = function()
+    PLAYER_ENTERING_WORLD = function(isInitialLogin, isReloadingUi)
+        local captureEquipped = isInitialLogin or isReloadingUi or isInitialLogin == nil
         C_Timer.After(1, function()
             RoutineData:CaptureBags()
-            RoutineData:CaptureEquipped()
+            if captureEquipped then RoutineData:CaptureEquipped() end
             RoutineData:RefreshCharacterGuild()
         end)
     end,
-    PLAYER_EQUIPMENT_CHANGED = function()
+    PLAYER_EQUIPMENT_CHANGED = function(slot)
+        if (tonumber(slot) or 0) > LastEquippedSlot() then return end
+        Debounced("equipped", function() RoutineData:CaptureEquipped() end)
+    end,
+    UNIT_INVENTORY_CHANGED = function(unit)
+        if unit ~= "player" or state.inventoryReady then return end
+        state.inventoryReady = true
         Debounced("equipped", function() RoutineData:CaptureEquipped() end)
     end,
     PLAYER_GUILD_UPDATE = function(unit)
