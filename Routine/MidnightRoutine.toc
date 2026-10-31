@@ -52,7 +52,7 @@ UI/Trackers/Darkmoon.lua
 UI/Trackers/CurrencyBrowser.lua
 UI/Trackers/Renown.lua
 UI/Trackers/Rares.lua
-UI/Trackers/ProfessionKnowledge.lua
+UI/Trackers/ProfessionKnowledge/ProfessionKnowledge.xml
 
 UI/Warband/Model.lua
 UI/Warband/Shared.lua

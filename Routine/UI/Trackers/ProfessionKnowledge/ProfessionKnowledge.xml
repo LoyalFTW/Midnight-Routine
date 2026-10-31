@@ -1,0 +1,9 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="Shared.lua"/>
+    <Script file="Tooltips.lua"/>
+    <Script file="Render.lua"/>
+    <Script file="Rows.lua"/>
+    <Script file="Cards.lua"/>
+    <Script file="Config.lua"/>
+    <Script file="Window.lua"/>
+</Ui>
