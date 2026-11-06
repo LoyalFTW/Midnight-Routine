@@ -9,6 +9,7 @@
 ## IconTexture: Interface\AddOns\MidnightRoutine\Media\Icon
 ## X-Curse-Project-ID: 1472162
 ## X-Wago-ID: QN53j5KB
+## Category: Routine
 ## Category-enUS: Routine
 
 Libs/LibStub/LibStub.lua
