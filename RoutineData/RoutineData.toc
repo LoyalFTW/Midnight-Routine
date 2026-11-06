@@ -8,6 +8,7 @@
 ## IconTexture: Interface\AddOns\RoutineData\Media\Icon
 ## X-Curse-Project-ID: 1733527
 ## X-Wago-ID: ZKbqyy61
+## Category: Routine
 ## Category-enUS: Routine
 
 Libs/LibStub/LibStub.lua
