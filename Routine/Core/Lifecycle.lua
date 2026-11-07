@@ -1105,11 +1105,34 @@ function MR:OnEnable()
         self:ScheduleNextResetCheck()
         return
     end
-    self:RegisterBucketEvent({
+
+    local missing, seenMissing = {}, {}
+    local function handlerExists(handler)
+        if type(self[handler]) == "function" then
+            return true
+        end
+        if not seenMissing[handler] then
+            seenMissing[handler] = true
+            missing[#missing + 1] = handler
+        end
+        return false
+    end
+    local function listen(event, handler)
+        if handlerExists(handler) then
+            self:RegisterEvent(event, handler)
+        end
+    end
+    local function listenBucket(events, interval, handler)
+        if handlerExists(handler) then
+            self:RegisterBucketEvent(events, interval, handler)
+        end
+    end
+
+    listenBucket({
         "AREA_POIS_UPDATED",
     }, 10, "OnAreaPoisUpdated")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "QUEST_LOG_UPDATE",
         "UNIT_QUEST_LOG_CHANGED",
         "GOSSIP_SHOW",
@@ -1120,12 +1143,12 @@ function MR:OnEnable()
         "QUEST_COMPLETE",
     }, 2, "OnQuestDataChanged")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "CRITERIA_UPDATE",
         "ACHIEVEMENT_EARNED",
     }, 0.25, "OnRareProgressChanged")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "SKILL_LINES_CHANGED",
         "TRADE_SKILL_LIST_UPDATE",
         "SKILL_LINE_SPECS_RANKS_CHANGED",
@@ -1133,42 +1156,47 @@ function MR:OnEnable()
         "LEARNED_SPELL_IN_SKILL_LINE",
     }, 1, "OnProfessionChange")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "ZONE_CHANGED_NEW_AREA",
     }, 0.5, "OnZoneChanged")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "CALENDAR_UPDATE_EVENT_LIST",
     }, 0.5, "OnCalendarEventsUpdated")
 
-    self:RegisterBucketEvent({
+    listenBucket({
         "CHALLENGE_MODE_COMPLETED",
         "WEEKLY_REWARDS_UPDATE",
         "LFG_COMPLETION_REWARD",
     }, 1, "OnVaultEvent")
 
-    self:RegisterEvent("ENCOUNTER_END",            "OnEncounterEnd")
-    self:RegisterEvent("BOSS_KILL",                "OnBossKill")
-    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE",  "OnCurrencyDisplayUpdate")
-    self:RegisterEvent("PLAYER_MONEY",             "OnPlayerMoney")
-    self:RegisterEvent("ACCOUNT_MONEY",            "OnWarbandMoney")
-    self:RegisterEvent("BANKFRAME_OPENED",         "OnWarbandMoney")
-    self:RegisterEvent("UPDATE_UI_WIDGET",         "OnDelveWidgetUpdate")
-    self:RegisterEvent("UPDATE_ALL_UI_WIDGETS",    "OnDelveWidgetUpdate")
-    self:RegisterEvent("LOOT_READY",               "OnDelveLootReady")
-    self:RegisterEvent("LOOT_OPENED",              "OnDelveLootReady")
-    self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnedIn")
-    self:RegisterEvent("QUEST_TURNED_IN",          "OnQuestTurnInCompletion")
-    self:RegisterEvent("QUEST_ACCEPTED",           "OnQuestAccepted")
-    self:RegisterEvent("QUEST_REMOVED",            "OnQuestRemoved")
-    self:RegisterEvent("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
-    self:RegisterEvent("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
-    self:RegisterEvent("PLAYER_REGEN_DISABLED",    "OnCombatStarted")
-    self:RegisterEvent("PLAYER_REGEN_ENABLED",     "OnCombatEnded")
+    listen("ENCOUNTER_END",            "OnEncounterEnd")
+    listen("BOSS_KILL",                "OnBossKill")
+    listen("CURRENCY_DISPLAY_UPDATE",  "OnCurrencyDisplayUpdate")
+    listen("PLAYER_MONEY",             "OnPlayerMoney")
+    listen("ACCOUNT_MONEY",            "OnWarbandMoney")
+    listen("BANKFRAME_OPENED",         "OnWarbandMoney")
+    listen("UPDATE_UI_WIDGET",         "OnDelveWidgetUpdate")
+    listen("UPDATE_ALL_UI_WIDGETS",    "OnDelveWidgetUpdate")
+    listen("LOOT_READY",               "OnDelveLootReady")
+    listen("LOOT_OPENED",              "OnDelveLootReady")
+    listen("QUEST_TURNED_IN",          "OnQuestTurnedIn")
+    listen("QUEST_TURNED_IN",          "OnQuestTurnInCompletion")
+    listen("QUEST_ACCEPTED",           "OnQuestAccepted")
+    listen("QUEST_REMOVED",            "OnQuestRemoved")
+    listen("BAG_UPDATE_DELAYED",       "OnBagUpdateDelayed")
+    listen("PLAYER_ENTERING_WORLD",    "OnEnteringWorld")
+    listen("PLAYER_REGEN_DISABLED",    "OnCombatStarted")
+    listen("PLAYER_REGEN_ENABLED",     "OnCombatEnded")
     if C_EventUtils and C_EventUtils.IsEventValid and C_EventUtils.IsEventValid("UNIT_DIED") then
-        self:RegisterEvent("UNIT_DIED", "OnRareUnitDied")
+        listen("UNIT_DIED", "OnRareUnitDied")
     else
-        self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED", "OnRareCombatLogEvent")
+        listen("COMBAT_LOG_EVENT_UNFILTERED", "OnRareCombatLogEvent")
+    end
+
+    if #missing > 0 and geterrorhandler then
+        geterrorhandler()("MidnightRoutine: no handler for " .. table.concat(missing, ", ")
+            .. ". Is RoutineData up to date?")
     end
 
     self:ScheduleNextResetCheck()

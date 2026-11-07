@@ -887,10 +887,16 @@ function MR:ToggleCurrencyBrowserFrame(anchor)
     end
 end
 
+local refreshBrowserSoon = MR:CreateDebouncer(function()
+    if MR.currencyBrowserFrame and MR.currencyBrowserFrame:IsShown() then
+        MR:RefreshCurrencyBrowserFrame()
+    end
+end, 0.25)
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
 eventFrame:SetScript("OnEvent", function()
     if MR.currencyBrowserFrame and MR.currencyBrowserFrame:IsShown() then
-        MR:RefreshCurrencyBrowserFrame()
+        refreshBrowserSoon()
     end
 end)

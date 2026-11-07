@@ -205,3 +205,19 @@ function MR:CancelAllTimers()
         self._timers[timer] = nil
     end
 end
+
+function MR:CreateDebouncer(callback, delay)
+    if type(callback) ~= "function" then
+        error("MidnightRoutine:CreateDebouncer needs a function callback", 2)
+    end
+    local pending
+    return function()
+        if pending and not (pending.IsCancelled and pending:IsCancelled()) then
+            return
+        end
+        pending = self:ScheduleTimer(function()
+            pending = nil
+            callback()
+        end, delay)
+    end
+end

@@ -91,6 +91,10 @@ tracking.installers["ForeverBootstrap"] = function(owner, context)
     })
     end
 
+    local refreshCurrenciesSoon = MR:CreateDebouncer(function()
+        if MR.RefreshCurrenciesModule then MR:RefreshCurrenciesModule(false) end
+    end, 0.1)
+
     local rareWatcher = CreateFrame("Frame")
     if not ns.Forever.hideRares then
         rareWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -118,7 +122,11 @@ tracking.installers["ForeverBootstrap"] = function(owner, context)
             if MR.OnRaresZoneChanged then MR:OnRaresZoneChanged() end
             return
         end
-        if event == "PLAYER_ENTERING_WORLD" or event == "CURRENCY_DISPLAY_UPDATE" then
+        if event == "CURRENCY_DISPLAY_UPDATE" then
+            refreshCurrenciesSoon()
+            return
+        end
+        if event == "PLAYER_ENTERING_WORLD" then
             if MR.RefreshCurrenciesModule then MR:RefreshCurrenciesModule(false) end
             if MR.RequestScan then MR:RequestScan(0.2) end
             return
