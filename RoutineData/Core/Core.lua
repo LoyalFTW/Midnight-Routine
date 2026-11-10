@@ -213,7 +213,8 @@ function API.GetCharacters()
 end
 
 function API.GetCharacterClass(charKey)
-    local record = RoutineData.db.characters[charKey]
+    local db = RoutineData.db
+    local record = db and db.characters and db.characters[charKey]
     return record and record.classFile or nil
 end
 
@@ -270,7 +271,9 @@ end
 
 function API.GetTotalGold()
     local total = 0
-    for _, record in pairs(RoutineData.db.characters) do
+    local db = RoutineData.db
+    if not (db and db.characters) then return total end
+    for _, record in pairs(db.characters) do
         total = total + (record.gold or 0)
     end
     return total

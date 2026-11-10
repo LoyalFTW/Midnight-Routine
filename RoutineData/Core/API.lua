@@ -103,7 +103,7 @@ end
 
 function API.GetProfessions(charKey)
     local record = SavedRecord(charKey)
-    return record and record.professions or nil
+    return record and record.professions and CopyTable(record.professions) or nil
 end
 
 function API.GetConcentration(charKey)
@@ -113,7 +113,7 @@ end
 
 function API.GetRareKills(charKey)
     local record = SavedRecord(charKey)
-    return record and record.raresKills or nil
+    return record and record.raresKills and CopyTable(record.raresKills) or nil
 end
 
 function API.GetWarbandGold()
@@ -139,7 +139,8 @@ function API.GetCurrentWeekKey()
 end
 
 function API.GetBankSnapshots()
-    return RoutineData:GetBankSnapshotView()
+    local view = RoutineData:GetBankSnapshotView()
+    return view and CopyTable(view) or nil
 end
 
 local bridge = {}
