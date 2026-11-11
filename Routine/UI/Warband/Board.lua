@@ -1089,7 +1089,12 @@ function MR:RefreshWarbandBoard(reuseData)
     frame.heroScore:SetFont(ns.FONT_ROWS, math.max(10, GetFontSize()), GetFontFlags())
     frame.heroScore:SetText(WBMythicScoreText(selected))
     local syncAt = selected.lastSyncAt and selected.lastSyncAt > 0 and selected.lastSyncAt or selected.lastResetAt
-    frame.heroMeta:SetText(string.format(L["AltBoard_LastSynced"] or "%s  |  Last synced: %s", selected.realm ~= "" and selected.realm or (L["AltBoard_UnknownRealm"] or "Unknown Realm"), WBFormatTimestamp(syncAt)))
+    local heroRealm = selected.realm ~= "" and selected.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm"))
+    if heroRealm == "" then
+        frame.heroMeta:SetText(string.format("Last synced: %s", WBFormatTimestamp(syncAt)))
+    else
+        frame.heroMeta:SetText(string.format(L["AltBoard_LastSynced"] or "%s  |  Last synced: %s", heroRealm, WBFormatTimestamp(syncAt)))
+    end
     if frame.heroNoteBox and not frame.heroNoteBox:HasFocus() then
         frame.heroNoteBox:SetText(selected.note or "")
     end

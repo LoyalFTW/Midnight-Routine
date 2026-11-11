@@ -700,8 +700,8 @@ function MR:BuildUI()
 
     local function UpdateCharacterBar()
         local altInfo = MR.GetMainAltViewCharacterInfo and MR:GetMainAltViewCharacterInfo() or nil
-        local name = altInfo and altInfo.name or (UnitName and UnitName("player")) or (L["Unknown"] or "Unknown")
-        local realm = altInfo and altInfo.realm or (GetRealmName and GetRealmName()) or ""
+        local name = altInfo and altInfo.name or MR:GetPlayerDisplayName() or (L["Unknown"] or "Unknown")
+        local realm = MR:GetRealmDisplay(altInfo and altInfo.realm or (GetRealmName and GetRealmName()) or "")
         local classFile = altInfo and altInfo.data and altInfo.data.classFile or select(2, UnitClass("player"))
         local classColor = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] or nil
         local cr, cg, cb = 0.18, 0.78, 0.72

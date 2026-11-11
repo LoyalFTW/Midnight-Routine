@@ -414,7 +414,7 @@ function MR:MoveAltBoardCharacter(charKey, direction)
                 discovered[#discovered + 1] = {
                     key = existingKey,
                     name = name,
-                    realm = realm,
+                    realm = MR:GetRealmDisplay(realm),
                     isCurrent = existingKey == currentKey,
                     hidden = hiddenChars[existingKey] == true,
                 }
@@ -497,7 +497,7 @@ function MR:SetAltBoardCharacterPosition(charKey, targetCharKey, afterTarget)
                 discovered[#discovered + 1] = {
                     key = existingKey,
                     name = name,
-                    realm = realm,
+                    realm = MR:GetRealmDisplay(realm),
                     isCurrent = existingKey == currentKey,
                     hidden = hiddenChars[existingKey] == true,
                 }
@@ -680,7 +680,7 @@ function MR:GetMainAltViewCharacterInfo()
     return {
         key = charKey,
         name = name,
-        realm = realm,
+        realm = MR:GetRealmDisplay(realm),
         data = self:GetCharacter(charKey),
     }
 end
@@ -754,7 +754,7 @@ function MR:GetWarbandWeeklyData(showHiddenOverride, detailCharKey, onlyCharKey)
             local snapshot = {
                 key = charKey,
                 name = name,
-                realm = realm,
+                realm = MR:GetRealmDisplay(realm),
                 classFile = charData.classFile,
                 mythicPlusScore = tonumber(charData.mythicPlusScore),
                 gold = tonumber(charData.gold),
@@ -1273,7 +1273,7 @@ function MR:GetCharacterMainOverview(charKey)
     local overview = {
         key = charKey,
         name = name,
-        realm = realm,
+        realm = MR:GetRealmDisplay(realm),
         classFile = charData.classFile,
         isCurrent = isCurrent,
         stale = (not isCurrent) and weeklyReset > 0 and lastSyncAt > 0 and lastSyncAt < weeklyReset,

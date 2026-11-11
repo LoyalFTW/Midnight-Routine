@@ -48,6 +48,44 @@ end
 
 local interfaceVersion = GetBuildInfo and tonumber((select(4, GetBuildInfo()))) or 0
 MR.isForever = interfaceVersion >= 16000 and interfaceVersion < 17000
+
+function MR:GetRealmTag(realm)
+    if type(realm) ~= "string" or realm == "" then return "" end
+    local lower = realm:lower()
+    local isRP = lower:find("%f[%a]rp%f[%A]") ~= nil
+    local isPvP = lower:find("pvp", 1, true) ~= nil
+    local isPvE = lower:find("pve", 1, true) ~= nil
+    if isRP and isPvP then return "RP-PvP" end
+    if isRP then return "RP" end
+    if isPvP then return "PvP" end
+    if isPvE then return "PvE" end
+    return ""
+end
+
+function MR:GetRealmDisplay(realm)
+    if self.isForever then return self:GetRealmTag(realm) end
+    return realm or ""
+end
+
+function MR:GetPlayerDisplayName()
+    local base = UnitName and UnitName("player") or nil
+    if not base or base == "" then return nil end
+    local best = base
+    local function consider(candidate)
+        if type(candidate) ~= "string" or candidate == "" then return end
+        if #candidate > #best and candidate:sub(1, #base):lower() == base:lower() then
+            best = candidate
+        end
+    end
+    if self.GetCurrentCharacterKey and self.ParseCharacterKey then
+        local key = self:GetCurrentCharacterKey()
+        if key then consider((self:ParseCharacterKey(key))) end
+    end
+    if UnitFullName then consider((UnitFullName("player"))) end
+    if GetUnitName then consider(GetUnitName("player", false)) end
+    return best
+end
+
 MR._eventController = Foundry:RequireModule("Events", 2):New(addonName)
 MR._timers = {}
 MR._buckets = {}

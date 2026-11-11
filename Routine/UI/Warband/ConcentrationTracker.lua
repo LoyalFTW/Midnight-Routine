@@ -455,11 +455,12 @@ function MR:PopulateConcentrationTrackerConfigFrame(f)
         local concentrationEntries = type(charEntry.concentration) == "table" and charEntry.concentration or nil
         if concentrationEntries and #concentrationEntries > 0 then
             anyCharacters = true
-            local label = string.format(
+            local realmLabel = charEntry.realm ~= "" and charEntry.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm"))
+            local label = realmLabel ~= "" and string.format(
                 (L["AltBoard_ConcentrationShowCharacter"] or "Show %s - %s"),
                 charEntry.name or "?",
-                charEntry.realm ~= "" and charEntry.realm or (L["AltBoard_UnknownRealm"] or "Unknown Realm")
-            )
+                realmLabel
+            ) or (charEntry.name or "?")
             Check(label,
                 function() return not WBIsConcentrationTrackerCharacterHidden(charEntry.key) end,
                 function(value)

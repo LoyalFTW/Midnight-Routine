@@ -62,7 +62,7 @@ local function CharacterGoldName(entry, currentKey)
     local name, realm = MR:ParseCharacterKey(entry.key)
     local color = entry.classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[entry.classFile]
     local text = color and color:WrapTextInColorCode(name) or name
-    if realm ~= "" and realm ~= GetRealmName() then
+    if not MR.isForever and realm ~= "" and realm ~= GetRealmName() then
         text = text .. " |cff8c8c99" .. realm .. "|r"
     end
     if entry.key == currentKey then

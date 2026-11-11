@@ -853,7 +853,7 @@ local function PopulateConcentrationCards(frame, data, opts)
             card._meta:ClearAllPoints()
             card._meta:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, opts.mode == "overview" and -10 or -11)
             card._meta:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-            card._meta:SetText(charEntry.realm ~= "" and charEntry.realm or (L["AltBoard_UnknownRealm"] or "Unknown Realm"))
+            card._meta:SetText(charEntry.realm ~= "" and charEntry.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm")))
             card._meta:SetTextColor(0.64, 0.72, 0.82)
 
             local rowY = opts.mode == "overview" and 32 or (opts.compact and 26 or 34)
@@ -927,7 +927,7 @@ local function WBGetMainAltPickerData(frame)
             local name, realm = MR:ParseCharacterKey(charKey)
             entry.key = charKey
             entry.name = name or charKey
-            entry.realm = realm or ""
+            entry.realm = MR:GetRealmDisplay(realm or "")
             entry.classFile = charData.classFile
             entry.mythicPlusScore = tonumber(charData.mythicPlusScore)
             entry.gold = tonumber(charData.gold)
@@ -977,8 +977,8 @@ local function WBRefreshMainAltPicker(frame)
     local currentRow = frame._currentCharacterEntry or {}
     frame._currentCharacterEntry = currentRow
     currentRow.key = currentKey
-    currentRow.name = UnitName and UnitName("player") or (L["AltPicker_CurrentCharacter"] or "Current Character")
-    currentRow.realm = GetRealmName and GetRealmName() or ""
+    currentRow.name = MR:GetPlayerDisplayName() or (L["AltPicker_CurrentCharacter"] or "Current Character")
+    currentRow.realm = MR:GetRealmDisplay(GetRealmName and GetRealmName() or "")
     currentRow.classFile = select(2, UnitClass("player"))
     currentRow.mythicPlusScore = MR.db and MR.db.char and tonumber(MR.db.char.mythicPlusScore) or nil
     currentRow.gold = MR.db and MR.db.char and tonumber(MR.db.char.gold) or nil
@@ -1112,7 +1112,7 @@ local function WBRefreshMainAltPicker(frame)
 
         local realm = row._realm
         realm:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
-        realm:SetText(entry.realm ~= "" and entry.realm or (L["AltBoard_UnknownRealm"] or "Unknown Realm"))
+        realm:SetText(entry.realm ~= "" and entry.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm")))
 
         local gold = row._gold
         gold:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
