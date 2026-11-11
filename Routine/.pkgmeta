@@ -11,7 +11,10 @@ externals:
   Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1.git
   Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
   Libs/AceLocale-3.0: https://repos.curseforge.com/wow/ace3/trunk/AceLocale-3.0
-  Libs/Foundry: https://github.com/Royaleint/Foundry.git
+  Libs/Foundry:
+    url: https://github.com/Royaleint/Foundry.git
+    curse-slug: foundry
+    tag: v1.0.115
  
 
 ignore:
