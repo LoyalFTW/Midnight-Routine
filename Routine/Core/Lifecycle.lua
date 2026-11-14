@@ -1096,6 +1096,7 @@ function MR:OnEnable()
         ns.ApplySharedMedia(self:GetActiveMediaSettings())
     end
     if self.EnableAltBankTracking then self:EnableAltBankTracking() end
+    self:RegisterEvent("PLAYER_LEVEL_UP", "OnPlayerLevelUp")
     if self.isForever then
         self:RegisterBucketEvent({ "QUEST_LOG_UPDATE", "SKILL_LINES_CHANGED", "UPDATE_FACTION" }, 0.5, "OnForeverProgressChanged")
         self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "OnForeverProgressChanged")

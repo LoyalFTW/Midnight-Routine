@@ -9,6 +9,12 @@ local function ParseCharacterKey(charKey)
     return MR:ParseCharacterKey(charKey)
 end
 
+function ns.FormatCharacterLevel(level)
+    if type(level) == "number" and level > 0 then
+        return string.format(TOOLTIP_UNIT_LEVEL or "Level %s", level)
+    end
+end
+
 local function GetRowWarbandCharacterName(charKey, charData, currentKey)
     local name = ParseCharacterKey(charKey)
     if charKey == currentKey then
@@ -17,9 +23,13 @@ local function GetRowWarbandCharacterName(charKey, charData, currentKey)
 
     local classColor = charData and charData.classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[charData.classFile]
     if classColor and classColor.colorStr then
-        return string.format("|c%s%s|r", classColor.colorStr, name)
+        name = string.format("|c%s%s|r", classColor.colorStr, name)
     end
 
+    local levelText = ns.FormatCharacterLevel(charData.level)
+    if levelText then
+        name = string.format("%s (%s)", name, levelText)
+    end
     return name
 end
 
@@ -756,6 +766,7 @@ function MR:GetWarbandWeeklyData(showHiddenOverride, detailCharKey, onlyCharKey)
                 name = name,
                 realm = MR:GetRealmDisplay(realm),
                 classFile = charData.classFile,
+                level = charData.level,
                 mythicPlusScore = tonumber(charData.mythicPlusScore),
                 gold = tonumber(charData.gold),
                 note = note,

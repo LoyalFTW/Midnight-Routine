@@ -23,8 +23,22 @@ function MR:RestoreSavedManagedWindows()
     end
 end
 
+local function UpdateCurrentCharacterLevel(self, level)
+    local charData = self.db and self.db.char
+    if not charData or type(level) ~= "number" or level <= 0 or charData.level == level then
+        return
+    end
+    charData.level = level
+    self:RefreshWarbandCharacterSurfaces()
+end
+
+function MR:OnPlayerLevelUp(_, level)
+    UpdateCurrentCharacterLevel(self, level)
+end
+
 function MR:OnEnteringWorld()
     self:RefreshEnteringWorldTracking()
+    UpdateCurrentCharacterLevel(self, UnitLevel("player"))
     local temporarilyHidden = self._toggleRestoreState ~= nil
     local mainPanelOpen = self:GetMainPanelOpen()
 

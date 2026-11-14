@@ -929,6 +929,7 @@ local function WBGetMainAltPickerData(frame)
             entry.name = name or charKey
             entry.realm = MR:GetRealmDisplay(realm or "")
             entry.classFile = charData.classFile
+            entry.level = charData.level
             entry.mythicPlusScore = tonumber(charData.mythicPlusScore)
             entry.gold = tonumber(charData.gold)
             entry.isCurrent = false
@@ -980,6 +981,7 @@ local function WBRefreshMainAltPicker(frame)
     currentRow.name = MR:GetPlayerDisplayName() or (L["AltPicker_CurrentCharacter"] or "Current Character")
     currentRow.realm = MR:GetRealmDisplay(GetRealmName and GetRealmName() or "")
     currentRow.classFile = select(2, UnitClass("player"))
+    currentRow.level = MR.db and MR.db.char and MR.db.char.level
     currentRow.mythicPlusScore = MR.db and MR.db.char and tonumber(MR.db.char.mythicPlusScore) or nil
     currentRow.gold = MR.db and MR.db.char and tonumber(MR.db.char.gold) or nil
     currentRow.isCurrent = true
@@ -1034,6 +1036,7 @@ local function WBRefreshMainAltPicker(frame)
             realm:SetPoint("TOPLEFT", row, "TOPLEFT", 29, -22)
             realm:SetPoint("TOPRIGHT", row, "TOP", -4, -22)
             realm:SetJustifyH("LEFT")
+            realm:SetWordWrap(false)
             realm:SetTextColor(0.68, 0.70, 0.74)
             row._realm = realm
 
@@ -1112,7 +1115,12 @@ local function WBRefreshMainAltPicker(frame)
 
         local realm = row._realm
         realm:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())
-        realm:SetText(entry.realm ~= "" and entry.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm")))
+        local realmText = entry.realm ~= "" and entry.realm or (MR.isForever and "" or (L["AltBoard_UnknownRealm"] or "Unknown Realm"))
+        local levelText = ns.FormatCharacterLevel(entry.level)
+        if levelText then
+            realmText = realmText ~= "" and (levelText .. " | " .. realmText) or levelText
+        end
+        realm:SetText(realmText)
 
         local gold = row._gold
         gold:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())

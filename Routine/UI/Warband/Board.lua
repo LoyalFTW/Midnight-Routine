@@ -158,6 +158,10 @@ end
 
 local function GetCharacterDetailsText(entry)
     local details = entry.realm ~= "" and entry.realm or ""
+    local levelText = ns.FormatCharacterLevel(entry.level)
+    if levelText then
+        details = details ~= "" and (levelText .. " | " .. details) or levelText
+    end
     local professions = entry.professionLabels
     if type(professions) == "table" and #professions > 0 then
         local professionText = table.concat(professions, ", ", 1, math.min(#professions, 2))
