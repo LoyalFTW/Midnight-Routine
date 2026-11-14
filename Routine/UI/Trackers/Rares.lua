@@ -504,6 +504,10 @@ local function CreateRareRow(body)
                 else
                     tooltip:AddLine(L["Rares_Tooltip_NotKilled"], 0.50, 0.50, 0.50)
                 end
+                if rare.spawnNote then
+                    tooltip:AddLine(" ")
+                    tooltip:AddLine(L[rare.spawnNote], 0.95, 0.82, 0.55, true)
+                end
                 AddWarbandRareTooltipLines(tooltip, rare)
                 if MR.isForever then ns.Forever.AddRareLocationTooltip(tooltip, rare) end
                 if rare[3] and rare[4] and rare[5] then

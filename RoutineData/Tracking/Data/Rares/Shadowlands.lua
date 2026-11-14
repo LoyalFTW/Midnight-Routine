@@ -248,5 +248,12 @@ tracking.rareCatalogs[#tracking.rareCatalogs + 1] = {
         { "Euv'ouk", 65555, 1970, 47.45, 45.15, 184409, catalogEntry = true, achievementID = 15391, criteriaID = 52982 },
         { "Shifting Stargorger", 65549, 1970, 42.30, 21.00, 184413, catalogEntry = true, achievementID = 15391, criteriaID = 52988 },
         { "Dominated Irregular", nil, 1970, 48.65, 13.70, 184819, catalogEntry = true, achievementID = 15211, criteriaID = 52568, resolveQuestID = false },
+        { "Astra, As Azshara", 61201, 1565, 41.28, 44.34, 166135, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Mi'kai, As Argus, the Unmaker", 61202, 1565, 41.28, 44.34, 166138, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Glimmerdust, As Kil'jaeden", 61203, 1565, 41.34, 44.57, 166139, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Senthii, As Gul'dan", 61204, 1565, 41.46, 44.75, 166140, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Glimmerdust, As Jaina", 61205, 1565, 41.28, 44.34, 166142, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Dreamweaver, As N'Zoth", 61206, 1565, 41.44, 44.83, 166145, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
+        { "Niya, As Xavius", 61207, 1565, 41.28, 44.34, 166146, catalogEntry = true, achievementID = 14309, spawnNote = "Rares_Spawn_StarLake" },
     },
 }

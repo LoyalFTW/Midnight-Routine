@@ -174,5 +174,7 @@ tracking.rareCatalogs[#tracking.rareCatalogs + 1] = {
         { "Arcana-Monger So'zer", 90696, 2472, 34.70, 36.10, 241956, catalogEntry = true, achievementID = 42761, criteriaID = 106332 },
         { "Malek'ta", 91275, 2371, 54.05, 58.84, 245997, catalogEntry = true, achievementID = 42761, criteriaID = 106336 },
         { "Heka'tamos", 91276, 2371, 75.23, 30.98, 245998, catalogEntry = true, achievementID = 42761, criteriaID = 106334 },
+        { "Shatterpulse", 90687, 2371, 49.14, 28.24, 238135, catalogEntry = true, achievementID = 41980, spawnNote = "Rares_Spawn_Shatterpulse" },
+        { "Hollowbane", 90689, 2371, 48.43, 16.95, 238536, catalogEntry = true, achievementID = 41980, spawnNote = "Rares_Spawn_Hollowbane" },
     },
 }
