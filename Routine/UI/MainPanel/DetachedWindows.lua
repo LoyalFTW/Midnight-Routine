@@ -201,9 +201,10 @@ function MR:RefreshVisibleDetachedFrames()
         seenDetached[key] = nil
     end
     local allowShowing = not self._instanceFramesHidden and not self:IsManagedWindowsBundleHidden()
+    local charData = MR:GetMainFrameProgressSource()
 
     for _, mod in ipairs(MR:GetOrderedMainModules()) do
-        local modVisible = not mod.isVisible or mod:isVisible()
+        local modVisible = MR:MeetsModuleLevelRequirement(mod, charData) and (not mod.isVisible or mod:isVisible())
         local detached = MR:IsModuleDetached(mod.key)
         local frame = self.detachedFrames[mod.key]
         local stats = detached and MR:IsModuleEnabled(mod.key) and modVisible and GetModuleStats(self, mod) or nil

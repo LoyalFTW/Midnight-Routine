@@ -897,6 +897,13 @@ function MR:IsPatchAvailable(patchKey)
     return (tonumber(interfaceVersion) or 0) >= info.minInterface
 end
 
+function MR:MeetsModuleLevelRequirement(mod, charData)
+    if not mod.minLevel then
+        return true
+    end
+    return charData ~= nil and (tonumber(charData.level) or 0) >= mod.minLevel
+end
+
 function MR:IsModuleAvailable(modOrKey)
     local mod = modOrKey
     if type(modOrKey) == "string" then

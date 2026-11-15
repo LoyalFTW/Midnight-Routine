@@ -1159,7 +1159,7 @@ function Config.BuildModulesPage(ctx)
     for _, mod in ipairs(_allMods) do
         local currentMod = mod
         local key = currentMod.key
-        local optVisible = not mod.isVisible or mod:isVisible()
+        local optVisible = MR:MeetsModuleLevelRequirement(mod, MR.db.char) and (not mod.isVisible or mod:isVisible())
         local isStoryConfigModule = IsStoryConfigModule(mod)
         local patchKey = MR:GetModulePatchKey(mod)
 

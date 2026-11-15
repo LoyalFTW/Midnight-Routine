@@ -993,7 +993,7 @@ function MR:GetWarbandCharacterModuleState(charKey, mod)
         return false, false, false, false
     end
 
-    local available = self:IsModuleAvailable(mod)
+    local available = self:IsModuleAvailable(mod) and self:MeetsModuleLevelRequirement(mod, charData)
     local learned = true
     if mod.profSkillLine then
         local professions = type(charData.professions) == "table" and charData.professions or nil
@@ -1182,7 +1182,7 @@ local function IsAltModuleShown(self, charKey, charData, mod, isCurrent)
         return false
     end
     if isCurrent then
-        if not self:IsModuleEnabled(mod.key) then
+        if not self:IsModuleEnabled(mod.key) or not self:MeetsModuleLevelRequirement(mod, charData) then
             return false
         end
         return not mod.isVisible or mod:isVisible()

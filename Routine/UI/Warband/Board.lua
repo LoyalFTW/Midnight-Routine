@@ -671,7 +671,7 @@ local function PopulateWarbandModuleView(frame, selected)
 
     local professionGroupRendered = false
     for _, mod in ipairs(modules) do
-        if IsBoardModule(mod) then
+        if IsBoardModule(mod) and MR:MeetsModuleLevelRequirement(mod, charData) then
             if mod.profSkillLine then
                 if not professionGroupRendered then
                     professionGroupRendered = true

@@ -34,6 +34,11 @@ end
 
 function MR:OnPlayerLevelUp(_, level)
     UpdateCurrentCharacterLevel(self, level)
+    if self.isForever and level == 60 then
+        self:RequestUIRefresh()
+        self:RequestConfigRepopulate()
+        self:RequestScan(0.2)
+    end
 end
 
 function MR:OnEnteringWorld()

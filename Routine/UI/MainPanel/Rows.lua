@@ -1927,8 +1927,9 @@ local function BuildVisibleMainModules(self, primeLabels)
     self._visibleModsBuffer = visibleMods
     local visibleModCount = 0
     local lastVisibleExpansionKey
+    local charData = MR:GetMainFrameProgressSource()
     for _, mod in ipairs(MR:GetOrderedMainModules()) do
-        local modVisible = not mod.isVisible or mod:isVisible()
+        local modVisible = MR:MeetsModuleLevelRequirement(mod, charData) and (not mod.isVisible or mod:isVisible())
         if MR:IsModuleEnabled(mod.key) and modVisible and not MR:IsModuleDetached(mod.key) and not (MR.ShouldHideProfessionModuleInMain and MR:ShouldHideProfessionModuleInMain(mod)) then
             if primeLabels and MR.PrimeProfessionKnowledgeModuleLabels then
                 MR:PrimeProfessionKnowledgeModuleLabels(mod)

@@ -13,6 +13,26 @@ tracking.installers["ForeverBootstrap"] = function(owner, context)
 
     MR:RegisterExpansion({ key = "forever", label = "WoW Forever", order = 1 })
 
+    MR:RegisterModule({
+        key = "forever_weekly",
+        expansionKey = "forever",
+        label = L["Weekly_SeasonTitle"],
+        labelColor = "#2ae7c6",
+        defaultOpen = true,
+        resetType = "weekly",
+        minLevel = 60,
+        rows = {
+            {
+                key = "in_demand",
+                label = L["Forever_InDemand_Label"],
+                note = L["Forever_InDemand_Note"],
+                max = 1,
+                questIds = { 96076, 96075, 96087, 96088 },
+                autoTracked = true,
+            },
+        },
+    })
+
     function MR:OnForeverProgressChanged()
         self:RequestScan(0.2)
     end
