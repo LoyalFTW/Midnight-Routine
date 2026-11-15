@@ -67,21 +67,20 @@ function RoutineData:ScanRares()
     end
 
     local now = (GetServerTime and GetServerTime()) or time()
-    if isForever then
-        record.updatedAt.rares = now
-        return
-    end
-    local lastReset = self:GetLastWeeklyReset()
-    for npcID, rare in pairs(rareByNpcID) do
-        if IsKilledNow(rare) then
-            if not kills[npcID] or kills[npcID] < lastReset then
-                kills[npcID] = now
+    if not isForever then
+        local lastReset = self:GetLastWeeklyReset()
+        for npcID, rare in pairs(rareByNpcID) do
+            if IsKilledNow(rare) then
+                if not kills[npcID] or kills[npcID] < lastReset then
+                    kills[npcID] = now
+                end
+            else
+                kills[npcID] = nil
             end
-        else
-            kills[npcID] = nil
         end
     end
     record.updatedAt.rares = now
+    self:Fire("RaresUpdated", charKey)
 end
 
 local scanQueued
@@ -181,6 +180,7 @@ local function RecordRareDeath(guid)
     local now = (GetServerTime and GetServerTime()) or time()
     record.rares[npcID] = now
     record.updatedAt.rares = now
+    RoutineData:Fire("RaresUpdated", charKey, npcID)
 end
 
 RoutineData:OnLogin(function()

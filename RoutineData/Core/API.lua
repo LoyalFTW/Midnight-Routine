@@ -18,7 +18,6 @@ function API.IsReady()
 end
 
 local baseGetCharacters = API.GetCharacters
-local baseGetGold = API.GetGold
 
 function API.GetCharacters()
     local seen, keys = {}, {}
@@ -42,8 +41,9 @@ function API.GetCharacters()
 end
 
 function API.GetGold(charKey)
-    local gold = baseGetGold and RoutineData.db and baseGetGold(charKey) or 0
-    if gold > 0 then
+    local own = RoutineData.db and RoutineData.db.characters[charKey]
+    local gold = own and tonumber(own.gold)
+    if gold then
         return gold
     end
     local record = SavedRecord(charKey)
@@ -84,6 +84,7 @@ function API.GetCharacterInfo(charKey)
         gold = API.GetGold(charKey),
         mythicPlusScore = record and tonumber(record.mythicPlusScore),
         lastSyncAt = lastSyncAt or 0,
+        updatedAt = own and own.updatedAt and CopyTable(own.updatedAt) or {},
     }
 end
 
@@ -108,7 +109,68 @@ end
 
 function API.GetConcentration(charKey)
     local record = SavedRecord(charKey)
-    return record and record.professionConcentration or nil
+    return record and record.professionConcentration and CopyTable(record.professionConcentration) or nil
+end
+
+function API.GetRareCatalog()
+    local entries = {}
+    if RoutineData.isForever then
+        local byNPC = {}
+        for npcID, rare in pairs(tracking.Forever.rareCatalog or {}) do
+            local entry = { npcID = npcID, name = rare.name, locations = {} }
+            byNPC[npcID] = entry
+            entries[#entries + 1] = entry
+        end
+        for mapID, rares in pairs(tracking.Forever.rareLocations or {}) do
+            for npcID, points in pairs(rares) do
+                local entry = byNPC[npcID]
+                if entry then
+                    for _, point in ipairs(points) do
+                        entry.locations[#entry.locations + 1] = { mapID = mapID, x = point[1], y = point[2] }
+                    end
+                end
+            end
+        end
+        table.sort(entries, function(a, b) return a.npcID < b.npcID end)
+        return entries
+    end
+
+    for _, catalog in ipairs(tracking.rareCatalogs or {}) do
+        for _, rare in ipairs(catalog.rares) do
+            local locations = {}
+            if rare[3] then
+                locations[1] = { mapID = rare[3], x = rare[4], y = rare[5] }
+            end
+            entries[#entries + 1] = {
+                npcID = rare[6],
+                name = rare[1],
+                locations = locations,
+                catalog = catalog.label,
+                questID = rare[2],
+                questIDs = rare.questIDs and CopyTable(rare.questIDs),
+                questAny = rare.questAny,
+                achievementID = rare.achievementID,
+                criteriaID = rare.criteriaID,
+                faction = rare.faction,
+                patch = rare.patch,
+                eventName = rare.eventName,
+                spawnNote = rare.spawnNote,
+            }
+        end
+    end
+    return entries
+end
+
+function API.GetRareKillSnapshot(charKey)
+    local db = RoutineData.db
+    local record = db and type(charKey) == "string" and db.characters[charKey]
+    if type(record) ~= "table" then return nil end
+    local updatedAt = type(record.updatedAt) == "table" and record.updatedAt.rares or nil
+    if type(record.rares) ~= "table" and not updatedAt then return nil end
+    return {
+        kills = type(record.rares) == "table" and CopyTable(record.rares) or {},
+        updatedAt = updatedAt,
+    }
 end
 
 function API.GetRareKills(charKey)

@@ -199,8 +199,16 @@ function API.UnregisterCallback(owner, event)
     return RoutineData.UnregisterCallback(owner, event)
 end
 
+function API.UnregisterAllCallbacks(owner)
+    return RoutineData.UnregisterAllCallbacks(owner)
+end
+
+function API.IsDataReady()
+    return RoutineData.dataReady == true
+end
+
 function API.GetCurrentCharacterKey()
-    return RoutineData:GetCurrentCharacterKey()
+    return RoutineData.db and RoutineData:GetCurrentCharacterKey() or nil
 end
 
 function API.GetCharacters()
@@ -262,11 +270,6 @@ function API.GetItemCounts(itemID)
     table.sort(result.guilds, function(a, b) return a.key < b.key end)
 
     return result
-end
-
-function API.GetGold(charKey)
-    local record = RoutineData.db.characters[charKey]
-    return record and record.gold or 0
 end
 
 function API.GetTotalGold()
@@ -349,6 +352,7 @@ frame:SetScript("OnEvent", function(_, event, loadedName)
         for _, handler in ipairs(RoutineData.loginHandlers) do
             xpcall(handler, geterrorhandler(), RoutineData)
         end
+        RoutineData.dataReady = true
         RoutineData:Fire("DataReady")
     end
 end)
