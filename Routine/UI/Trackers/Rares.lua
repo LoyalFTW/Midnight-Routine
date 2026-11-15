@@ -610,6 +610,7 @@ local function EnsureZoneSection(f, zone)
     local zHdr = CreateFrame("Button", nil, content, "BackdropTemplate")
     zHdr:SetHeight(ZONE_HDR_H)
     zHdr:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(zHdr, "settingsSection")
 
     local arrow = zHdr:CreateFontString(nil, "OVERLAY")
     arrow:SetFont(ns.FONT_ROWS, zoneHeaderFontSize, GetFontFlags())
@@ -661,6 +662,7 @@ local function EnsureZoneSection(f, zone)
     local body = CreateFrame("Frame", nil, content, "BackdropTemplate")
     body:SetHeight(1)
     body:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(body, "content")
     body:Hide()
     body.dotList = {}
     body.nameLbls = {}
@@ -805,6 +807,7 @@ BuildRaresFrame = function()
     if f.topAccent  then f.topAccent:SetAlpha(alpha)  end
 
     local titleBar = TitleBar(f, TITLE_H)
+    ns.HookBackdropFrame(titleBar, "trackerTitle")
     f.titleBar = titleBar
     titleBar:SetBackdropColor(0, 0, 0, 0)
     titleBar:SetClipsChildren(true)
@@ -1147,6 +1150,8 @@ PopulateRaresConfig = function(f)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", P + (i - 1) * (tabW + 2), yOff)
             btn:SetBackdrop(MakeBackdrop())
             local isActive = activePage == tab.key
+            btn._mrControlActive = isActive
+            ns.HookBackdropFrame(btn, "control")
             btn:SetBackdropColor(isActive and 0.11 or 0.05, isActive and 0.24 or 0.09, isActive and 0.23 or 0.15, 1)
             btn:SetBackdropBorderColor(isActive and 0.22 or 0.16, isActive and 0.82 or 0.28, isActive and 0.70 or 0.36, 1)
 
@@ -1242,6 +1247,8 @@ PopulateRaresConfig = function(f)
                 pb:SetSize(btnW, 16)
                 pb:SetPoint("TOPLEFT", body, "TOPLEFT", P + (i - 1) * (btnW + 2), yOff - 2)
                 pb:SetBackdrop(MakeBackdrop())
+                pb._mrControlActive = isActive
+                ns.HookBackdropFrame(pb, "control")
                 pb:SetBackdropColor(isActive and 0.12 or 0.05, isActive and 0.35 or 0.10, isActive and 0.32 or 0.18, syncFs and 0.4 or 1)
                 pb:SetBackdropBorderColor(isActive and 0.25 or 0.18, isActive and 0.85 or 0.40, isActive and 0.70 or 0.45, syncFs and 0.4 or 1)
                 local pfs = pb:CreateFontString(nil, "OVERLAY")
@@ -1374,13 +1381,14 @@ LayoutRaresFrame = function(frame)
     local width = db.raresWidth or DEFAULT_W
     local cols = width >= 220 and COLS or 1
     local rowHeight = GetRowH()
-    local innerW = width - 8 - (OUTER_PAD * 2)
+    local scrollInset = 8
+    local innerW = width - scrollInset - (OUTER_PAD * 2)
     local colW = innerW / cols
     local yOff = 2
     local singleZone = #(frame.visibleZones or {}) == 1
 
     frame:SetWidth(width)
-    frame._content:SetWidth(width - 8)
+    frame._content:SetWidth(width - scrollInset)
     if frame.titleText then
         frame.titleText:SetFont(ns.FONT_HEADERS, math.max(9, (db.raresFontSize or 9) + 1), GetFontFlags())
     end

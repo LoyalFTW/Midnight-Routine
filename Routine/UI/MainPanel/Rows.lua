@@ -728,6 +728,7 @@ end
 local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     local card = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     card:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(card, "content")
     card._glow = card:CreateTexture(nil, "BACKGROUND")
     card._glow:SetPoint("TOPLEFT", card, "TOPLEFT", 1, -1)
     card._glow:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -1, 1)
@@ -736,6 +737,7 @@ local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     if includeExpansionHeader then
         card._expHeader = CreateFrame("Frame", nil, card, "BackdropTemplate")
         card._expHeader:SetBackdrop(MakeBackdrop())
+        ns.HookBackdropFrame(card._expHeader, "title")
         card._expHeader._label = card._expHeader:CreateFontString(nil, "OVERLAY")
         card._expHeader._label:SetJustifyH("LEFT")
     end
@@ -763,6 +765,7 @@ local function CreateSectionWidget(parent, includeExpansionHeader, registerDrag)
     card._hdrFrame._currencyBrowserButton = CreateFrame("Button", nil, card, "BackdropTemplate")
     card._hdrFrame._currencyBrowserButton:SetHeight(20)
     card._hdrFrame._currencyBrowserButton:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(card._hdrFrame._currencyBrowserButton, "control")
     card._hdrFrame._currencyBrowserButton:SetScript("OnClick", CurrencyBrowserButtonOnClick)
     card._hdrFrame._currencyBrowserButton:SetScript("OnEnter", CurrencyBrowserButtonOnEnter)
     card._hdrFrame._currencyBrowserButton:SetScript("OnLeave", CurrencyBrowserButtonOnLeave)
@@ -888,11 +891,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
     card._hdrFrame._mrDetachedHost = hostFrame
     card._hdrFrame._mrHoverAlpha = transparent and (0.10 * textOnlyHeaderAlpha) or ((showSectionHeaders and 0.05 or 0) * frameAlpha)
     local customHeaderBg = MR.GetHeaderBackgroundColor and MR:GetHeaderBackgroundColor(mod.key) or nil
-    local hdrR, hdrG, hdrB = 0.08, 0.09, 0.12
-    if customHeaderBg then
-        hdrR, hdrG, hdrB = hex(customHeaderBg)
-    end
-    card._hdrFrame._hdrBg:SetColorTexture(hdrR, hdrG, hdrB, headerAlpha)
+    ns.ApplyModuleHeaderBackground(card._hdrFrame, customHeaderBg, headerAlpha)
 
     local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local customColor = MR:GetHeaderColor(mod.key)
@@ -937,6 +936,7 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
 
     card._hdrFrame._count:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
     card._hdrFrame._count:ClearAllPoints()
+    local countInset = ns.GetInterfaceTheme() and -30 or -22
     local currencyBrowserButton = card._hdrFrame._currencyBrowserButton
     local showCurrencyBrowserButton = mod.key == "currencies" and MR.ToggleCurrencyBrowserFrame and MR:IsRowEnabled("currencies", "currency_browser_button")
     if showCurrencyBrowserButton then
@@ -945,10 +945,10 @@ local function UpdateDetachedSectionWidget(self, hostFrame, mod, contentWidth)
         currencyBrowserButton:SetPoint("TOPRIGHT", card, "TOPRIGHT", -4, -(HEADER_HEIGHT + 3))
         StyleCurrencyBrowserButton(currencyBrowserButton, transparent, frameAlpha)
         currencyBrowserButton:Show()
-        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
+        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", countInset, 0)
     else
         currencyBrowserButton:Hide()
-        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", -22, 0)
+        card._hdrFrame._count:SetPoint("RIGHT", card._hdrFrame, "RIGHT", countInset, 0)
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)
@@ -1088,6 +1088,7 @@ local function EnsureMainRowHeaderParts(rowFrame)
     rowFrame._headerText = rowFrame:CreateFontString(nil, "OVERLAY")
     rowFrame._headerActionButton = CreateFrame("Button", nil, rowFrame, "BackdropTemplate")
     rowFrame._headerActionButton:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(rowFrame._headerActionButton, "control")
     rowFrame._headerActionButton._mrOwner = rowFrame
     rowFrame._headerActionButton:SetScript("OnClick", MainHeaderActionOnClick)
     rowFrame._headerActionButton:SetScript("OnEnter", MainHeaderActionOnEnter)
@@ -1294,24 +1295,16 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         if headerColor then
             hr, hg, hb = hex(headerColor)
         end
-        if transparent then
-            rowFrame._headerBg:SetColorTexture(1, 1, 1, 0)
-        elseif row.categoryHeader then
-            local categoryBackground = row.headerBackgroundKey and MR:GetHeaderBackgroundColor(row.headerBackgroundKey)
-            if categoryBackground then
-                local br, bg, bb = hex(categoryBackground)
-                rowFrame._headerBg:SetColorTexture(br, bg, bb, 0.96 * frameAlpha)
+        local headerBackground = row.headerBackgroundKey and MR:GetHeaderBackgroundColor(row.headerBackgroundKey)
+        local headerAlpha = transparent and 0 or ((row.categoryHeader and 0.96 or 0.92) * frameAlpha)
+        if not ns.ApplyInterfaceHeader(rowFrame._headerBg, headerAlpha, false, headerBackground and { hex(headerBackground) }) then
+            rowFrame._headerBg:SetDesaturated(false)
+            if row.categoryHeader then
+                rowFrame._headerBg:SetColorTexture(hr * 0.16, hg * 0.16, hb * 0.16, headerAlpha)
             else
-                rowFrame._headerBg:SetColorTexture(hr * 0.16, hg * 0.16, hb * 0.16, 0.96 * frameAlpha)
+                rowFrame._headerBg:SetColorTexture(0.06, 0.08, 0.13, headerAlpha)
             end
-        else
-            local headerBackground = row.headerBackgroundKey and MR:GetHeaderBackgroundColor(row.headerBackgroundKey)
-            if headerBackground then
-                local br, bg, bb = hex(headerBackground)
-                rowFrame._headerBg:SetColorTexture(br, bg, bb, 0.92 * frameAlpha)
-            else
-                rowFrame._headerBg:SetColorTexture(0.06, 0.08, 0.13, 0.92 * frameAlpha)
-            end
+            rowFrame._headerBg:SetVertexColor(1, 1, 1)
         end
 
         if row.categoryHeader and not transparent then
@@ -1339,7 +1332,8 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
         local headerActionButton = nil
         if ((row.headerActionText and row.headerActionText ~= "") or row.headerActionStyle == "visibility" or row.headerActionStyle == "collapse") and row.onHeaderActionClick then
             headerActionButton = rowFrame._headerActionButton
-            SetOneAnchor(headerActionButton, "RIGHT", rowFrame, "RIGHT", -4, 0)
+            local actionInset = ns.GetInterfaceTheme() and -14 or -4
+            SetOneAnchor(headerActionButton, "RIGHT", rowFrame, "RIGHT", actionInset, 0)
             headerActionButton:Show()
             if headerActionButton._lineA then headerActionButton._lineA:Hide() end
             if headerActionButton._lineB then headerActionButton._lineB:Hide() end
@@ -1379,11 +1373,16 @@ UpdateMainRowWidget = function(self, section, mod, row, done, yOff, colW)
                 SetOneAnchor(rowFrame._headerActionText, "CENTER", headerActionButton, "CENTER", 0, 0)
                 rowFrame._headerActionText:SetJustifyH("CENTER")
                 rowFrame._headerActionText:SetText(row.headerActionVisible and "o" or "-")
-                rowFrame._headerActionText:SetTextColor(
-                    row.headerActionVisible and 0.25 or 0.55,
-                    row.headerActionVisible and 0.85 or 0.25,
-                    row.headerActionVisible and 0.70 or 0.25
-                )
+                if ns.GetInterfaceTheme() then
+                    local tint = row.headerActionVisible and 0.87 or 0.55
+                    rowFrame._headerActionText:SetTextColor(tint, tint, tint)
+                else
+                    rowFrame._headerActionText:SetTextColor(
+                        row.headerActionVisible and 0.25 or 0.55,
+                        row.headerActionVisible and 0.85 or 0.25,
+                        row.headerActionVisible and 0.70 or 0.25
+                    )
+                end
             else
                 headerActionButton:SetSize(26, rowH)
                 SetFontIfChanged(rowFrame._headerActionText, FONT_ROWS, math.max(8, GetFontSize() - 2), GetFontFlags())

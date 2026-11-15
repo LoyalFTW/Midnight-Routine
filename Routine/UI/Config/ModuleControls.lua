@@ -86,6 +86,7 @@ function Config.CreateProfessionGroupControl(spec)
     frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 4, spec.y)
     frame:SetSize(spec.width, spec.height)
     frame:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(frame, "section")
     frame:SetBackdropColor(0.020, 0.085, 0.100, 0.98)
     ns.RegisterThemedBackdropBorder(frame, 0.24, 0.76, 0.70, 1)
 
@@ -326,6 +327,7 @@ function Config.CreateModuleControl(spec)
     frame:SetPoint("TOPLEFT", spec.parent, "TOPLEFT", spec.x or 4, spec.y)
     frame:SetSize(spec.width, spec.height)
     frame:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(frame, "content")
 
     if spec.emphasized then
         local r, g, b = hex(MR:GetHeaderColor(moduleKey) or mod.labelColor or "#2ae7c6")

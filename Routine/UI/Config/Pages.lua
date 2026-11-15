@@ -29,7 +29,15 @@ local RestoreFramePos = Config.RestoreFramePos
 
 local function ApplyThemeChoiceStyle(button, label, active)
     local themeColor = MR.GetThemeColor and MR:GetThemeColor()
-    if themeColor then
+    local theme = ns.GetInterfaceTheme()
+    if theme and MR.db.profile.themeColorMode == "default" then
+        local fill = active and theme.headerColor or theme.contentTint
+        local border = theme.contentBorder
+        local shade = active and 1 or 0.52
+        button:SetBackdropColor(fill[1] * shade, fill[2] * shade, fill[3] * shade, 1)
+        button:SetBackdropBorderColor(border[1], border[2], border[3], active and 1 or 0.70)
+        label:SetTextColor(active and 1 or 0.82, active and 1 or 0.81, active and 1 or 0.79)
+    elseif themeColor then
         local r, g, b = ns.ResolveThemeColor(0.22, 0.82, 0.70)
         local strength = active and 0.20 or 0.065
         button:SetBackdropColor(r * strength, g * strength, b * strength, 1)
@@ -91,7 +99,7 @@ function MR:PopulateConfigFrame(f)
     local moduleHeaderH = math.max(activePage == "modules" and 26 or 22, moduleHeaderFs + 14)
     local moduleRowH = math.max(activePage == "modules" and 21 or 18, moduleRowFs + 10)
     local moduleCompactH = math.max(16, moduleSubFs + 8)
-    local contentW = (f:GetWidth() or 344) - 16
+    local contentW = configWidth - 16
 
     local function Gap(h)          yOff = OptionsGap(body, yOff, h) end
     local function Divider()       yOff = OptionsDivider(body, yOff, 4) end
@@ -534,6 +542,15 @@ function MR:PopulateConfigFrame(f)
                 MR:RefreshUI()
             end, "#ff8000")
     elseif activePage == "layout" then
+        ChoiceDropdown(L["Config_InterfaceTheme"], {
+            { label = L["Config_InterfaceThemeRoutine"], value = "routine" },
+            { label = L["Config_InterfaceThemeRetail"], value = "retail" },
+            { label = L["Config_InterfaceThemeForever"], value = "forever" },
+        },
+            function() return select(2, ns.GetInterfaceTheme()) end,
+            function(value) MR:SetInterfaceTheme(value) end)
+        Gap(4); Divider()
+
         SectionLabel(L["Config_LayoutMode"] or "Layout Mode")
 
         local modeY = yOff - 4
@@ -820,7 +837,7 @@ function MR:PopulateConfigFrame(f)
                     ApplyThemeChoiceStyle(classBtn, classLbl, MR:IsThemeColorClassColor())
                 end
                 if resetBtn and resetLbl then
-                    ApplyThemeChoiceStyle(resetBtn, resetLbl, MR:GetThemeColor() == nil)
+                    ApplyThemeChoiceStyle(resetBtn, resetLbl, MR.db.profile.themeColorMode == "default")
                 end
             end
 
@@ -848,7 +865,7 @@ function MR:PopulateConfigFrame(f)
             end, function()
                 MR:ResetThemeColor()
                 RefreshThemeChoiceButtons()
-                return hex(DEFAULT_THEME_HEX)
+                return hex(MR:GetThemeColor() or DEFAULT_THEME_HEX)
             end, L["Config_ThemeColor"] or "Theme Color", function()
                 pickerOriginalMode = MR.db.profile.themeColorMode
                 pickerOriginalColor = MR.db.profile.themeColor
@@ -910,14 +927,14 @@ function MR:PopulateConfigFrame(f)
                 resetLbl:SetTextColor(1.0, 0.90, 0.90)
             end)
             resetBtn:SetScript("OnLeave", function()
-                ApplyThemeChoiceStyle(resetBtn, resetLbl, MR:GetThemeColor() == nil)
+                ApplyThemeChoiceStyle(resetBtn, resetLbl, MR.db.profile.themeColorMode == "default")
             end)
             ns.RegisterThemedState(resetBtn, function()
                 if resetBtn:IsMouseOver() then
                     resetBtn:SetBackdropBorderColor(0.82, 0.42, 0.42, 1)
                     resetLbl:SetTextColor(1.0, 0.90, 0.90)
                 else
-                    ApplyThemeChoiceStyle(resetBtn, resetLbl, MR:GetThemeColor() == nil)
+                    ApplyThemeChoiceStyle(resetBtn, resetLbl, MR.db.profile.themeColorMode == "default")
                 end
             end)
             RefreshThemeChoiceButtons()
@@ -1091,6 +1108,7 @@ function MR:PopulateConfigFrame(f)
             boxBg:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
             boxBg:SetSize(math.max(192, contentW), 20)
             boxBg:SetBackdrop(MakeBackdrop())
+            ns.HookBackdropFrame(boxBg, "content")
             boxBg:SetBackdropColor(0.05, 0.12, 0.20, 0.95)
             boxBg:SetBackdropBorderColor(0.18, 0.40, 0.45, 1)
             boxBg:EnableMouse(true)

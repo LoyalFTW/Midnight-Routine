@@ -297,7 +297,7 @@ local function ApplyTheme()
         if MR._titleBar    then MR._titleBar:SetBackdropBorderColor(0.17, 0.24, 0.32, v) end
         if MR._characterBar then MR._characterBar:SetBackdropColor(0.020, 0.040, 0.060, 0.96 * v) end
         if MR._characterBar then MR._characterBar:SetBackdropBorderColor(0.08, 0.16, 0.22, 0.45 * v) end
-        if MR._scrollBg    then ApplyBackgroundTexture(MR._scrollBg, COL.bg[1], COL.bg[2], COL.bg[3], 0.96 * v) end
+        if MR._scrollBg    then ApplyBackgroundTexture(MR._scrollBg, COL.bg[1], COL.bg[2], COL.bg[3], 0.96 * v, true) end
         if MR._titleAccent then MR._titleAccent:SetAlpha(0) end
     end
 end
@@ -481,11 +481,12 @@ end
 local function StyleSectionCollapseIndicator(indicator, isOpen)
     if not indicator then return end
     isOpen = isOpen and true or false
-    if not indicator._mrBaseLayoutApplied then
+    local inset = ns.GetInterfaceTheme() and 14 or 6
+    if indicator._mrCollapseInset ~= inset then
         indicator:ClearAllPoints()
         indicator:SetSize(14, 14)
-        indicator:SetPoint("RIGHT", indicator:GetParent(), "RIGHT", -6, 0)
-        indicator._mrBaseLayoutApplied = true
+        indicator:SetPoint("RIGHT", indicator:GetParent(), "RIGHT", -inset, 0)
+        indicator._mrCollapseInset = inset
     end
 
     if not indicator._lineA then

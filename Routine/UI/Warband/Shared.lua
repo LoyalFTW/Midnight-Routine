@@ -64,7 +64,7 @@ local function WBApplySurface(frame, variant, alpha)
     end
 
     if ns.HookBackdropFrame then
-        ns.HookBackdropFrame(frame)
+        ns.HookBackdropFrame(frame, variant == "raised" and "content" or "inset")
     end
 
     if variant == "panel" then
@@ -585,14 +585,11 @@ local function WBShouldHideCompletedCharacters()
 end
 
 local function WBCreateScrollArea(parent, topLeftAnchor, bottomRightAnchor)
-    local scroll, content, update, track, thumbTex = ns.CreateScrollArea(parent, topLeftAnchor, bottomRightAnchor, {
+    local scroll, content, update, track = ns.CreateScrollArea(parent, topLeftAnchor, bottomRightAnchor, {
         hideTrack = true,
         minThumbHeight = 18,
         thumbColor = { 0.24, 0.72, 0.72, 0.80 },
     })
-    if ns.RegisterThemedTexture then
-        ns.RegisterThemedTexture(thumbTex, 0.24, 0.72, 0.72, 0.80)
-    end
     return scroll, content, update, track
 end
 
@@ -1011,11 +1008,13 @@ local function WBRefreshMainAltPicker(frame)
             row:SetPoint("TOPLEFT", frame.charRail, "TOPLEFT", 0, -((index - 1) * 42))
             row:SetPoint("TOPRIGHT", frame.charRail, "TOPRIGHT", 0, -((index - 1) * 42))
             row:SetBackdrop(MakeBackdrop())
+            ns.HookBackdropFrame(row, "character")
 
             local iconPlate = CreateFrame("Frame", nil, row, "BackdropTemplate")
             iconPlate:SetSize(16, 16)
             iconPlate:SetPoint("LEFT", row, "LEFT", 7, 0)
             iconPlate:SetBackdrop(MakeBackdrop())
+            ns.HookBackdropFrame(iconPlate, "content")
             iconPlate:SetBackdropColor(0.004, 0.010, 0.016, 0.86)
             row._iconPlate = iconPlate
 
@@ -1189,6 +1188,7 @@ local function WBBuildMainAltPicker()
     searchBox:SetTextColor(0.90, 0.95, 1.00)
     searchBox:SetJustifyH("LEFT")
     searchBox:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(searchBox, "content")
     searchBox:SetBackdropColor(0.004, 0.010, 0.016, 0.98)
     searchBox:SetBackdropBorderColor(0.08, 0.22, 0.28, 0.78)
     searchBox:SetTextInsets(8, 24, 0, 0)
@@ -1203,6 +1203,7 @@ local function WBBuildMainAltPicker()
     clearBtn:SetSize(15, 15)
     clearBtn:SetPoint("RIGHT", searchBox, "RIGHT", -5, 0)
     clearBtn:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(clearBtn, "control")
     clearBtn:SetBackdropColor(0.030, 0.030, 0.042, 0.86)
     clearBtn:SetBackdropBorderColor(0.12, 0.12, 0.16, 0.72)
     clearBtn:Hide()

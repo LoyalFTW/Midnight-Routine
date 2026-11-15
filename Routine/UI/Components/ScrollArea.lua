@@ -1,10 +1,6 @@
 local _, ns = ...
 if ns.Inactive then return end
 
-local function SetColor(texture, color)
-    texture:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-end
-
 function ns.ScrollByDelta(scroll, content, delta, step, onUpdate)
     if not scroll or not content then
         return
@@ -23,7 +19,6 @@ function ns.AttachScrollList(scroll, content, track, opts)
 
     local trackBg = track:CreateTexture(nil, "BACKGROUND")
     trackBg:SetAllPoints()
-    SetColor(trackBg, opts.trackColor or { 0, 0, 0, 0.3 })
 
     local thumb = CreateFrame("Button", nil, track)
     thumb:SetPoint("LEFT", track, "LEFT", 0, 0)
@@ -34,11 +29,6 @@ function ns.AttachScrollList(scroll, content, track, opts)
     local thumbTex = thumb:CreateTexture(nil, "OVERLAY")
     thumbTex:SetAllPoints()
     local thumbColor = opts.thumbColor or { 0.20, 0.66, 0.63, 0.7 }
-    if opts.themed ~= false and ns.RegisterThemedTexture then
-        ns.RegisterThemedTexture(thumbTex, thumbColor[1], thumbColor[2], thumbColor[3], thumbColor[4] or 1)
-    else
-        SetColor(thumbTex, thumbColor)
-    end
 
     local function GetContentHeight()
         return content:GetHeight() or 0
@@ -73,17 +63,17 @@ function ns.AttachScrollList(scroll, content, track, opts)
             thumb:Hide()
             if opts.hideTrack then track:Hide() end
             return
+        else
+            track:Show()
+            thumb:Show()
+            local trackHeight = math.max(track:GetHeight(), 1)
+            local thumbHeight = math.min(trackHeight, math.max(trackHeight * (viewHeight / contentHeight), opts.minThumbHeight or 14))
+            local percent = currentScroll / math.max(maxScroll, 1)
+            thumb:SetHeight(thumbHeight)
+            thumb:ClearAllPoints()
+            thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackHeight - thumbHeight) * percent))
+            thumb:SetPoint("RIGHT", track, "RIGHT", 0, 0)
         end
-
-        track:Show()
-        thumb:Show()
-        local trackHeight = math.max(track:GetHeight(), 1)
-        local thumbHeight = math.max(trackHeight * (viewHeight / contentHeight), opts.minThumbHeight or 14)
-        local percent = currentScroll / math.max(maxScroll, 1)
-        thumb:SetHeight(thumbHeight)
-        thumb:ClearAllPoints()
-        thumb:SetPoint("TOPLEFT", track, "TOPLEFT", 0, -((trackHeight - thumbHeight) * percent))
-        thumb:SetPoint("RIGHT", track, "RIGHT", 0, 0)
 
         if opts.onScroll and currentScroll ~= lastNotifiedScroll then
             lastNotifiedScroll = currentScroll
@@ -121,14 +111,14 @@ function ns.AttachScrollList(scroll, content, track, opts)
             end
 
             local _, cursorY = GetCursorPosition()
-            SetScrollFromCursor(cursorY / UIParent:GetEffectiveScale(), self._grabOffset)
+            SetScrollFromCursor(cursorY / track:GetEffectiveScale(), self._grabOffset)
         end)
     end
 
     track:SetScript("OnMouseDown", function(_, mouseButton)
         if mouseButton ~= "LeftButton" or not thumb:IsShown() then return end
         local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
+        cursorY = cursorY / track:GetEffectiveScale()
         local grabOffset = thumb:GetHeight() * 0.5
         SetScrollFromCursor(cursorY, grabOffset)
         StartDragging(thumb, grabOffset)
@@ -137,7 +127,7 @@ function ns.AttachScrollList(scroll, content, track, opts)
     thumb:SetScript("OnMouseDown", function(self, mouseButton)
         if mouseButton ~= "LeftButton" or not self:IsShown() then return end
         local _, cursorY = GetCursorPosition()
-        cursorY = cursorY / UIParent:GetEffectiveScale()
+        cursorY = cursorY / track:GetEffectiveScale()
         local thumbTop = self:GetTop()
         StartDragging(self, thumbTop and (thumbTop - cursorY) or (self:GetHeight() * 0.5))
     end)
@@ -162,7 +152,12 @@ function ns.AttachScrollList(scroll, content, track, opts)
         track:Hide()
         thumb:Hide()
     end)
-    UpdateScrollBar()
+    ns.RegisterThemedState(track, function()
+        ns.ApplyScrollbarTrackColor(trackBg, opts.trackColor or { 0, 0, 0, 0.3 })
+        local r, g, b = ns.ResolveScrollbarColor(thumbColor[1], thumbColor[2], thumbColor[3], opts.themed)
+        thumbTex:SetColorTexture(r, g, b, thumbColor[4] or 1)
+        UpdateScrollBar()
+    end)
 
     return UpdateScrollBar, thumb, trackBg, thumbTex
 end

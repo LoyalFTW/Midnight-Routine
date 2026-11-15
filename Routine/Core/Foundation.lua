@@ -194,6 +194,7 @@ local DEFAULTS = {
         headerColors    = {},
         headerBackgroundColors = {},
         themeColor      = nil,
+        interfaceTheme  = "routine",
         themeColorMode  = "default",
         rowColors       = {},
         customTaskCategoryModules = {},

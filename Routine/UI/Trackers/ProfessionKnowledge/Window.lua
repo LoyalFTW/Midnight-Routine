@@ -122,6 +122,7 @@ local function BuildGatheringLocationsFrame(isRetry)
     })
 
     local titleBar = TitleBar(frame, TITLE_H)
+    ns.HookBackdropFrame(titleBar, "trackerTitle")
     frame.titleBar = titleBar
     titleBar:SetFrameLevel(frame:GetFrameLevel() + 20)
     titleBar:SetBackdropColor(0, 0, 0, 0)
@@ -230,8 +231,9 @@ local function BuildGatheringLocationsFrame(isRetry)
     frame._scrollTrack = track
 
     local UpdateScrollBar, _, trackBg, thumbTex = ns.AttachScrollList(scroll, content, track)
-    trackBg:SetColorTexture(0, 0, 0, 0.3 * chromeAlpha)
-    ns.RegisterThemedTexture(thumbTex, 0.80, 0.53, 0.20, 0.6 * chromeAlpha)
+    ns.ApplyScrollbarTrackColor(trackBg, { 0, 0, 0, 0.3 * chromeAlpha })
+    local thumbR, thumbG, thumbB = ns.ResolveScrollbarColor(0.80, 0.53, 0.20)
+    thumbTex:SetColorTexture(thumbR, thumbG, thumbB, 0.6 * chromeAlpha)
     frame.UpdateScrollBar = UpdateScrollBar
 
     local ApplyMinimized
@@ -381,7 +383,8 @@ local function BuildGatheringLocationsFrame(isRetry)
 
         local savedScroll = not resetScroll and scroll:GetVerticalScroll() or 0
         frame:SetWidth(width)
-        content:SetWidth(width - 8)
+        local scrollInset = 8
+        content:SetWidth(width - scrollInset)
         frame:SetScale(db.gatheringScale or 1.0)
         frame:SetMovable(not db.gatheringLocked)
 
@@ -400,20 +403,20 @@ local function BuildGatheringLocationsFrame(isRetry)
             titleBar:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
             titleBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
             scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -4)
-            scroll:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -8, 1)
+            scroll:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -scrollInset, 1)
             dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
         else
             titleBar:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
             titleBar:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
             scroll:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 0, -1)
-            scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 4)
+            scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -scrollInset, 4)
             dragger:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
         end
 
         titleTxt:SetFont(ns.FONT_HEADERS, math.max(10, (db.gatheringFontSize or 9) + 1), GetFontFlags())
         expansionDropdown:Update()
-        trackBg:SetColorTexture(0, 0, 0, 0.3 * chromeAlpha)
-        local tr, tg, tb = ns.ResolveThemeColor(0.80, 0.53, 0.20)
+        ns.ApplyScrollbarTrackColor(trackBg, { 0, 0, 0, 0.3 * chromeAlpha })
+        local tr, tg, tb = ns.ResolveScrollbarColor(0.80, 0.53, 0.20)
         thumbTex:SetColorTexture(tr, tg, tb, 0.6 * chromeAlpha)
 
         frame._emptyDrag = nil

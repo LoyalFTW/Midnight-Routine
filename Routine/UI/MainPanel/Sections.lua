@@ -179,11 +179,7 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     card._hdrFrame._mrMod = mod
     card._hdrFrame._mrHoverAlpha = transparent and (0.10 * textOnlyHeaderAlpha) or ((showSectionHeaders and 0.05 or 0) * frameAlpha)
     local customHeaderBg = MR.GetHeaderBackgroundColor and MR:GetHeaderBackgroundColor(mod.key) or nil
-    local hdrR, hdrG, hdrB = 0.08, 0.09, 0.12
-    if customHeaderBg then
-        hdrR, hdrG, hdrB = hex(customHeaderBg)
-    end
-    card._hdrFrame._hdrBg:SetColorTexture(hdrR, hdrG, hdrB, headerAlpha)
+    ns.ApplyModuleHeaderBackground(card._hdrFrame, customHeaderBg, headerAlpha)
 
     local explicitColor = MR.db.profile.headerColors and MR.db.profile.headerColors[mod.key]
     local customColor = MR:GetHeaderColor(mod.key)
@@ -219,6 +215,7 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
     card._hdrFrame._label:SetText((allDone and not explicitColor) and WC("00ff96", mod.label) or WC(headerColor:gsub("#", ""), mod.label))
 
     SetFontIfChanged(card._hdrFrame._count, FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
+    local countInset = ns.GetInterfaceTheme() and -30 or -22
     local currencyBrowserButton = card._hdrFrame._currencyBrowserButton
     local showCurrencyBrowserButton = mod.key == "currencies" and MR.ToggleCurrencyBrowserFrame and MR:IsRowEnabled("currencies", "currency_browser_button")
     if showCurrencyBrowserButton then
@@ -228,10 +225,10 @@ local function UpdateMainSectionWidget(self, mod, yOff, xOff, colW, col, recordR
         currencyBrowserButton:SetHeight(20)
         StyleCurrencyBrowserButton(currencyBrowserButton, transparent, frameAlpha)
         currencyBrowserButton:Show()
-        SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", -22, 0)
+        SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", countInset, 0)
     else
         currencyBrowserButton:Hide()
-        SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", -22, 0)
+        SetOneAnchor(card._hdrFrame._count, "RIGHT", card._hdrFrame, "RIGHT", countInset, 0)
     end
     card._hdrFrame._count:SetText(showCurrencyBrowserButton
         and string.format("%d / %d", secDone, secTotal)

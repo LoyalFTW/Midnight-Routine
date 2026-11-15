@@ -517,6 +517,7 @@ local function BuildRenownFrame()
         rowFrame:SetScript("OnDragStart", StartRenownDrag)
         rowFrame:SetScript("OnDragStop", StopRenownDrag)
         rowFrame:SetBackdrop(MakeBackdrop())
+        ns.HookBackdropFrame(rowFrame, "content")
         rowFrame:SetBackdropColor(0.018 + cr * 0.035, 0.022 + cg * 0.035, 0.032 + cb * 0.035, 0.92 * rowAlpha)
         rowFrame:SetBackdropBorderColor(cr * 0.28, cg * 0.28, cb * 0.28, 0.65 * rowAlpha)
 
@@ -1107,6 +1108,8 @@ PopulateRenownConfig = function(f)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", PAD + (i - 1) * (tabW + 2), yOff)
             btn:SetBackdrop(MakeBackdrop())
             local isActive = activePage == tab.key
+            btn._mrControlActive = isActive
+            ns.HookBackdropFrame(btn, "control")
             btn:SetBackdropColor(isActive and 0.11 or 0.05, isActive and 0.24 or 0.09, isActive and 0.23 or 0.15, 1)
             btn:SetBackdropBorderColor(isActive and 0.22 or 0.16, isActive and 0.82 or 0.28, isActive and 0.70 or 0.36, 1)
 

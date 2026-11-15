@@ -47,10 +47,13 @@ local function ApplyGatheringFrameTheme(frame, opts)
             frame._gatheringHeaderGlow:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
             frame._gatheringHeaderGlow:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
             frame._gatheringHeaderGlow:SetHeight(opts.headerHeight or 64)
+            ns.RegisterThemedState(frame._gatheringHeaderGlow, function(texture)
+                texture:SetShown(not ns.GetInterfaceTheme())
+            end)
         end
         frame._gatheringHeaderGlow:SetHeight(opts.headerHeight or 64)
         frame._gatheringHeaderGlow:SetColorTexture(accent[1] * 0.45, accent[2] * 0.45, accent[3] * 0.45, 0.22 * alpha)
-        frame._gatheringHeaderGlow:Show()
+        frame._gatheringHeaderGlow:SetShown(not ns.GetInterfaceTheme())
     elseif frame._gatheringHeaderGlow then
         frame._gatheringHeaderGlow:Hide()
     end

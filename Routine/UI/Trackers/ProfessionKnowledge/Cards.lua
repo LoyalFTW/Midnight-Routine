@@ -52,6 +52,7 @@ local function RenderSkinningLuresCard(content, width, yOff, fontSize, contentAl
     card:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -yOff)
     card:SetWidth(cardW)
     card:SetBackdrop(MakeBackdrop())
+    ns.HookBackdropFrame(card, "content")
     card:SetBackdropColor(0.018, 0.022, 0.028, (isCollapsed and 0.58 or 0.86) * contentAlpha)
     card:SetBackdropBorderColor(0.12, 0.15, 0.18, (isCollapsed and 0.48 or 0.74) * chromeAlpha)
 
@@ -189,6 +190,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                 card:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -yOff)
                 card:SetWidth(cardW)
                 card:SetBackdrop(MakeBackdrop())
+                ns.HookBackdropFrame(card, "content")
                 card:SetBackdropColor(0.018, 0.022, 0.028, (isCollapsed and 0.58 or 0.86) * contentAlpha)
                 card:SetBackdropBorderColor(0.12, 0.15, 0.18, (isCollapsed and 0.48 or 0.74) * chromeAlpha)
 

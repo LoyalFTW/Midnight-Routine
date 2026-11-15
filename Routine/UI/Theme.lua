@@ -191,6 +191,121 @@ local function HasCustomBackground(profile)
         and profile.backgroundMedia ~= ns.MEDIA_DEFAULT_TOKEN
 end
 
+local interfaceThemes = {
+    retail = {
+        background = "Interface\\FrameGeneral\\UI-Background-Rock",
+        borderLayout = "SimplePanelTemplate",
+        tint = { 0.43, 0.41, 0.38 },
+        borderTint = { 0.90, 0.88, 0.83 },
+        panelBorderColor = { 0.33, 0.31, 0.28 },
+        dropdownArrow = { 0.93, 0.88, 0.79 },
+        accent = "#d8bd83",
+        titleAtlas = "_UI-Frame-TitleTile",
+        windowTitleAtlas = "_UI-Frame-TitleTileBg",
+        windowTitleOffsetX = -2,
+        windowTitleLeftAdjustment = -1,
+        windowTitleOffsetY = 2,
+        neutralHeaderArtOnForever = true,
+        titleTint = { 1, 1, 1 },
+        headerAtlas = "UI-Character-Info-Title",
+        headerTint = { 1, 1, 1 },
+        headerColor = { 0.16, 0.15, 0.14 },
+        contentTint = { 0.095, 0.09, 0.085 },
+        contentBorder = { 0.27, 0.25, 0.22 },
+        cardTint = { 0.073, 0.069, 0.064 },
+        selectedCardBorder = { 0.55, 0.52, 0.45 },
+        scrollThumb = { 0.52, 0.50, 0.47 },
+        scrollTrack = { 0.05, 0.05, 0.05 },
+    },
+    forever = {
+        background = "Interface\\FrameGeneral\\UI-Background-Rock",
+        backgroundAtlas = "UI-Character-Info-Stat-BG",
+        borderLayout = "SimplePanelTemplate",
+        borderTint = { 1, 0.75, 0.52 },
+        panelBorderColor = { 0.45, 0.32, 0.19 },
+        dropdownArrow = { 0.85, 0.66, 0.44 },
+        tint = { 0.58, 0.52, 0.44 },
+        accent = "#dfc49b",
+        titleAtlas = "_UI-Frame-TitleTile",
+        windowTitleAtlas = "_UI-Frame-TitleTileBg",
+        windowTitleLeftAdjustment = -1,
+        windowTitleRightAdjustment = 1,
+        titleTint = { 0.94, 0.76, 0.55 },
+        headerAtlas = "UI-Character-Info-Title",
+        headerTint = { 0.95, 0.90, 0.80 },
+        headerColor = { 0.24, 0.19, 0.13 },
+        contentTint = { 0.12, 0.095, 0.065 },
+        contentBorder = { 0.40, 0.32, 0.23 },
+        cardTint = { 0.12, 0.088, 0.057 },
+        selectedCardBorder = { 0.67, 0.47, 0.28 },
+        scrollThumb = { 0.40, 0.25, 0.12 },
+        scrollTrack = { 0.10, 0.07, 0.04 },
+    },
+}
+
+function ns.GetInterfaceTheme()
+    local addon = ns.MR
+    local profile = addon and addon.db and addon.db.profile
+    local key = profile and profile.interfaceTheme
+    return interfaceThemes[key], interfaceThemes[key] and key or "routine"
+end
+
+function ns.ResolveScrollbarColor(r, g, b, themed)
+    local theme = ns.GetInterfaceTheme()
+    if theme then return unpack(theme.scrollThumb) end
+    if themed ~= false then return ns.ResolveThemeColor(r, g, b) end
+    return r, g, b
+end
+
+function ns.ApplyScrollbarTrackColor(texture, color)
+    local theme = ns.GetInterfaceTheme()
+    local tint = theme and theme.scrollTrack or color
+    texture:SetColorTexture(tint[1], tint[2], tint[3], color[4] or 1)
+end
+
+function ns.ApplyInterfaceHeader(texture, alpha, title, customColor, windowTitle)
+    local theme = ns.GetInterfaceTheme()
+    local atlas = theme and (title and theme.titleAtlas or theme.headerAtlas)
+    if theme and windowTitle and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(theme.windowTitleAtlas) then
+        atlas = theme.windowTitleAtlas
+    end
+    local atlasInfo = atlas and not customColor and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
+    local canSlice = texture.SetTextureSliceMargins and texture.SetTextureSliceMode and Enum and Enum.UITextureSliceMode
+    if atlasInfo and (title or canSlice) then
+        if texture:GetAtlas() ~= atlas then texture:SetAtlas(atlas) end
+        if canSlice then
+            local capWidth = title and 0 or math.min(12, math.floor((atlasInfo.width or 48) / 4))
+            texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
+            texture:SetTextureSliceMargins(capWidth, 0, capWidth, 0)
+        end
+        texture:SetDesaturated(not not (theme.neutralHeaderArtOnForever and ns.MR and ns.MR.isForever))
+        local tint = title and theme.titleTint or theme.headerTint
+        texture:SetVertexColor(tint[1], tint[2], tint[3], alpha)
+        return true
+    end
+
+    if canSlice then texture:SetTextureSliceMargins(0, 0, 0, 0) end
+    local color = customColor or (theme and theme.headerColor)
+    if color then
+        texture:SetDesaturated(false)
+        texture:SetColorTexture(color[1], color[2], color[3], alpha)
+        texture:SetVertexColor(1, 1, 1)
+        return true
+    end
+    return false
+end
+
+function ns.ApplyModuleHeaderBackground(header, hexColor, alpha)
+    alpha = alpha or header._mrHeaderAlpha or 0
+    header._mrHeaderAlpha = alpha
+    local texture = header._hdrBg
+    if not ns.ApplyInterfaceHeader(texture, alpha, false, hexColor and { ns.Hex(hexColor) }) then
+        texture:SetDesaturated(false)
+        texture:SetColorTexture(0.08, 0.09, 0.12, alpha)
+        texture:SetVertexColor(1, 1, 1)
+    end
+end
+
 function ns.GetSharedMediaList(kind)
     local sharedMedia = ns.GetSharedMedia()
     if not sharedMedia then
@@ -377,17 +492,27 @@ if type(ns.BACKDROP_FILE) ~= "string" then
     ns.BACKDROP_FILE = ResolveDefaultBackground()
 end
 
-function ns.ApplyBackgroundTexture(texture, r, g, b, a)
+function ns.ApplyBackgroundTexture(texture, r, g, b, a, useInterfaceTheme)
     if not texture then
         return
     end
 
-    local bgFile = ns.BACKDROP_FILE
+    local profile = GetActiveMediaProfile()
+    local custom = HasCustomBackground(profile)
+    local theme = useInterfaceTheme and not custom and ns.GetInterfaceTheme()
+    local atlas = theme and theme.backgroundAtlas
+    if atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
+        if texture:GetAtlas() ~= atlas then texture:SetAtlas(atlas) end
+        texture:SetVertexColor(theme.tint[1], theme.tint[2], theme.tint[3], a or 1)
+        return
+    end
+    local bgFile = theme and theme.background or ns.BACKDROP_FILE
     if type(bgFile) == "string" and bgFile ~= "" then
         texture:SetTexture(bgFile)
-        local profile = GetActiveMediaProfile()
-        if HasCustomBackground(profile) then
+        if custom then
             texture:SetVertexColor(1, 1, 1, a or 1)
+        elseif theme then
+            texture:SetVertexColor(theme.tint[1], theme.tint[2], theme.tint[3], a or 1)
         else
             texture:SetVertexColor(r or 1, g or 1, b or 1, a or 1)
         end
@@ -398,6 +523,244 @@ function ns.ApplyBackgroundTexture(texture, r, g, b, a)
 end
 
 local backdropFrames = setmetatable({}, { __mode = "k" })
+local panelBorderAtlases = {
+    SimplePanelTemplate = {
+        "UI-Frame-SimpleMetal-CornerTopLeft",
+        "_UI-Frame-SimpleMetal-EdgeTop",
+        "!UI-Frame-SimpleMetal-EdgeLeft",
+    },
+}
+local panelBordersAvailable = {}
+
+local function HasNativePanelBorder(layout)
+    if panelBordersAvailable[layout] ~= nil then return panelBordersAvailable[layout] end
+    if not (NineSliceUtil and type(NineSliceUtil.ApplyLayoutByName) == "function" and C_Texture and C_Texture.GetAtlasInfo) then
+        return false
+    end
+    for _, atlas in ipairs(panelBorderAtlases[layout]) do
+        if not C_Texture.GetAtlasInfo(atlas) then
+            panelBordersAvailable[layout] = false
+            return false
+        end
+    end
+    panelBordersAvailable[layout] = true
+    return true
+end
+
+local function GetBackdropTheme(frame)
+    if frame._mrUsePanelTheme or frame._mrBackdropRole then
+        return ns.GetInterfaceTheme()
+    end
+end
+
+local function JoinPanelBorderToTitle(frame, border, theme)
+    local title = frame._mrNativeTitleOwner
+    local anchor = title and title:GetPoint()
+    local join = theme and title and anchor and anchor:find("^TOP")
+    for _, name in ipairs({ "TopLeftCorner", "TopRightCorner", "TopEdge" }) do
+        local piece = border[name]
+        if piece then piece:SetShown(not join) end
+    end
+    for _, side in ipairs({ "Left", "Right" }) do
+        local edge = border[side .. "Edge"]
+        local corner = border["Top" .. side .. "Corner"]
+        if edge and corner then
+            local point = "TOP" .. side:upper()
+            if join then
+                edge:SetPoint(point, border, point, side == "Left" and -5 or 2, 1 - title:GetHeight())
+            else
+                edge:SetPoint(point, corner, "BOTTOM" .. side:upper(), 0, 0)
+            end
+        end
+    end
+end
+
+local function ApplyBackdropColor(frame, theme, custom, r, g, b, a)
+    local art = frame._mrBackdropArt
+    local role = frame._mrBackdropRole
+    local headerArt = role == "title" or role == "trackerTitle" or (role == "section" and not frame._mrCustomHeader)
+    local controlArt = theme and role == "control" and not custom
+    local windowTitle = role == "title" or role == "trackerTitle"
+    if theme and windowTitle and not frame._mrNativeTitle then
+        local trim = frame._mrTitleTrimOffsets or {}
+        local panel = CreateFrame("Frame", nil, frame, "DefaultPanelFlatTemplate")
+        panel:EnableMouse(false)
+        panel:SetPoint("TOPLEFT", frame, "TOPLEFT", trim.left or 0, trim.top or 0)
+        panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        panel:SetClipsChildren(true)
+        panel:SetFrameLevel(frame:GetFrameLevel())
+        panel.TitleContainer:Hide()
+        panel.Bg:Hide()
+        panel.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+        for _, name in ipairs({ "BottomLeftCorner", "BottomRightCorner", "LeftEdge", "RightEdge", "BottomEdge" }) do
+            local piece = panel.NineSlice[name]
+            if piece then piece:Hide() end
+        end
+        frame._mrNativeTitle = panel
+        local owner = frame:GetParent()
+        if owner and owner._mrUsePanelTheme then
+            owner._mrNativeTitleOwner = frame
+        end
+        local border = panel.NineSlice
+        local function PositionTitlePieces()
+            local currentTheme = GetBackdropTheme(frame)
+            local offsetX = currentTheme and currentTheme.windowTitleOffsetX or 0
+            local leftAdjustment = currentTheme and currentTheme.windowTitleLeftAdjustment or 0
+            local rightAdjustment = currentTheme and currentTheme.windowTitleRightAdjustment or 0
+            local offsetY = (22 - frame:GetHeight()) * 0.5 - 2
+                + (currentTheme and currentTheme.windowTitleOffsetY or 0) + (trim.top or 0)
+            border:ClearAllPoints()
+            border:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX + (trim.left or 0) + leftAdjustment, offsetY)
+            border:SetPoint("TOPRIGHT", frame, "TOPRIGHT", offsetX + 4 + (trim.right or -2) + rightAdjustment, offsetY)
+            border:SetHeight(100)
+            if owner and owner._mrNativeBorder and owner._mrNativeTitleOwner == frame then
+                JoinPanelBorderToTitle(owner, owner._mrNativeBorder, currentTheme)
+            end
+        end
+        panel._mrPositionTitlePieces = PositionTitlePieces
+        panel:HookScript("OnShow", PositionTitlePieces)
+        frame:HookScript("OnSizeChanged", PositionTitlePieces)
+    end
+    if frame._mrNativeTitle then
+        frame._mrNativeTitle:SetShown(theme ~= nil and windowTitle)
+        local parentColor = frame:GetParent()._mrBackgroundColor
+        frame._mrNativeTitle:SetAlpha(role == "trackerTitle" and parentColor and parentColor[4] or a)
+        if theme then
+            frame._mrNativeTitle._mrPositionTitlePieces()
+            local tr, tg, tb = unpack(theme.titleTint)
+            local neutral = theme.neutralHeaderArtOnForever and ns.MR and ns.MR.isForever
+            for _, piece in ipairs({ frame._mrNativeTitle.NineSlice:GetRegions() }) do
+                piece:SetDesaturated(not not neutral)
+                piece:SetVertexColor(tr, tg, tb)
+            end
+        end
+        local owner = frame:GetParent()
+        local outerBorder = owner and owner._mrNativeBorder
+        if outerBorder and owner._mrNativeTitleOwner == frame then
+            JoinPanelBorderToTitle(owner, outerBorder, theme)
+        end
+    end
+    if theme and (headerArt or controlArt or (not custom and frame._mrUsePanelTheme and theme.backgroundAtlas)) then
+        if not art then
+            art = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+            art:SetAllPoints()
+            frame._mrBackdropArt = art
+        end
+        art:ClearAllPoints()
+        if controlArt then
+            art:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
+            art:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+            ns.ApplyInterfaceHeader(art, a, true)
+            local brightness = frame:IsMouseOver() and 0.85 or 0.55
+            art:SetVertexColor(brightness, brightness, brightness, a)
+        elseif frame._mrUsePanelTheme then
+            art:SetPoint("TOPLEFT", frame, "TOPLEFT", 3, -5)
+            art:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, 3)
+        else
+            art:SetAllPoints()
+        end
+        if headerArt then
+            local parentColor = frame:GetParent()._mrBackgroundColor
+            local titleAlpha = frame._mrBackdropRole == "trackerTitle" and parentColor and parentColor[4] or a
+            ns.ApplyInterfaceHeader(art, titleAlpha, role ~= "section", nil, role == "title" or role == "trackerTitle")
+        elseif not controlArt then
+            ns.ApplyBackgroundTexture(art, r, g, b, a, true)
+        end
+        art:Show()
+        if windowTitle and frame._mrNativeTitle then
+            art:Hide()
+        end
+    elseif art then
+        art:Hide()
+    end
+
+    local tint = theme and (frame._mrUsePanelTheme and theme.tint or theme.contentTint)
+    if theme and role == "settingsSection" then
+        tint = theme.headerColor
+    elseif theme and role == "inset" then
+        tint = theme.scrollTrack
+    elseif theme and role == "character" then
+        tint = frame._selected and theme.headerColor or theme.cardTint
+    elseif theme and role == "control" and (frame._mrControlActive or frame:IsMouseOver()) then
+        tint = theme.headerColor
+    end
+    if custom and not frame._mrCustomHeader then
+        r, g, b = 1, 1, 1
+    elseif tint and not frame._mrCustomHeader then
+        r, g, b = unpack(tint)
+    end
+    local backgroundAlpha = theme and windowTitle and frame._mrNativeTitle and 0 or a
+    frame._mrOriginalSetBackdropColor(frame, r, g, b, backgroundAlpha)
+    if theme and windowTitle and frame._mrNativeTitle and frame._mrOriginalSetBackdropBorderColor then
+        frame._mrOriginalSetBackdropBorderColor(frame, 0, 0, 0, 0)
+    end
+end
+
+local function ApplyBackdropBorder(frame, theme, r, g, b, a)
+    local nativeBorder = frame._mrNativeBorder
+    local layout = theme and frame._mrUsePanelTheme and theme.borderLayout
+    local useNativeBorder = layout
+        and a > 0 and frame:GetHeight() >= 64 and frame:GetWidth() >= 64
+        and HasNativePanelBorder(layout)
+    if useNativeBorder then
+        if not nativeBorder then
+            nativeBorder = CreateFrame("Frame", nil, frame)
+            nativeBorder:SetFrameLevel(frame:GetFrameLevel())
+            nativeBorder:EnableMouse(false)
+            nativeBorder.layoutTextureSubLevel = 0
+            frame._mrNativeBorder = nativeBorder
+        end
+        if nativeBorder._mrLayout ~= layout then
+            nativeBorder:ClearAllPoints()
+            nativeBorder:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, 0)
+            nativeBorder:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 2, -1)
+            NineSliceUtil.ApplyLayoutByName(nativeBorder, layout)
+            nativeBorder._mrLayout = layout
+        end
+    end
+    if nativeBorder then
+        nativeBorder:SetShown(not not useNativeBorder)
+        if useNativeBorder then
+            JoinPanelBorderToTitle(frame, nativeBorder, theme)
+            if nativeBorder._mrAppliedTheme ~= theme then
+                local tr, tg, tb = 1, 1, 1
+                if theme.borderTint then
+                    tr, tg, tb = unpack(theme.borderTint)
+                end
+                for _, texture in ipairs({ nativeBorder:GetRegions() }) do
+                    texture:SetVertexColor(tr, tg, tb)
+                end
+                nativeBorder._mrAppliedTheme = theme
+            end
+            nativeBorder:SetAlpha(a)
+            a = 0
+        end
+    end
+    if theme and not frame._mrCustomHeader then
+        if frame._mrUsePanelTheme then
+            r, g, b = unpack(theme.panelBorderColor or theme.selectedCardBorder)
+        elseif frame._mrBackdropRole == "character" and frame._selected then
+            r, g, b = unpack(theme.selectedCardBorder)
+        elseif frame._mrBackdropRole == "control" and frame._mrControlActive then
+            r, g, b = unpack(theme.selectedCardBorder)
+        else
+            r, g, b = unpack(theme.contentBorder)
+        end
+    end
+    local role = frame._mrBackdropRole
+    if theme and frame._mrNativeTitle and (role == "title" or role == "trackerTitle") then
+        a = 0
+    end
+    frame._mrOriginalSetBackdropBorderColor(frame, r, g, b, a)
+end
+
+local function ApplyBackdropColors(frame, theme, custom)
+    ApplyBackdropColor(frame, theme, custom, unpack(frame._mrBackgroundColor))
+    local border = frame._mrBorderColor
+    if border then
+        ApplyBackdropBorder(frame, theme, unpack(border))
+    end
+end
 
 function ns.RefreshFrameBackground(frame)
     if not frame then
@@ -412,24 +775,20 @@ function ns.RefreshFrameBackground(frame)
     if type(frame.GetBackdrop) == "function" and type(frame.SetBackdrop) == "function" then
         local backdrop = frame:GetBackdrop()
         if type(backdrop) == "table" then
-            local bgFile = ns.BACKDROP_FILE or ResolveDefaultBackground()
-            if frame._mrAppliedBackdropFile ~= bgFile then
+            local theme = GetBackdropTheme(frame)
+            local custom = HasCustomBackground(GetActiveMediaProfile())
+            local bgFile = theme and frame._mrUsePanelTheme and not custom and theme.background or ns.BACKDROP_FILE or ResolveDefaultBackground()
+            if backdrop.bgFile ~= bgFile or frame._mrAppliedBackdropTheme ~= theme
+                or frame._mrAppliedCustomBackground ~= custom then
                 backdrop.bgFile = bgFile
+                if frame._mrUsePanelTheme then
+                    backdrop.insets = theme and { left = 3, right = 3, top = 5, bottom = 3 } or frame._mrOriginalBackdropInsets
+                end
                 frame._mrRefreshingBackground = true
                 frame:SetBackdrop(backdrop)
-                frame._mrAppliedBackdropFile = bgFile
-                if type(frame._mrOriginalSetBackdropColor) == "function" then
-                    local profile = GetActiveMediaProfile()
-                    if HasCustomBackground(profile) then
-                        frame._mrOriginalSetBackdropColor(frame, 1, 1, 1, color[4] or 1)
-                    else
-                        frame._mrOriginalSetBackdropColor(frame, color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
-                    end
-                end
-                if type(frame._mrOriginalSetBackdropBorderColor) == "function" and frame._mrBorderColor then
-                    local border = frame._mrBorderColor
-                    frame._mrOriginalSetBackdropBorderColor(frame, border[1] or 1, border[2] or 1, border[3] or 1, border[4] or 1)
-                end
+                frame._mrAppliedBackdropTheme = theme
+                frame._mrAppliedCustomBackground = custom
+                ApplyBackdropColors(frame, theme, custom)
                 frame._mrRefreshingBackground = nil
             end
         end
@@ -456,35 +815,49 @@ local function HookFrameBackdrop(frame)
     end
 
     frame._mrBackdropHooked = true
+    local backdrop = frame:GetBackdrop()
+    frame._mrOriginalBackdropInsets = backdrop and backdrop.insets
+    frame._mrUsePanelTheme = frame:GetParent() == UIParent and backdrop
+        and backdrop.edgeFile == ResolveDefaultBackground()
     backdropFrames[frame] = true
     local originalSetBackdropColor = frame.SetBackdropColor
     local originalSetBackdropBorderColor = frame.SetBackdropBorderColor
     frame._mrOriginalSetBackdropColor = originalSetBackdropColor
     frame._mrOriginalSetBackdropBorderColor = originalSetBackdropBorderColor
+    if frame._mrUsePanelTheme then
+        frame:HookScript("OnSizeChanged", function(self)
+            if self._mrBorderColor then
+                ApplyBackdropBorder(self, GetBackdropTheme(self), unpack(self._mrBorderColor))
+            end
+        end)
+    end
     frame.SetBackdropColor = function(self, r, g, b, a)
         if self._mrRefreshingBackground then
             originalSetBackdropColor(self, r, g, b, a)
             return
         end
 
-        local profile = GetActiveMediaProfile()
-        if HasCustomBackground(profile) then
-            originalSetBackdropColor(self, 1, 1, 1, a)
-        else
-            originalSetBackdropColor(self, r, g, b, a)
-        end
         self._mrBackgroundColor = { r or 1, g or 1, b or 1, a or 1 }
+        ApplyBackdropColor(self, GetBackdropTheme(self), HasCustomBackground(GetActiveMediaProfile()), unpack(self._mrBackgroundColor))
         ns.RefreshFrameBackground(self)
     end
     if type(originalSetBackdropBorderColor) == "function" then
         frame.SetBackdropBorderColor = function(self, r, g, b, a)
+            if self._mrRefreshingBackground then
+                originalSetBackdropBorderColor(self, r, g, b, a)
+                return
+            end
             self._mrBorderColor = { r or 1, g or 1, b or 1, a or 1 }
-            originalSetBackdropBorderColor(self, r, g, b, a)
+            ApplyBackdropBorder(self, GetBackdropTheme(self), unpack(self._mrBorderColor))
         end
     end
 end
 
-function ns.HookBackdropFrame(frame)
+function ns.HookBackdropFrame(frame, role, customHeader)
+    if frame and role then
+        frame._mrBackdropRole = role
+        frame._mrCustomHeader = customHeader
+    end
     HookFrameBackdrop(frame)
     if frame and frame._mrBackgroundColor then
         ns.RefreshFrameBackground(frame)
@@ -536,7 +909,17 @@ local themedBackdropBorders = setmetatable({}, { __mode = "k" })
 local themedStateRefreshers = setmetatable({}, { __mode = "k" })
 
 local function ApplyThemedColor(target, method, defaultR, defaultG, defaultB, alpha)
-    local r, g, b = ns.ResolveThemeColor(defaultR, defaultG, defaultB)
+    local isBorder = method == "SetBackdropBorderColor"
+    local isBackground = method == "SetBackdropColor"
+    local theme = (isBorder or isBackground) and ns.GetInterfaceTheme()
+    local addon = ns.MR
+    local profile = addon and addon.db and addon.db.profile
+    local r, g, b
+    if theme and profile and profile.themeColorMode == "default" then
+        r, g, b = unpack(isBorder and theme.contentBorder or theme.contentTint)
+    else
+        r, g, b = ns.ResolveThemeColor(defaultR, defaultG, defaultB)
+    end
     target[method](target, r, g, b, alpha or 1)
 end
 
@@ -652,7 +1035,8 @@ function ns.ApplyTitleBarTheme(hexColor)
         addon.titleText:SetTextColor(r, g, b)
     end
     if addon and addon._scrollThumbTex then
-        addon._scrollThumbTex:SetColorTexture(r, g, b, 0.75)
+        local sr, sg, sb = ns.ResolveScrollbarColor(r, g, b, false)
+        addon._scrollThumbTex:SetColorTexture(sr, sg, sb, 0.75)
     end
     if ns.RefreshThemedTextures then
         ns.RefreshThemedTextures()
@@ -767,6 +1151,9 @@ function ns.TopAccent(parent, r, g, b)
     tex:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
     tex:SetHeight(2)
     ns.RegisterThemedTexture(tex, r, g, b, 1)
+    ns.RegisterThemedState(tex, function()
+        tex:SetShown(not ns.GetInterfaceTheme())
+    end)
     return tex
 end
 
@@ -975,6 +1362,7 @@ function ns.OptionsSectionLabel(body, yOff, text, pad, fontSize)
     frame:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad + 2, yOff)
     frame:SetHeight(17)
     frame:SetBackdrop(ns.MakeBackdrop())
+    ns.HookBackdropFrame(frame, "settingsSection")
     frame:SetBackdropColor(0.025, 0.12, 0.15, 0.92)
     ns.RegisterThemedBackdropBorder(frame, 0.12, 0.42, 0.44, 0.58)
 
@@ -1029,6 +1417,7 @@ function ns.OptionsBtn(body, yOff, label, onClick, width, pad, fontSize, style)
     btn:SetSize(width, height)
     btn:SetPoint("TOPLEFT", body, "TOPLEFT", pad, yOff)
     btn:SetBackdrop(ns.MakeBackdrop())
+    ns.HookBackdropFrame(btn, "control")
     btn:SetBackdropColor(primary and 0.04 or 0.05, primary and 0.25 or 0.10, primary and 0.28 or 0.18, 1)
     local borderR = primary and 0.20 or 0.18
     local borderG = primary and 0.82 or 0.40

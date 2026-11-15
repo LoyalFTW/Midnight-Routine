@@ -33,6 +33,26 @@ local ROW_BG = { 0.05, 0.12, 0.20, 0.94 }
 local ROW_BORDER = { 0.12, 0.26, 0.32, 0.95 }
 local SELECTED_BG = { 0.10, 0.22, 0.30, 0.98 }
 
+local function ApplyDropdownArt(texture, atlas, alpha)
+    local enabled = ns.GetInterfaceTheme() and C_Texture and C_Texture.GetAtlasInfo
+        and C_Texture.GetAtlasInfo(atlas) and true or false
+    texture:SetShown(enabled)
+    if enabled then
+        if texture:GetAtlas() ~= atlas then texture:SetAtlas(atlas) end
+        texture:SetAlpha(alpha)
+    end
+    return enabled
+end
+
+function ns.ApplyDropdownArrow(texture, alpha)
+    local theme = ns.GetInterfaceTheme()
+    local showArrow = ApplyDropdownArt(texture, "common-dropdown-c-button-hover-arrow", alpha)
+    if showArrow then
+        texture:SetVertexColor(unpack(theme.dropdownArrow))
+    end
+    return showArrow
+end
+
 local function Resolve(opts, key, fallback)
     local value = opts[key]
     if type(value) == "function" then
@@ -100,12 +120,14 @@ function ns.CreateDropdown(parent, opts)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
     button:SetSize(opts.width or 130, opts.height or 18)
     button:SetBackdrop(ns.MakeBackdrop())
+    ns.HookBackdropFrame(button, "inset")
 
     local label = button:CreateFontString(nil, "OVERLAY")
     label:SetFont(ns.FONT_ROWS, GetFontSize(), ns.GetFontFlags())
     label:SetPoint("LEFT", button, "LEFT", opts.labelInset or 8, opts.textYOffset or 1)
     label:SetPoint("RIGHT", button, "RIGHT", opts.labelRightInset or -20, opts.textYOffset or 1)
     label:SetJustifyH("LEFT")
+    label:SetWordWrap(false)
     button._label = label
 
     local caret = button:CreateFontString(nil, "OVERLAY")
@@ -113,6 +135,9 @@ function ns.CreateDropdown(parent, opts)
     caret:SetPoint("RIGHT", button, "RIGHT", opts.caretInset or -7, opts.textYOffset or 1)
     caret:SetText("v")
     button._caret = caret
+    local arrowArt = button:CreateTexture(nil, "OVERLAY")
+    arrowArt:SetPoint("RIGHT", button, "RIGHT", opts.caretInset or -7, 0)
+    arrowArt:SetSize(9, 6)
     if opts.themed ~= false then
         label:SetTextColor(0.94, 0.96, 0.98, style.label[4])
         ns.RegisterThemedFontString(caret, style.caret[1], style.caret[2], style.caret[3], style.caret[4])
@@ -124,6 +149,15 @@ function ns.CreateDropdown(parent, opts)
     local scrollTrack
     local updatePopupScroll
     local dismiss
+    local function RefreshButtonStyle(self, hovered)
+        local alpha = GetAlpha()
+        local styledArrow = ns.ApplyDropdownArrow(arrowArt, alpha)
+        caret:SetShown(not styledArrow)
+        SetBackdropColor(self, hovered and HOVER_BG or BUTTON_BG, alpha)
+        SetThemeBorderColor(self, hovered and style.hoverBorder or style.buttonBorder, alpha)
+        label:SetTextColor(0.94, 0.96, 0.98, alpha)
+        SetThemeTextColor(caret, style.caret, alpha)
+    end
 
     local function EnsurePopup()
         if popup then
@@ -135,8 +169,32 @@ function ns.CreateDropdown(parent, opts)
         popup:SetFrameLevel(50)
         popup:SetClampedToScreen(true)
         popup:SetBackdrop(ns.MakeBackdrop())
+        ns.HookBackdropFrame(popup, "content")
         popup:Hide()
         popup.buttons = {}
+        local popupArt = popup:CreateTexture(nil, "ARTWORK")
+        popupArt:SetAllPoints()
+        local function RefreshPopupArt()
+            local alpha = GetAlpha()
+            local _, themeKey = ns.GetInterfaceTheme()
+            local skinned = themeKey == "forever" and ApplyDropdownArt(popupArt, "common-dropdown-bg", alpha)
+            if not skinned then popupArt:Hide() end
+            if themeKey == "retail" then
+                popup:SetBackdropColor(0.09, 0.09, 0.09, 1)
+                popup:SetBackdropBorderColor(0.29, 0.27, 0.23, 1)
+                return
+            end
+            SetBackdropColor(popup, POPUP_BG, skinned and math.max(0.95, alpha) or alpha)
+            SetThemeBorderColor(popup, style.popupBorder, skinned and 0 or alpha)
+        end
+        ns.RegisterThemedState(popup, RefreshPopupArt)
+        popup:HookScript("OnShow", function()
+            RefreshPopupArt()
+            RefreshButtonStyle(button, button:IsMouseOver())
+        end)
+        popup:HookScript("OnHide", function()
+            RefreshButtonStyle(button, button:IsMouseOver())
+        end)
 
         popupScroll = CreateFrame("ScrollFrame", nil, popup)
         popupContent = CreateFrame("Frame", nil, popupScroll)
@@ -179,15 +237,10 @@ function ns.CreateDropdown(parent, opts)
         local caretSize = math.max(9, fontSize + 1)
         local minHeight = opts.height or 18
         local maxHeight = opts.maxHeight or math.huge
-        local alpha = GetAlpha()
-
         self:SetHeight(math.min(maxHeight, math.max(minHeight, fontSize + (opts.heightPadding or 8))))
         label:SetFont(ns.FONT_ROWS, fontSize, ns.GetFontFlags())
         caret:SetFont(ns.FONT_HEADERS, caretSize, ns.GetFontFlags())
-        SetBackdropColor(self, BUTTON_BG, alpha)
-        SetThemeBorderColor(self, style.buttonBorder, alpha)
-        label:SetTextColor(0.94, 0.96, 0.98, alpha)
-        SetThemeTextColor(caret, style.caret, alpha)
+        RefreshButtonStyle(self, self:IsMouseOver())
 
         if opts.dynamicWidth then
             local textWidth = (label:GetStringWidth() or 0) + (opts.widthPadding or 30)
@@ -204,22 +257,36 @@ function ns.CreateDropdown(parent, opts)
     end
 
     button:SetScript("OnEnter", function(self)
-        local alpha = GetAlpha()
-        SetBackdropColor(self, HOVER_BG, alpha)
-        SetThemeBorderColor(self, style.hoverBorder, alpha)
+        RefreshButtonStyle(self, true)
     end)
     button:SetScript("OnLeave", function(self)
-        local alpha = GetAlpha()
-        SetBackdropColor(self, BUTTON_BG, alpha)
-        SetThemeBorderColor(self, style.buttonBorder, alpha)
+        RefreshButtonStyle(self, false)
     end)
     ns.RegisterThemedState(button, function(self)
-        local alpha = GetAlpha()
-        SetBackdropColor(self, self:IsMouseOver() and HOVER_BG or BUTTON_BG, alpha)
-        SetThemeBorderColor(self, self:IsMouseOver() and style.hoverBorder or style.buttonBorder, alpha)
-        label:SetTextColor(0.94, 0.96, 0.98, alpha)
-        SetThemeTextColor(caret, style.caret, alpha)
+        RefreshButtonStyle(self, self:IsMouseOver())
     end)
+
+    local function RefreshOptionStyle(row, hovered)
+        local alpha = GetAlpha()
+        local theme, themeKey = ns.GetInterfaceTheme()
+        if theme then
+            local fill = hovered and theme.headerColor or theme.contentTint
+            row:SetBackdropColor(fill[1], fill[2], fill[3], (hovered and 0.85 or row._checked and 0.60 or 0) * alpha)
+            row:SetBackdropBorderColor(0, 0, 0, 0)
+        else
+            SetBackdropColor(row, hovered and HOVER_BG or (row._checked and SELECTED_BG or ROW_BG), alpha)
+            if hovered or row._checked then
+                SetThemeBorderColor(row, hovered and style.hoverBorder or style.selectedBorder, alpha)
+            else
+                SetBackdropBorderColor(row, ROW_BORDER, alpha)
+            end
+        end
+        local selected = theme and row._checked and ApplyDropdownArt(row._selectedArt, "common-icon-checkmark", alpha)
+        if selected then row._selectedArt:SetDesaturated(themeKey == "retail") end
+        if not selected then row._selectedArt:Hide() end
+        row._check:SetText(row._checked and not selected and (theme and "+" or "x") or "")
+        SetThemeTextColor(row._check, style.check, alpha)
+    end
 
     local function EnsurePopupButton(index)
         local row = popup.buttons[index]
@@ -232,23 +299,22 @@ function ns.CreateDropdown(parent, opts)
         row._label:SetPoint("LEFT", row, "LEFT", 8, 1)
         row._label:SetPoint("RIGHT", row, "RIGHT", -22, 1)
         row._label:SetJustifyH("LEFT")
+        row._label:SetWordWrap(false)
         row._check = row:CreateFontString(nil, "OVERLAY")
         row._check:SetFont(ns.FONT_HEADERS, math.max(9, GetFontSize() + 1), ns.GetFontFlags())
         row._check:SetPoint("RIGHT", row, "RIGHT", -7, 1)
+        row._selectedArt = row:CreateTexture(nil, "OVERLAY")
+        row._selectedArt:SetSize(12, 12)
+        row._selectedArt:SetPoint("RIGHT", row, "RIGHT", -6, 0)
 
         row:SetScript("OnEnter", function(self)
-            local alpha = GetAlpha()
-            SetBackdropColor(self, HOVER_BG, alpha)
-            SetThemeBorderColor(self, style.hoverBorder, alpha)
+            RefreshOptionStyle(self, true)
         end)
         row:SetScript("OnLeave", function(self)
-            local alpha = GetAlpha()
-            SetBackdropColor(self, self._checked and SELECTED_BG or ROW_BG, alpha)
-            if self._checked then
-                SetThemeBorderColor(self, style.selectedBorder, alpha)
-            else
-                SetBackdropBorderColor(self, ROW_BORDER, alpha)
-            end
+            RefreshOptionStyle(self, false)
+        end)
+        ns.RegisterThemedState(row, function(self)
+            RefreshOptionStyle(self, self:IsMouseOver())
         end)
         row:SetScript("OnClick", function(self)
             local option = self._option
@@ -289,6 +355,7 @@ function ns.CreateDropdown(parent, opts)
         local maxVisibleRows = opts.maxVisibleRows or 10
         local visibleRows = math.min(#options, maxVisibleRows)
         local needsScroll = #options > maxVisibleRows
+        local scrollPadding = needsScroll and 10 or 0
         self:ApplyFonts()
 
         local rowWidth = math.max(self:GetWidth(), opts.minMenuWidth or 130)
@@ -301,38 +368,30 @@ function ns.CreateDropdown(parent, opts)
 
         popup:ClearAllPoints()
         popup:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, -4)
-        popup:SetSize(rowWidth + (needsScroll and 10 or 0), (visibleRows * (rowHeight + rowSpacing)) + 6)
+        local contentHeight = (#options * (rowHeight + rowSpacing)) - rowSpacing
+        popup:SetSize(rowWidth + scrollPadding, (visibleRows * (rowHeight + rowSpacing)) - rowSpacing + 6)
         local alpha = GetAlpha()
-        SetBackdropColor(popup, POPUP_BG, alpha)
-        SetThemeBorderColor(popup, style.popupBorder, alpha)
 
         popupScroll:ClearAllPoints()
         popupScroll:SetPoint("TOPLEFT", popup, "TOPLEFT", 3, -3)
-        popupScroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", needsScroll and -12 or -3, 3)
+        popupScroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", needsScroll and -(scrollPadding + 2) or -3, 3)
         scrollTrack:ClearAllPoints()
         scrollTrack:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -3, -3)
         scrollTrack:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -3, 3)
         if not needsScroll then scrollTrack:Hide() end
-        popupContent:SetSize(rowWidth - 6, math.max((#options * (rowHeight + rowSpacing)) - rowSpacing + 6, 1))
+        popupContent:SetSize(rowWidth - 6, math.max(contentHeight, 1))
 
         for index, option in ipairs(options) do
             local row = EnsurePopupButton(index)
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", popupContent, "TOPLEFT", 0, -3 - ((index - 1) * (rowHeight + rowSpacing)))
-            row:SetPoint("TOPRIGHT", popupContent, "TOPRIGHT", 0, -3 - ((index - 1) * (rowHeight + rowSpacing)))
+            row:SetPoint("TOPLEFT", popupContent, "TOPLEFT", 0, -((index - 1) * (rowHeight + rowSpacing)))
+            row:SetPoint("TOPRIGHT", popupContent, "TOPRIGHT", 0, -((index - 1) * (rowHeight + rowSpacing)))
             row:SetHeight(rowHeight)
             row._option = option
             row._checked = OptionKey(option) == selectedKey
             row._label:SetText(OptionLabel(option))
             row._label:SetTextColor(row._checked and 1 or 0.90, row._checked and 1 or 0.93, row._checked and 1 or 0.96, alpha)
-            row._check:SetText(row._checked and "x" or "")
-            SetThemeTextColor(row._check, style.check, alpha)
-            SetBackdropColor(row, row._checked and SELECTED_BG or ROW_BG, alpha)
-            if row._checked then
-                SetThemeBorderColor(row, style.selectedBorder, alpha)
-            else
-                SetBackdropBorderColor(row, ROW_BORDER, alpha)
-            end
+            RefreshOptionStyle(row, false)
             row:Show()
         end
 

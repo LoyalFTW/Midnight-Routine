@@ -200,7 +200,7 @@ local function EnsureRow(frame, index)
     row:SetHeight(ROW_HEIGHT)
     row:EnableMouseWheel(true)
     row:SetBackdrop(MakeBackdrop())
-    HookBackdrop(row)
+    ns.HookBackdropFrame(row, "content")
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(16, 16)
     row.warbandIcon = row:CreateTexture(nil, "ARTWORK")
@@ -315,7 +315,7 @@ local function ApplyRow(row, entry, y)
     row.count:SetFont(rowFont, rowSize, GetFontFlags())
     row.add.text:SetFont(rowFont, math.max(8, GetFontSize() - 2), GetFontFlags())
     row:SetBackdrop(MakeBackdrop())
-    HookBackdrop(row)
+    ns.HookBackdropFrame(row, "content")
     row.add:SetBackdrop(MakeSolidBackdrop())
     row.add:SetBackdropColor(0.05, 0.11, 0.13, 1)
     row.add:SetBackdropBorderColor(0.16, 0.55, 0.45, 1)
@@ -507,18 +507,18 @@ function MR:ApplyCurrencyBrowserTheme()
 
     if frame.refreshButton then
         frame.refreshButton:SetBackdrop(MakeBackdrop())
-        HookBackdrop(frame.refreshButton)
+        ns.HookBackdropFrame(frame.refreshButton, "control")
         frame.refreshButton:SetBackdropColor(0.05, 0.10, 0.13, 1)
         frame.refreshButton:SetBackdropBorderColor(0.18, 0.48, 0.42, 1)
     end
     if frame.warbandFilterButton then
         frame.warbandFilterButton:SetBackdrop(MakeBackdrop())
-        HookBackdrop(frame.warbandFilterButton)
+        ns.HookBackdropFrame(frame.warbandFilterButton, "control")
         SetWarbandFilterButtonState(frame)
     end
     if frame.searchBg then
         frame.searchBg:SetBackdrop(MakeBackdrop())
-        HookBackdrop(frame.searchBg)
+        ns.HookBackdropFrame(frame.searchBg, "content")
         frame.searchBg:SetBackdropColor(0.02, 0.04, 0.06, 1)
         frame.searchBg:SetBackdropBorderColor(0.16, 0.28, 0.32, 1)
     end
@@ -615,6 +615,7 @@ function MR:ShowCurrencyBrowserFrame(anchor)
             font = GetRowFont(),
             fontSize = math.max(8, GetFontSize() - 2),
             color = { 0.50, 0.95, 0.80, 1 },
+            themed = true,
             background = { 0.05, 0.10, 0.13, 1 },
             border = { 0.18, 0.48, 0.42, 1 },
             onClick = function() MR:RefreshCurrencyBrowserFrame() end,

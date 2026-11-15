@@ -142,7 +142,7 @@ PopulateGatheringConfig = function(frame)
 
     local db = MR.db.profile
     local yOff, pad = frame.configScroll and -6 or -28, 8
-    local contentW = (frame:GetWidth() or 224) - (pad * 2)
+    local contentW = bodyParent:GetWidth() - (pad * 2)
     local activePage = MR._gatheringCfgPage or "display"
     local cfgFs = (ns.GetFontSize and ns.GetFontSize()) or (MR.db and MR.db.profile and MR.db.profile.fontSize) or 9
 
@@ -175,6 +175,8 @@ PopulateGatheringConfig = function(frame)
             btn:SetPoint("TOPLEFT", body, "TOPLEFT", pad + (i - 1) * (tabW + 2), yOff)
             btn:SetBackdrop(MakeBackdrop())
             local isActive = activePage == tab.key
+            btn._mrControlActive = isActive
+            ns.HookBackdropFrame(btn, "control")
             btn:SetBackdropColor(isActive and 0.11 or 0.05, isActive and 0.24 or 0.09, isActive and 0.23 or 0.15, 1)
             btn:SetBackdropBorderColor(isActive and 0.22 or 0.16, isActive and 0.82 or 0.28, isActive and 0.70 or 0.36, 1)
 
@@ -264,6 +266,7 @@ PopulateGatheringConfig = function(frame)
             btn:SetHeight(16)
             if hasToggle then
                 btn:SetBackdrop(MakeBackdrop())
+                ns.HookBackdropFrame(btn, "settingsSection")
                 btn:SetBackdropColor(enabled and 0.035 or 0.055, enabled and 0.085 or 0.045, enabled and 0.095 or 0.050, 0.72)
                 btn:SetBackdropBorderColor(enabled and 0.10 or 0.24, enabled and 0.32 or 0.12, enabled and 0.34 or 0.12, 0.70)
             end
@@ -347,6 +350,7 @@ PopulateGatheringConfig = function(frame)
             eyeBtn:SetSize(14, 14)
             eyeBtn:SetPoint("RIGHT", rowFr, "RIGHT", 0, 0)
             eyeBtn:SetBackdrop(MakeBackdrop())
+            ns.HookBackdropFrame(eyeBtn, "control")
             local eyeLbl = eyeBtn:CreateFontString(nil, "OVERLAY")
             eyeLbl:SetFont(ns.FONT_ROWS, 9, GetFontFlags())
             eyeLbl:SetPoint("CENTER", eyeBtn, "CENTER", 0, 0)
@@ -418,6 +422,7 @@ PopulateGatheringConfig = function(frame)
             header:SetPoint("TOPRIGHT", body, "TOPRIGHT", -pad, yOff)
             header:SetHeight(ROW_H)
             header:SetBackdrop(MakeBackdrop())
+            ns.HookBackdropFrame(header, "settingsSection")
             header:SetBackdropColor(0.020, 0.085, 0.100, 0.95)
             header:SetBackdropBorderColor(0.22, 0.68, 0.64, 0.92)
             header:RegisterForClicks("LeftButtonUp")
@@ -506,6 +511,7 @@ PopulateGatheringConfig = function(frame)
                         expandBtn:SetSize(18, 18)
                         expandBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
                         expandBtn:SetBackdrop(MakeBackdrop())
+                        ns.HookBackdropFrame(expandBtn, "control")
                         expandBtn:SetBackdropColor(0.05, 0.10, 0.18, 1)
                         expandBtn:SetBackdropBorderColor(0.15, 0.32, 0.38, 1)
                         local expandLbl = expandBtn:CreateFontString(nil, "OVERLAY")

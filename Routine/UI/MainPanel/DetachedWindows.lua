@@ -50,7 +50,7 @@ function MR:EnsureDetachedFrame(mod)
     dragBar:SetPoint("TOPRIGHT", title, "TOPRIGHT", 0, 0)
     dragBar:SetHeight(6)
     dragBar:SetBackdrop(MakeBackdrop())
-    if ns.HookBackdropFrame then ns.HookBackdropFrame(dragBar) end
+    if ns.HookBackdropFrame then ns.HookBackdropFrame(dragBar, "title") end
     dragBar:SetBackdropColor(0.04, 0.10, 0.20, 1)
     dragBar:SetBackdropBorderColor(0.10, 0.28, 0.35, 1)
     dragBar:EnableMouse(false)

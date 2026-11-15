@@ -9,6 +9,14 @@ local function ApplyButtonBase(button)
 end
 
 local function ApplyButtonHover(button, hovered)
+    local theme = ns.GetInterfaceTheme()
+    if theme then
+        local fill = hovered and theme.headerColor or theme.contentTint
+        local edge = hovered and theme.selectedCardBorder or theme.contentBorder
+        button:SetBackdropColor(fill[1], fill[2], fill[3], hovered and 1 or 0.85)
+        button:SetBackdropBorderColor(edge[1], edge[2], edge[3], 1)
+        return
+    end
     if hovered then
         button:SetBackdropColor(0.08, 0.22, 0.32, 1)
         button:SetBackdropBorderColor(0.25, 0.85, 0.72, 1)
@@ -24,13 +32,14 @@ local function ShowHeaderTooltip(button, text)
     end
 end
 
-function ns.TitleBar(parent, height)
+function ns.TitleBar(parent, height, trimOffsets)
     local bar = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     bar:SetPoint("TOPLEFT")
     bar:SetPoint("TOPRIGHT")
     bar:SetHeight(height or 36)
+    bar._mrTitleTrimOffsets = trimOffsets
     bar:SetBackdrop(ns.MakeBackdrop(false))
-    ns.HookBackdropFrame(bar)
+    ns.HookBackdropFrame(bar, "title")
     local colors = ns.COLORS
     bar:SetBackdropColor(colors.titlebar[1], colors.titlebar[2], colors.titlebar[3], 1)
     bar:EnableMouse(true)
@@ -44,6 +53,7 @@ function ns.CloseButton(parent, onClose, opts)
     local button = ns.HeaderButton(parent, {
         size = size,
         text = "x",
+        close = onClose ~= nil,
         font = opts.font or ns.FONT_HEADERS,
         fontSize = opts.fontSize or math.max(8, size - 9),
         color = { 0.88, 0.56, 0.56, 1 },
@@ -73,8 +83,34 @@ function ns.HeaderButton(parent, opts)
     local hoverBorder = opts.hoverBorder or { 0.25, 0.85, 0.72, 1 }
     local normalColor = opts.color or { 1, 1, 1, 1 }
     local hoverColor = opts.hoverColor or { 1, 1, 1, 1 }
+    local closeArt
+    if opts.close then
+        closeArt = button:CreateTexture(nil, "ARTWORK")
+        closeArt:SetAllPoints()
+        closeArt:Hide()
+    end
 
     local function ApplyBackdrop(background, border)
+        local theme = ns.GetInterfaceTheme()
+        local closeAtlas = "RedButton-Exit"
+        local nativeClose = theme and closeArt and C_Texture and C_Texture.GetAtlasInfo
+            and C_Texture.GetAtlasInfo(closeAtlas)
+        if closeArt then
+            closeArt:SetShown(not not nativeClose)
+            button._lbl:SetShown(not nativeClose)
+        end
+        if nativeClose then
+            if closeArt:GetAtlas() ~= closeAtlas then closeArt:SetAtlas(closeAtlas) end
+            local brightness = background == hoverBg and 1 or 0.94
+            closeArt:SetVertexColor(brightness, brightness, brightness)
+            button:SetBackdropColor(0, 0, 0, 0)
+            button:SetBackdropBorderColor(0, 0, 0, 0)
+            return
+        end
+        if theme then
+            background = background == hoverBg and theme.headerColor or theme.contentTint
+            border = theme.contentBorder
+        end
         button:SetBackdropColor(background[1], background[2], background[3], background[4] or 1)
         button:SetBackdropBorderColor(border[1], border[2], border[3], border[4] or 1)
     end
@@ -115,6 +151,14 @@ function ns.HeaderButton(parent, opts)
         end
     end
 
+    local function GetNormalIconColor()
+        if opts.themed then
+            local r, g, b = ns.ResolveThemeColor(normalColor[1], normalColor[2], normalColor[3])
+            return { r, g, b, normalColor[4] }
+        end
+        return normalColor
+    end
+
     ApplyBackdrop(normalBg, normalBorder)
     button:SetScript("OnEnter", function(self)
         ApplyBackdrop(hoverBg, hoverBorder)
@@ -133,26 +177,19 @@ function ns.HeaderButton(parent, opts)
     end)
     button:SetScript("OnLeave", function(self)
         ApplyBackdrop(normalBg, normalBorder)
-        if opts.themed then
-            local r, g, b = ns.ResolveThemeColor(normalColor[1], normalColor[2], normalColor[3])
-            SetIconColor({ r, g, b, normalColor[4] })
-        else
-            SetIconColor(normalColor)
-        end
+        SetIconColor(GetNormalIconColor())
         ns.HideOwnedTooltip(self)
     end)
     ns.RegisterThemedState(button, function(self)
+        if opts.close then
+            iconObject:SetText(ns.GetInterfaceTheme() and "×" or opts.text)
+        end
         if self:IsMouseOver() then
             ApplyBackdrop(hoverBg, hoverBorder)
             SetIconColor(hoverColor)
         else
             ApplyBackdrop(normalBg, normalBorder)
-            if opts.themed then
-                local r, g, b = ns.ResolveThemeColor(normalColor[1], normalColor[2], normalColor[3])
-                SetIconColor({ r, g, b, normalColor[4] })
-            else
-                SetIconColor(normalColor)
-            end
+            SetIconColor(GetNormalIconColor())
         end
     end)
     if opts.onClick then

@@ -248,11 +248,11 @@ local function BuildWelcomeScreen()
     scrollBg:SetBackdropBorderColor(0.10, 0.30, 0.34, 0.72)
 
     thumb:SetScript("OnEnter", function()
-        local r, g, b = ns.ResolveThemeColor(0.36, 0.86, 0.82)
+        local r, g, b = ns.ResolveScrollbarColor(0.36, 0.86, 0.82)
         thumbTex:SetColorTexture(r, g, b, 0.95)
     end)
     thumb:SetScript("OnLeave", function()
-        local r, g, b = ns.ResolveThemeColor(0.24, 0.72, 0.72)
+        local r, g, b = ns.ResolveScrollbarColor(0.24, 0.72, 0.72)
         thumbTex:SetColorTexture(r, g, b, 0.82)
     end)
 

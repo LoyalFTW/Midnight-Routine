@@ -615,7 +615,22 @@ function MR:GetThemeColor()
     if profile.themeColorMode == "class" then
         return self:GetClassColorHex()
     end
-    return profile.themeColor
+    local theme = ns.GetInterfaceTheme()
+    return profile.themeColor or (theme and theme.accent)
+end
+
+function MR:SetInterfaceTheme(key)
+    local _, current = ns.GetInterfaceTheme()
+    if key == current then return end
+
+    self.db.profile.interfaceTheme = key
+    if self.ApplyTheme then self:ApplyTheme() end
+    if self.frame and ns.ApplyMainFrameLayout then ns.ApplyMainFrameLayout(self.frame, true) end
+    self:ApplyThemeColorSelection()
+    ns.RefreshAllFrameBackgrounds()
+    if self.RebuildRaresFrame then self:RebuildRaresFrame() end
+    if self.ApplyCurrencyBrowserTheme then self:ApplyCurrencyBrowserTheme() end
+    if self.RequestConfigRepopulate then self:RequestConfigRepopulate() end
 end
 
 function MR:RefreshImmediateThemeSurfaces()
@@ -627,6 +642,7 @@ function MR:RefreshImmediateThemeSurfaces()
         local mod = header and header._mrMod
         if not (mod and header._label) then return end
 
+        ns.ApplyModuleHeaderBackground(header, self:GetHeaderBackgroundColor(mod.key))
         local explicit = profile.headerColors and profile.headerColors[mod.key]
         local color = explicit or self:GetThemeColor() or mod.labelColor or "#ffffff"
         if mod.profSkillLine and not explicit then

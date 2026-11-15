@@ -309,7 +309,7 @@ function MR:BuildConfigFrame()
         f:SetPoint("CENTER")
     end
 
-    local tbar = TitleBar(f, 22)
+    local tbar = TitleBar(f, 22, { right = 0 })
     tbar:SetBackdropColor(0.035, 0.075, 0.145, 1)
     tbar:SetScript("OnDragStart", function() f:StartMoving() end)
     tbar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
@@ -329,6 +329,17 @@ function MR:BuildConfigFrame()
     ns.RegisterThemedTexture(titleEdge, 0.10, 0.24, 0.30, 0.85)
 
     CloseButton(tbar, function() f:Hide() end)
+    ns.RegisterThemedState(ttitle, function()
+        local theme = ns.GetInterfaceTheme()
+        ttitle:ClearAllPoints()
+        if theme then
+            ttitle:SetPoint("LEFT", tbar, "LEFT", 8, 0)
+            ttitle:SetTextColor(1, 0.97, 0.90)
+        else
+            ttitle:SetPoint("LEFT", tbar, "LEFT", 8, 0)
+        end
+        titleEdge:SetShown(not theme)
+    end)
 
     local scroll = CreateFrame("ScrollFrame", nil, f)
     scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -22)
