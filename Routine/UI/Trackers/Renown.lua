@@ -289,6 +289,61 @@ end
 
 local renownFrame
 local renownFrameCache = {}
+local MIN_WIDTH, MAX_WIDTH = 200, 400
+
+local function GetReputationHeightLimit(frame)
+    return UIParent:GetHeight() * 0.9 / frame:GetScale()
+end
+
+local function AddReputationResizeGrip(frame)
+    local anchor = frame.headerBottom and "bottom" or "top"
+    local grip = ns.CreateManagedResizeGrip(frame, frame.headerBottom, function()
+        return MR.db.profile.renownLocked
+    end)
+    frame._dragger = grip
+    grip:Hide()
+
+    local startX, startY, startWidth, startHeight, startPreference
+    local function FinishResize()
+        grip:SetScript("OnUpdate", nil)
+        if not grip._dragging then return end
+        grip._dragging = false
+        MR:RepopulateRenownConfig()
+    end
+
+    grip:SetScript("OnMouseDown", function(_, button)
+        local db = MR.db.profile
+        if button ~= "LeftButton" or db.renownLocked then return end
+        SyncManagedFramePos(frame, "renownPos", anchor)
+        startX, startY = GetCursorPosition()
+        startWidth, startHeight = frame:GetWidth(), frame:GetHeight()
+        startPreference = db.renownHeight
+        grip._dragging = true
+        grip:SetScript("OnUpdate", function()
+            if not IsMouseButtonDown("LeftButton") or db.renownLocked then
+                FinishResize()
+                return
+            end
+            local x, y = GetCursorPosition()
+            local scale = frame:GetEffectiveScale()
+            local width = math.floor(math.max(MIN_WIDTH, math.min(MAX_WIDTH, startWidth + (x - startX) / scale)))
+            local heightDelta = (y - startY) / scale * (frame.headerBottom and 1 or -1)
+            local height = startPreference
+            if math.abs(heightDelta) >= 1 then
+                height = math.floor(math.min(GetReputationHeightLimit(frame), math.max(96, startHeight + heightDelta)))
+            end
+            if width ~= frame:GetWidth() or height ~= db.renownHeight then
+                db.renownWidth, db.renownHeight = width, height
+                frame:SetWidth(width)
+                RefreshRenownFrame()
+            end
+        end)
+    end)
+    grip:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then FinishResize() end
+    end)
+    grip:SetScript("OnHide", FinishResize)
+end
 
 local function GetRenownLayoutKey()
     local db = MR.db and MR.db.profile or {}
@@ -334,7 +389,7 @@ local function BuildRenownFrame()
     local f = StyledFrame(UIParent, nil, "MEDIUM", 10)
     MR:RegisterPriorityFrame(f)
     f.layoutKey = GetRenownLayoutKey()
-    f:SetSize(FRAME_W, minimized and HEADER_H or totalH)
+    f:SetSize(FRAME_W, (minimized or MR.isForever) and HEADER_H or totalH)
     f:SetBackdropColor(0.02, 0.03, 0.08, 0.97)
     f:SetBackdropBorderColor(0.55, 0.42, 0.08, 1)
     f.rowSpace = ROW_SPACE
@@ -422,7 +477,21 @@ local function BuildRenownFrame()
 
     f.factionRows = {}
 
-    local yOff = emblemMode and 1 or (HEADER_H + PAD)
+    if MR.isForever then
+        local top = headerBottom and f or titleBar
+        local bottom = headerBottom and titleBar or f
+        f.reputationScroll, f.reputationContent, f.UpdateScrollBar = ns.CreateScrollArea(f,
+            { "TOPLEFT", top, headerBottom and "TOPLEFT" or "BOTTOMLEFT", PAD, 0 },
+            { "BOTTOMRIGHT", bottom, headerBottom and "TOPRIGHT" or "BOTTOMRIGHT", -PAD, 0 },
+            { contentWidth = FRAME_W - 2 * PAD, hideTrack = true, thumbColor = { 0.85, 0.65, 0.20, 0.8 } })
+        f.reputationScroll:Hide()
+        AddReputationResizeGrip(f)
+    end
+
+    local rowParent = f.reputationContent or f
+    local rowInset = f.reputationContent and 0 or PAD
+    local rowStart = f.reputationContent and PAD or (HEADER_H + PAD)
+    local yOff = emblemMode and 1 or rowStart
 
     for i, faction in ipairs(GetOrderedFactions()) do
         local cr, cg, cb = GetFactionColor(faction)
@@ -430,16 +499,16 @@ local function BuildRenownFrame()
         if compact and not emblemMode then rowAlpha = 1.0 end
 
         if emblemMode then
-        local emblem = CreateFrame("Button", nil, f, "BackdropTemplate")
+        local emblem = CreateFrame("Button", nil, rowParent, "BackdropTemplate")
         local idx = yOff
         local col = (idx - 1) % emblemCols
         local row = math.floor((idx - 1) / emblemCols)
-        local x = PAD + (col * (EMBLEM_SIZE + EMBLEM_GAP))
-        local y = HEADER_H + PAD + (row * (EMBLEM_SIZE + EMBLEM_GAP))
+        local x = rowInset + (col * (EMBLEM_SIZE + EMBLEM_GAP))
+        local y = rowStart + (row * (EMBLEM_SIZE + EMBLEM_GAP))
         if headerBottom then
-            emblem:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", x, y)
+            emblem:SetPoint("BOTTOMLEFT", rowParent, "BOTTOMLEFT", x, y)
         else
-            emblem:SetPoint("TOPLEFT", f, "TOPLEFT", x, -y)
+            emblem:SetPoint("TOPLEFT", rowParent, "TOPLEFT", x, -y)
         end
         emblem:SetSize(EMBLEM_SIZE, EMBLEM_SIZE)
         emblem:RegisterForClicks("LeftButtonUp")
@@ -503,13 +572,13 @@ local function BuildRenownFrame()
 
         yOff = yOff + 1
         else
-        local rowFrame = CreateFrame("Button", nil, f, "BackdropTemplate")
+        local rowFrame = CreateFrame("Button", nil, rowParent, "BackdropTemplate")
         if headerBottom then
-            rowFrame:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,  yOff)
-            rowFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, yOff)
+            rowFrame:SetPoint("BOTTOMLEFT",  rowParent, "BOTTOMLEFT",  rowInset,  yOff)
+            rowFrame:SetPoint("BOTTOMRIGHT", rowParent, "BOTTOMRIGHT", -rowInset, yOff)
         else
-            rowFrame:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  -yOff)
-            rowFrame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -yOff)
+            rowFrame:SetPoint("TOPLEFT",  rowParent, "TOPLEFT",  rowInset,  -yOff)
+            rowFrame:SetPoint("TOPRIGHT", rowParent, "TOPRIGHT", -rowInset, -yOff)
         end
         rowFrame:SetHeight(ROW_SPACE - 8)
         rowFrame:RegisterForClicks("LeftButtonUp")
@@ -699,6 +768,10 @@ local function BuildRenownFrame()
     ApplyMinimized = function(isMin)
         if MR.db then MR.db.profile.renownMinimized = isMin end
         if minBtn.RefreshLabel then minBtn:RefreshLabel() end
+        if isMin and f.reputationScroll then
+            f.reputationScroll:Hide()
+            f._dragger:Hide()
+        end
 
         for _, row in pairs(f.factionRows) do
             if row.rowFrame then
@@ -723,8 +796,12 @@ local function BuildRenownFrame()
             AnimateManagedFrameHeight(f, HEADER_H, RestoreRenownOnUpdate)
         else
             SyncManagedFramePos(f, "renownPos", headerBottom and "bottom" or "top")
-            AnimateManagedFrameHeight(f, totalH, RestoreRenownOnUpdate)
-            RefreshRenownFrame()
+            if f.reputationScroll then
+                RefreshRenownFrame(RestoreRenownOnUpdate)
+            else
+                AnimateManagedFrameHeight(f, totalH, RestoreRenownOnUpdate)
+                RefreshRenownFrame()
+            end
         end
     end
     f.ApplyMinimized = ApplyMinimized
@@ -737,7 +814,7 @@ local function BuildRenownFrame()
     return f
 end
 
-RefreshRenownFrame = function()
+RefreshRenownFrame = function(onHeightFinished)
     if not renownFrame or not renownFrame:IsShown() then return end
     MR._renownWindowRefreshCount = (MR._renownWindowRefreshCount or 0) + 1
     if MR.NoteRefreshSource then MR:NoteRefreshSource("Renown:Refresh", true) end
@@ -752,8 +829,17 @@ RefreshRenownFrame = function()
     local pad        = renownFrame.layoutPad or 12
     local headerH    = renownFrame.headerHeight or ((renownFrame.titleBar and renownFrame.titleBar:GetHeight()) or 24)
     local headerBottom = renownFrame.headerBottom == true
+    local scroll = renownFrame.reputationScroll
+    local content = renownFrame.reputationContent
+    local rowParent = content or renownFrame
+    local rowInset = content and 0 or pad
+    local rowStart = content and pad or (headerH + pad)
 
     if minimized then
+        if scroll then
+            scroll:Hide()
+            renownFrame._dragger:Hide()
+        end
         for _, row in pairs(renownFrame.factionRows) do
             if row.rowFrame then
                 row.rowFrame:Hide()
@@ -789,13 +875,13 @@ RefreshRenownFrame = function()
                 local idx = visibleRows - 1
                 local col = idx % cols
                 local gridRow = math.floor(idx / cols)
-                local x = pad + (col * (iconSize + iconGap))
-                local yOff = headerH + pad + (gridRow * (iconSize + iconGap))
+                local x = rowInset + (col * (iconSize + iconGap))
+                local yOff = rowStart + (gridRow * (iconSize + iconGap))
                 row.rowFrame:ClearAllPoints()
                 if headerBottom then
-                    row.rowFrame:SetPoint("BOTTOMLEFT", renownFrame, "BOTTOMLEFT", x, yOff)
+                    row.rowFrame:SetPoint("BOTTOMLEFT", rowParent, "BOTTOMLEFT", x, yOff)
                 else
-                    row.rowFrame:SetPoint("TOPLEFT", renownFrame, "TOPLEFT", x, -yOff)
+                    row.rowFrame:SetPoint("TOPLEFT", rowParent, "TOPLEFT", x, -yOff)
                 end
                 row.rowFrame:SetSize(iconSize, iconSize)
                 SetEmblemChrome(row.rowFrame, row.emblemPlate, row.emblemGlow, cr, cg, cb, visualAlpha, false)
@@ -841,15 +927,15 @@ RefreshRenownFrame = function()
         else
             visibleRows = visibleRows + 1
             if row.rowFrame then
-                local yOff = headerH + pad + ((visibleRows - 1) * rowSpace)
+                local yOff = rowStart + ((visibleRows - 1) * rowSpace)
                 row.rowFrame:SetHeight(rowSpace - 8)
                 row.rowFrame:ClearAllPoints()
                 if headerBottom then
-                    row.rowFrame:SetPoint("BOTTOMLEFT",  renownFrame, "BOTTOMLEFT",  pad,  yOff)
-                    row.rowFrame:SetPoint("BOTTOMRIGHT", renownFrame, "BOTTOMRIGHT", -pad, yOff)
+                    row.rowFrame:SetPoint("BOTTOMLEFT",  rowParent, "BOTTOMLEFT",  rowInset,  yOff)
+                    row.rowFrame:SetPoint("BOTTOMRIGHT", rowParent, "BOTTOMRIGHT", -rowInset, yOff)
                 else
-                    row.rowFrame:SetPoint("TOPLEFT",  renownFrame, "TOPLEFT",  pad,  -yOff)
-                    row.rowFrame:SetPoint("TOPRIGHT", renownFrame, "TOPRIGHT", -pad, -yOff)
+                    row.rowFrame:SetPoint("TOPLEFT",  rowParent, "TOPLEFT",  rowInset,  -yOff)
+                    row.rowFrame:SetPoint("TOPRIGHT", rowParent, "TOPRIGHT", -rowInset, -yOff)
                 end
                 row.rowFrame:Show()
             end
@@ -923,19 +1009,47 @@ RefreshRenownFrame = function()
         renownFrame.divider:SetShown(visibleRows > 0)
     end
 
-    SyncManagedFramePos(renownFrame, "renownPos", headerBottom and "bottom" or "top")
+    if not (renownFrame._dragger and renownFrame._dragger._dragging) then
+        SyncManagedFramePos(renownFrame, "renownPos", headerBottom and "bottom" or "top")
+    end
+    local contentH = visibleRows * rowSpace
     if renownFrame.emblemMode then
         local iconSize = renownFrame.emblemSize or 34
         local iconGap = renownFrame.emblemGap or 7
         local cols = math.max(1, math.floor((((renownFrame:GetWidth() or 280) - (pad * 2)) + iconGap) / (iconSize + iconGap)))
         renownFrame.emblemCols = cols
         local rows = math.ceil(visibleRows / cols)
-        local contentH = (rows > 0) and ((rows * iconSize) + ((rows - 1) * iconGap)) or 0
-        renownFrame:SetHeight((rows > 0) and (headerH + pad + contentH + pad) or headerH)
-    elseif visibleRows > 0 then
-        renownFrame:SetHeight(headerH + pad + (visibleRows * rowSpace) + pad)
+        contentH = (rows > 0) and ((rows * iconSize) + ((rows - 1) * iconGap)) or 0
+    end
+    local bodyH = visibleRows > 0 and (contentH + 2 * pad) or 0
+    if scroll then
+        local maxBodyH = math.max(0, UIParent:GetHeight() * 0.65 / renownFrame:GetScale() - headerH)
+        local viewH = math.min(bodyH, maxBodyH)
+        if db.renownHeight then
+            viewH = math.max(0, math.min(db.renownHeight, GetReputationHeightLimit(renownFrame)) - headerH)
+        end
+        local startAtBottom = headerBottom and (not scroll:IsShown()
+            or scroll:GetVerticalScroll() >= content:GetHeight() - scroll:GetHeight() - 1)
+        content:SetSize(renownFrame:GetWidth() - 2 * pad, math.max(1, bodyH))
+        local function UpdateReputationScroll(frame)
+            scroll:SetShown(viewH > 0)
+            frame._dragger:Show()
+            if startAtBottom and bodyH > viewH then
+                scroll:SetVerticalScroll(bodyH - viewH)
+            end
+            frame.UpdateScrollBar()
+        end
+        if onHeightFinished then
+            AnimateManagedFrameHeight(renownFrame, headerH + viewH, function(frame)
+                UpdateReputationScroll(frame)
+                onHeightFinished(frame)
+            end)
+        else
+            renownFrame:SetHeight(headerH + viewH)
+            UpdateReputationScroll(renownFrame)
+        end
     else
-        renownFrame:SetHeight(headerH)
+        renownFrame:SetHeight(headerH + bodyH)
     end
 end
 
@@ -1208,7 +1322,7 @@ PopulateRenownConfig = function(f)
             function(v) db.renownShowLevel = v; RefreshRenownFrame() end)
 
         Gap(4); Divider()
-        Slider(L["WIDTH"], 200, 400, 10,
+        Slider(L["WIDTH"], MIN_WIDTH, MAX_WIDTH, 10,
             function() return db.renownWidth or 280 end,
             function(v)
                 db.renownWidth = math.floor(v/10)*10
@@ -1242,7 +1356,10 @@ PopulateRenownConfig = function(f)
             function() return db.renownScale or 1.0 end,
             function(v)
                 db.renownScale = v
-                if renownFrame then renownFrame:SetScale(v) end
+                if renownFrame then
+                    renownFrame:SetScale(v)
+                    if MR.isForever then RefreshRenownFrame() end
+                end
             end,
             0.55, 0.22, 0.82, MR.db.profile.syncWindowScale == true)
     else

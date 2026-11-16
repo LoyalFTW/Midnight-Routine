@@ -1144,6 +1144,28 @@ function ns.StyledFrame(parent, name, strata, level)
     return frame
 end
 
+function ns.CreateManagedResizeGrip(frame, headerBottom, isLocked)
+    local grip = CreateFrame("Frame", nil, frame)
+    local corner = headerBottom and "TOPRIGHT" or "BOTTOMRIGHT"
+    grip:SetSize(12, 12)
+    grip:SetPoint(corner, frame, corner, -1, headerBottom and -1 or 1)
+    grip:SetFrameLevel(frame:GetFrameLevel() + 10)
+    grip:EnableMouse(true)
+
+    local texture = grip:CreateTexture(nil, "OVERLAY")
+    texture:SetAllPoints()
+    texture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetScript("OnEnter", function()
+        if not isLocked() then
+            texture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+        end
+    end)
+    grip:SetScript("OnLeave", function()
+        texture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    end)
+    return grip
+end
+
 function ns.TopAccent(parent, r, g, b)
     r, g, b = r or DEFAULT_ACCENT[1], g or DEFAULT_ACCENT[2], b or DEFAULT_ACCENT[3]
     local tex = parent:CreateTexture(nil, "BORDER")

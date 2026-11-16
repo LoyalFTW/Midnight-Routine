@@ -260,21 +260,10 @@ local function BuildGatheringLocationsFrame(isRetry)
     local yOff = 0
     local RenderContent
 
-    local dragger = CreateFrame("Frame", nil, frame)
-    dragger:SetSize(12, 12)
-    if headerBottom then
-        dragger:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
-    else
-        dragger:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
-    end
-    dragger:SetFrameLevel(frame:GetFrameLevel() + 10)
-    dragger:EnableMouse(true)
+    local dragger = ns.CreateManagedResizeGrip(frame, headerBottom, function()
+        return db.gatheringLocked
+    end)
     frame._dragger = dragger
-    local dTex = dragger:CreateTexture(nil, "OVERLAY")
-    dTex:SetAllPoints()
-    dTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    dragger:SetScript("OnEnter", function() if not db.gatheringLocked then dTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight") end end)
-    dragger:SetScript("OnLeave", function() dTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up") end)
 
     local dragStartW, dragStartH, dragStartX, dragStartY
     local function UpdateGatheringResize()

@@ -46,7 +46,10 @@ function MR:ApplyScaleToAll(v)
     local rf = self.raresFrame
     if rf and rf:IsShown() then rf:SetScale(v) end
     local rnf = self.renownFrame
-    if rnf and rnf:IsShown() then rnf:SetScale(v) end
+    if rnf and rnf:IsShown() then
+        rnf:SetScale(v)
+        if self.isForever then self:RefreshRenown() end
+    end
     local gf = self.gatheringLocationsFrame
     if gf and gf:IsShown() then gf:SetScale(v) end
     if self.detachedFrames then
