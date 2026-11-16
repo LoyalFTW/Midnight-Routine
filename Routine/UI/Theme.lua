@@ -1,4 +1,4 @@
-local _, ns = ...
+local addonName, ns = ...
 if ns.Inactive then return end
 local LSM = LibStub and LibStub:GetLibrary("LibSharedMedia-3.0", true)
 ns.MEDIA_DEFAULT_TOKEN = "__MIDNIGHT_DEFAULT__"
@@ -191,6 +191,12 @@ local function HasCustomBackground(profile)
         and profile.backgroundMedia ~= ns.MEDIA_DEFAULT_TOKEN
 end
 
+local headerMedia = "Interface\\AddOns\\" .. addonName .. "\\Media\\"
+local titlePieceAtlases = {
+    TopLeftCorner = "UI-Frame-Metal-CornerTopLeft",
+    TopEdge = "_UI-Frame-Metal-EdgeTop",
+    TopRightCorner = "UI-Frame-Metal-CornerTopRight",
+}
 local interfaceThemes = {
     retail = {
         background = "Interface\\FrameGeneral\\UI-Background-Rock",
@@ -207,7 +213,12 @@ local interfaceThemes = {
         windowTitleOffsetY = 2,
         neutralHeaderArtOnForever = true,
         titleTint = { 1, 1, 1 },
-        headerAtlas = "UI-Character-Info-Title",
+        headerTexture = headerMedia .. "SectionHeaderRetail",
+        titlePieces = {
+            TopLeftCorner = { file = 2406979, size = 150, coords = { 1/512, 151/512, 1/512, 151/512 } },
+            TopEdge = { file = 2406987, size = 150, coords = { 0, 1, 1/256, 151/256 } },
+            TopRightCorner = { file = 2406979, size = 150, coords = { 153/512, 303/512, 1/512, 151/512 } },
+        },
         headerTint = { 1, 1, 1 },
         headerColor = { 0.16, 0.15, 0.14 },
         contentTint = { 0.095, 0.09, 0.085 },
@@ -231,7 +242,12 @@ local interfaceThemes = {
         windowTitleLeftAdjustment = -1,
         windowTitleRightAdjustment = 1,
         titleTint = { 0.94, 0.76, 0.55 },
-        headerAtlas = "UI-Character-Info-Title",
+        headerTexture = headerMedia .. "SectionHeaderForever",
+        titleTextures = {
+            TopLeftCorner = { file = headerMedia .. "TitleCornersForever", left = 20/512, right = 190/512, width = 170 },
+            TopEdge = { file = headerMedia .. "TitleEdgeForever", left = 0, right = 1 },
+            TopRightCorner = { file = headerMedia .. "TitleCornersForever", left = 192/512, right = 382/512, width = 190 },
+        },
         headerTint = { 0.95, 0.90, 0.80 },
         headerColor = { 0.24, 0.19, 0.13 },
         contentTint = { 0.12, 0.095, 0.065 },
@@ -265,21 +281,31 @@ end
 
 function ns.ApplyInterfaceHeader(texture, alpha, title, customColor, windowTitle)
     local theme = ns.GetInterfaceTheme()
-    local atlas = theme and (title and theme.titleAtlas or theme.headerAtlas)
+    local canSlice = texture.SetTextureSliceMargins and texture.SetTextureSliceMode and Enum and Enum.UITextureSliceMode
+    if theme and not title and not customColor and canSlice then
+        texture:SetTexture(theme.headerTexture)
+        texture:SetTexCoord(0, 1, 0, 1)
+        texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
+        texture:SetTextureSliceMargins(12, 0, 12, 0)
+        texture:SetDesaturated(false)
+        local tint = theme.headerTint
+        texture:SetVertexColor(tint[1], tint[2], tint[3], alpha)
+        return true
+    end
+
+    local atlas = theme and title and theme.titleAtlas
     if theme and windowTitle and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(theme.windowTitleAtlas) then
         atlas = theme.windowTitleAtlas
     end
     local atlasInfo = atlas and not customColor and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
-    local canSlice = texture.SetTextureSliceMargins and texture.SetTextureSliceMode and Enum and Enum.UITextureSliceMode
-    if atlasInfo and (title or canSlice) then
+    if atlasInfo then
         if texture:GetAtlas() ~= atlas then texture:SetAtlas(atlas) end
         if canSlice then
-            local capWidth = title and 0 or math.min(12, math.floor((atlasInfo.width or 48) / 4))
             texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
-            texture:SetTextureSliceMargins(capWidth, 0, capWidth, 0)
+            texture:SetTextureSliceMargins(0, 0, 0, 0)
         end
         texture:SetDesaturated(not not (theme.neutralHeaderArtOnForever and ns.MR and ns.MR.isForever))
-        local tint = title and theme.titleTint or theme.headerTint
+        local tint = theme.titleTint
         texture:SetVertexColor(tint[1], tint[2], tint[3], alpha)
         return true
     end
@@ -575,6 +601,62 @@ local function JoinPanelBorderToTitle(frame, border, theme)
     end
 end
 
+local function ApplyNativeTitleArt(panel, theme)
+    if panel._mrArtTheme == theme then return end
+    local r, g, b = unpack(theme.titleTint)
+    local nativeForever = theme.titleTextures and ns.MR and ns.MR.isForever
+    local titleTextures = not nativeForever and theme.titleTextures
+    panel.NineSlice:SetShown(not titleTextures)
+    if titleTextures and not panel._mrTitleTextures then
+        local left = panel:CreateTexture(nil, "BACKGROUND")
+        local right = panel:CreateTexture(nil, "BACKGROUND")
+        local edge = panel:CreateTexture(nil, "BACKGROUND")
+        left:SetPoint("TOPLEFT", panel, "TOPLEFT")
+        left:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT")
+        right:SetPoint("TOPRIGHT", panel, "TOPRIGHT")
+        right:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT")
+        edge:SetPoint("TOPLEFT", left, "TOPRIGHT")
+        edge:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
+        panel._mrTitleTextures = { TopLeftCorner = left, TopRightCorner = right, TopEdge = edge }
+    end
+    if panel._mrTitleTextures then
+        for name, piece in pairs(panel._mrTitleTextures) do
+            local art = titleTextures and titleTextures[name]
+            piece:SetShown(art ~= nil)
+            if art then
+                piece:SetTexture(art.file)
+                piece:SetTexCoord(art.left, art.right, 21/256, 86/256)
+                piece:SetVertexColor(r, g, b)
+                if art.width then piece:SetWidth(art.width * 22 / 65) end
+            end
+        end
+    end
+    panel._mrArtTheme = theme
+    if titleTextures then return end
+
+    for name, atlas in pairs(titlePieceAtlases) do
+        local piece = panel.NineSlice[name]
+        if piece then
+            local art = theme.titlePieces and theme.titlePieces[name]
+            local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
+            if info and (nativeForever or info.file == art.file) then
+                piece:SetTexCoord(0, 1, 0, 1)
+                piece:SetAtlas(atlas, true)
+                piece:SetHorizTile(info.tilesHorizontally)
+            elseif art then
+                local tiled = name == "TopEdge"
+                piece:SetTexture(art.texture or art.file, tiled and "REPEAT" or "CLAMP")
+                piece:SetTexCoord(unpack(art.coords))
+                piece:SetHorizTile(tiled)
+                piece:SetHeight(art.size)
+                if not tiled then piece:SetWidth(art.size) end
+            end
+            piece:SetDesaturated(false)
+            piece:SetVertexColor(r, g, b)
+        end
+    end
+end
+
 local function ApplyBackdropColor(frame, theme, custom, r, g, b, a)
     local art = frame._mrBackdropArt
     local role = frame._mrBackdropRole
@@ -604,6 +686,8 @@ local function ApplyBackdropColor(frame, theme, custom, r, g, b, a)
         local border = panel.NineSlice
         local function PositionTitlePieces()
             local currentTheme = GetBackdropTheme(frame)
+            local useBundledTitle = currentTheme and currentTheme.titleTextures and not (ns.MR and ns.MR.isForever)
+            panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", useBundledTitle and -(trim.right or -2) or 0, 0)
             local offsetX = currentTheme and currentTheme.windowTitleOffsetX or 0
             local leftAdjustment = currentTheme and currentTheme.windowTitleLeftAdjustment or 0
             local rightAdjustment = currentTheme and currentTheme.windowTitleRightAdjustment or 0
@@ -626,13 +710,8 @@ local function ApplyBackdropColor(frame, theme, custom, r, g, b, a)
         local parentColor = frame:GetParent()._mrBackgroundColor
         frame._mrNativeTitle:SetAlpha(role == "trackerTitle" and parentColor and parentColor[4] or a)
         if theme then
+            ApplyNativeTitleArt(frame._mrNativeTitle, theme)
             frame._mrNativeTitle._mrPositionTitlePieces()
-            local tr, tg, tb = unpack(theme.titleTint)
-            local neutral = theme.neutralHeaderArtOnForever and ns.MR and ns.MR.isForever
-            for _, piece in ipairs({ frame._mrNativeTitle.NineSlice:GetRegions() }) do
-                piece:SetDesaturated(not not neutral)
-                piece:SetVertexColor(tr, tg, tb)
-            end
         end
         local owner = frame:GetParent()
         local outerBorder = owner and owner._mrNativeBorder
