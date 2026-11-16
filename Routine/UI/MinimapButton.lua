@@ -8,7 +8,7 @@ local L       = LibStub("AceLocale-3.0"):GetLocale("MidnightRoutine")
 
 local GLOW_PULSE_INTERVAL = 1.5
 local LDB_NAME = "MidnightRoutine"
-local MINIMAP_ICON = "Interface\\AddOns\\MidnightRoutine\\Media\\MinimapIcon.tga"
+local MINIMAP_ICON = "Interface\\AddOns\\MidnightRoutine\\Media\\MinimapIcon.blp"
 
 local function StopGlow()
     if MR._firstSeenGlowTimer then

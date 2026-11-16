@@ -213,13 +213,15 @@ local interfaceThemes = {
         windowTitleOffsetY = 2,
         neutralHeaderArtOnForever = true,
         titleTint = { 1, 1, 1 },
-        headerTexture = headerMedia .. "SectionHeaderRetail",
-        titlePieces = {
-            TopLeftCorner = { file = 2406979, size = 150, coords = { 1/512, 151/512, 1/512, 151/512 } },
-            TopEdge = { file = 2406987, size = 150, coords = { 0, 1, 1/256, 151/256 } },
-            TopRightCorner = { file = 2406979, size = 150, coords = { 153/512, 303/512, 1/512, 151/512 } },
+        titleAtlasFiles = { TopLeftCorner = 2406979, TopEdge = 2406987, TopRightCorner = 2406979 },
+        titleTexturesOnForever = true,
+        titleCropHeight = 52,
+        titleTextureHeight = 64,
+        titleTextures = {
+            TopLeftCorner = { file = headerMedia .. "TitleCornersRetail.blp", left = 0, right = 0.5 },
+            TopEdge = { file = headerMedia .. "TitleEdgeRetail.blp", left = 0, right = 1 },
+            TopRightCorner = { file = headerMedia .. "TitleCornersRetail.blp", left = 0.5, right = 1 },
         },
-        headerTint = { 1, 1, 1 },
         headerColor = { 0.16, 0.15, 0.14 },
         contentTint = { 0.095, 0.09, 0.085 },
         contentBorder = { 0.27, 0.25, 0.22 },
@@ -241,15 +243,17 @@ local interfaceThemes = {
         windowTitleAtlas = "_UI-Frame-TitleTileBg",
         windowTitleLeftAdjustment = -1,
         windowTitleRightAdjustment = 1,
+        nativeTitleLeftTrim = -3,
         titleTint = { 0.94, 0.76, 0.55 },
-        headerTexture = headerMedia .. "SectionHeaderForever",
+        titleCropHeight = 65,
+        titleTextureHeight = 128,
         titleTextures = {
-            TopLeftCorner = { file = headerMedia .. "TitleCornersForever", left = 20/512, right = 190/512, width = 170 },
-            TopEdge = { file = headerMedia .. "TitleEdgeForever", left = 0, right = 1 },
-            TopRightCorner = { file = headerMedia .. "TitleCornersForever", left = 192/512, right = 382/512, width = 190 },
+            TopLeftCorner = { file = headerMedia .. "TitleCornersForever.blp", left = 0, right = 0.5 },
+            TopEdge = { file = headerMedia .. "TitleEdgeForever.blp", left = 0, right = 1 },
+            TopRightCorner = { file = headerMedia .. "TitleCornersForever.blp", left = 0.5, right = 1 },
         },
-        headerTint = { 0.95, 0.90, 0.80 },
         headerColor = { 0.24, 0.19, 0.13 },
+        sectionHeaderColor = { 52/255, 37/255, 24/255 },
         contentTint = { 0.12, 0.095, 0.065 },
         contentBorder = { 0.40, 0.32, 0.23 },
         cardTint = { 0.12, 0.088, 0.057 },
@@ -282,17 +286,6 @@ end
 function ns.ApplyInterfaceHeader(texture, alpha, title, customColor, windowTitle)
     local theme = ns.GetInterfaceTheme()
     local canSlice = texture.SetTextureSliceMargins and texture.SetTextureSliceMode and Enum and Enum.UITextureSliceMode
-    if theme and not title and not customColor and canSlice then
-        texture:SetTexture(theme.headerTexture)
-        texture:SetTexCoord(0, 1, 0, 1)
-        texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
-        texture:SetTextureSliceMargins(12, 0, 12, 0)
-        texture:SetDesaturated(false)
-        local tint = theme.headerTint
-        texture:SetVertexColor(tint[1], tint[2], tint[3], alpha)
-        return true
-    end
-
     local atlas = theme and title and theme.titleAtlas
     if theme and windowTitle and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(theme.windowTitleAtlas) then
         atlas = theme.windowTitleAtlas
@@ -311,7 +304,7 @@ function ns.ApplyInterfaceHeader(texture, alpha, title, customColor, windowTitle
     end
 
     if canSlice then texture:SetTextureSliceMargins(0, 0, 0, 0) end
-    local color = customColor or (theme and theme.headerColor)
+    local color = customColor or (theme and (not title and theme.sectionHeaderColor or theme.headerColor))
     if color then
         texture:SetDesaturated(false)
         texture:SetColorTexture(color[1], color[2], color[3], alpha)
@@ -601,11 +594,24 @@ local function JoinPanelBorderToTitle(frame, border, theme)
     end
 end
 
+local function GetBundledTitleTextures(theme)
+    if not theme then return end
+    local isForever = not not (ns.MR and ns.MR.isForever)
+    if isForever == not not theme.titleTexturesOnForever then
+        return theme.titleTextures
+    end
+    for name, atlas in pairs(titlePieceAtlases) do
+        local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
+        if not info or (theme.titleAtlasFiles and info.file ~= theme.titleAtlasFiles[name]) then
+            return theme.titleTextures
+        end
+    end
+end
+
 local function ApplyNativeTitleArt(panel, theme)
     if panel._mrArtTheme == theme then return end
     local r, g, b = unpack(theme.titleTint)
-    local nativeForever = theme.titleTextures and ns.MR and ns.MR.isForever
-    local titleTextures = not nativeForever and theme.titleTextures
+    local titleTextures = GetBundledTitleTextures(theme)
     panel.NineSlice:SetShown(not titleTextures)
     if titleTextures and not panel._mrTitleTextures then
         local left = panel:CreateTexture(nil, "BACKGROUND")
@@ -625,9 +631,9 @@ local function ApplyNativeTitleArt(panel, theme)
             piece:SetShown(art ~= nil)
             if art then
                 piece:SetTexture(art.file)
-                piece:SetTexCoord(art.left, art.right, 21/256, 86/256)
+                piece:SetTexCoord(art.left, art.right, 0, theme.titleCropHeight / theme.titleTextureHeight)
                 piece:SetVertexColor(r, g, b)
-                if art.width then piece:SetWidth(art.width * 22 / 65) end
+                if name ~= "TopEdge" then piece:SetWidth(32 * 22 / theme.titleCropHeight) end
             end
         end
     end
@@ -637,19 +643,11 @@ local function ApplyNativeTitleArt(panel, theme)
     for name, atlas in pairs(titlePieceAtlases) do
         local piece = panel.NineSlice[name]
         if piece then
-            local art = theme.titlePieces and theme.titlePieces[name]
             local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
-            if info and (nativeForever or info.file == art.file) then
+            if info then
                 piece:SetTexCoord(0, 1, 0, 1)
                 piece:SetAtlas(atlas, true)
                 piece:SetHorizTile(info.tilesHorizontally)
-            elseif art then
-                local tiled = name == "TopEdge"
-                piece:SetTexture(art.texture or art.file, tiled and "REPEAT" or "CLAMP")
-                piece:SetTexCoord(unpack(art.coords))
-                piece:SetHorizTile(tiled)
-                piece:SetHeight(art.size)
-                if not tiled then piece:SetWidth(art.size) end
             end
             piece:SetDesaturated(false)
             piece:SetVertexColor(r, g, b)
@@ -686,15 +684,22 @@ local function ApplyBackdropColor(frame, theme, custom, r, g, b, a)
         local border = panel.NineSlice
         local function PositionTitlePieces()
             local currentTheme = GetBackdropTheme(frame)
-            local useBundledTitle = currentTheme and currentTheme.titleTextures and not (ns.MR and ns.MR.isForever)
-            panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", useBundledTitle and -(trim.right or -2) or 0, 0)
+            local useBundledTitle = GetBundledTitleTextures(currentTheme)
+            local retailTitle = useBundledTitle and currentTheme.titleTexturesOnForever
+            local leftTrim = trim.left or 0
+            if currentTheme and currentTheme.nativeTitleLeftTrim and not useBundledTitle then
+                leftTrim = math.min(leftTrim, currentTheme.nativeTitleLeftTrim)
+            end
+            panel:SetPoint("TOPLEFT", frame, "TOPLEFT", retailTitle and 0 or leftTrim, trim.top or 0)
+            panel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT",
+                retailTitle and 1 or (useBundledTitle and -(trim.right or -2) or 0), 0)
             local offsetX = currentTheme and currentTheme.windowTitleOffsetX or 0
             local leftAdjustment = currentTheme and currentTheme.windowTitleLeftAdjustment or 0
             local rightAdjustment = currentTheme and currentTheme.windowTitleRightAdjustment or 0
             local offsetY = (22 - frame:GetHeight()) * 0.5 - 2
                 + (currentTheme and currentTheme.windowTitleOffsetY or 0) + (trim.top or 0)
             border:ClearAllPoints()
-            border:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX + (trim.left or 0) + leftAdjustment, offsetY)
+            border:SetPoint("TOPLEFT", frame, "TOPLEFT", offsetX + leftTrim + leftAdjustment, offsetY)
             border:SetPoint("TOPRIGHT", frame, "TOPRIGHT", offsetX + 4 + (trim.right or -2) + rightAdjustment, offsetY)
             border:SetHeight(100)
             if owner and owner._mrNativeBorder and owner._mrNativeTitleOwner == frame then

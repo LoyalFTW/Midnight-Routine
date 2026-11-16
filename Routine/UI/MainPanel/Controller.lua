@@ -262,15 +262,16 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     end
 
     if characterBar then
+        local inset = ns.GetInterfaceTheme() and 3 or 0
         characterBar:ClearAllPoints()
         characterBar:SetHeight(math.max(1, characterBarHeight))
         characterBar:SetShown(characterBarHeight > 0 and not minimized and not combatDisabled)
         if headerBottom then
-            characterBar:SetPoint("BOTTOMLEFT", titleBar, "TOPLEFT", 0, 0)
-            characterBar:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", 0, 0)
+            characterBar:SetPoint("BOTTOMLEFT", titleBar, "TOPLEFT", inset, 0)
+            characterBar:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -inset, 0)
         else
-            characterBar:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 0, 0)
-            characterBar:SetPoint("TOPRIGHT", titleBar, "BOTTOMRIGHT", 0, 0)
+            characterBar:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", inset, 0)
+            characterBar:SetPoint("TOPRIGHT", titleBar, "BOTTOMRIGHT", -inset, 0)
         end
     end
 
