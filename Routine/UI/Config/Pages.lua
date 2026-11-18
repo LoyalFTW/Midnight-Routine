@@ -522,18 +522,16 @@ function MR:PopulateConfigFrame(f)
             Checkbox(L["Config_RaresUnitTooltip"],
                 function() return MR.db.profile.raresUnitTooltip ~= false end,
                 function(v) MR.db.profile.raresUnitTooltip = v and true or false end)
-        end
-        Gap(4); Divider()
-        SectionLabel(L["Config_SectionAdventureGuide"] or "ADVENTURE GUIDE")
-        Checkbox(L["Config_HideAdventureGuideBossIDs"],
-            function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
-            function(v)
-                MR.db.profile.hideAdventureGuideBossIDs = v and true or false
-                if MR.RefreshEncounterJournalOverlays then
-                    MR:RefreshEncounterJournalOverlays()
-                end
-            end)
-        if not MR.isForever then
+            Gap(4); Divider()
+            SectionLabel(L["Config_SectionAdventureGuide"] or "ADVENTURE GUIDE")
+            Checkbox(L["Config_HideAdventureGuideBossIDs"],
+                function() return MR.db.profile.hideAdventureGuideBossIDs == true end,
+                function(v)
+                    MR.db.profile.hideAdventureGuideBossIDs = v and true or false
+                    if MR.RefreshEncounterJournalOverlays then
+                        MR:RefreshEncounterJournalOverlays()
+                    end
+                end)
             Gap(4); Divider()
             SectionLabel(L["GreatVault_Title"])
             Checkbox(L["Config_CompactGreatVault"],
