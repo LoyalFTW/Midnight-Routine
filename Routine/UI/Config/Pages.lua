@@ -533,14 +533,16 @@ function MR:PopulateConfigFrame(f)
                     MR:RefreshEncounterJournalOverlays()
                 end
             end)
-        Gap(4); Divider()
-        SectionLabel(L["GreatVault_Title"])
-        Checkbox(L["Config_CompactGreatVault"],
-            function() return MR.db and MR.db.profile and MR.db.profile.greatVaultCombined == true end,
-            function(v)
-                MR.db.profile.greatVaultCombined = v and true or false
-                MR:RefreshUI()
-            end, "#ff8000")
+        if not MR.isForever then
+            Gap(4); Divider()
+            SectionLabel(L["GreatVault_Title"])
+            Checkbox(L["Config_CompactGreatVault"],
+                function() return MR.db and MR.db.profile and MR.db.profile.greatVaultCombined == true end,
+                function(v)
+                    MR.db.profile.greatVaultCombined = v and true or false
+                    MR:RefreshUI()
+                end, "#ff8000")
+        end
     elseif activePage == "layout" then
         ChoiceDropdown(L["Config_InterfaceTheme"], {
             { label = L["Config_InterfaceThemeRoutine"], value = "routine" },
