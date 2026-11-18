@@ -356,6 +356,15 @@ local function CaptureOpenBank()
     RoutineData:CaptureWarbandBank()
 end
 
+local function OpenGuildBank()
+    if state.guildBankOpen then return end
+    local session = {}
+    state.guildBankOpen = session
+    C_Timer.After(0.4, function()
+        if state.guildBankOpen == session then RoutineData:CaptureGuildBank() end
+    end)
+end
+
 local handlers = {
     PLAYER_ENTERING_WORLD = function(isInitialLogin, isReloadingUi)
         local captureEquipped = isInitialLogin or isReloadingUi or isInitialLogin == nil
@@ -411,10 +420,7 @@ local handlers = {
         if state.mailOpen then Debounced("mail", function() RoutineData:CaptureMail() end) end
     end,
     GUILDBANKFRAME_OPENED = function()
-        state.guildBankOpen = true
-        C_Timer.After(0.4, function()
-            if state.guildBankOpen then RoutineData:CaptureGuildBank() end
-        end)
+        OpenGuildBank()
     end,
     GUILDBANKFRAME_CLOSED = function()
         state.guildBankOpen = nil
@@ -427,10 +433,7 @@ local handlers = {
     end,
     PLAYER_INTERACTION_MANAGER_FRAME_SHOW = function(interactionType)
         if Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
-            state.guildBankOpen = true
-            C_Timer.After(0.4, function()
-                if state.guildBankOpen then RoutineData:CaptureGuildBank() end
-            end)
+            OpenGuildBank()
         end
     end,
     PLAYER_INTERACTION_MANAGER_FRAME_HIDE = function(interactionType)

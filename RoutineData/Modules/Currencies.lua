@@ -24,11 +24,11 @@ local function StoreEntry(record, currencyID, info)
         record.currencies[currencyID] = nil
         return
     end
-    record.currencies[currencyID] = {
-        q = quantity,
-        w = tonumber(info.quantityEarnedThisWeek) or 0,
-        mw = tonumber(info.maxWeeklyQuantity) or 0,
-    }
+    local weekly = tonumber(info.quantityEarnedThisWeek) or 0
+    local maxWeekly = tonumber(info.maxWeeklyQuantity) or 0
+    local entry = record.currencies[currencyID]
+    if entry and entry.q == quantity and entry.w == weekly and entry.mw == maxWeekly then return end
+    record.currencies[currencyID] = { q = quantity, w = weekly, mw = maxWeekly }
 end
 
 local function CurrencyIDFromLink(link)
@@ -108,7 +108,7 @@ function RoutineData:ScanCurrencies()
         end
         record.classFile = select(2, UnitClass("player")) or record.classFile
         record.updatedAt.currencies = Now()
-        RestoreCollapsedHeaders(collapsed)
+        if next(collapsed) then RestoreCollapsedHeaders(collapsed) end
     end)
     scanning = nil
     if not ok then
