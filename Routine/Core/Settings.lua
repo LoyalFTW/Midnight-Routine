@@ -848,15 +848,16 @@ function MR:IsCursorWithinBounds(target)
     end
 
     local cursorX, cursorY = GetCursorPosition()
-    local uiScale = UIParent and UIParent:GetEffectiveScale() or 1
-    cursorX = cursorX / uiScale
-    cursorY = cursorY / uiScale
+    local scale = target:GetEffectiveScale()
+    cursorX = cursorX / scale
+    cursorY = cursorY / scale
 
     return cursorX >= left and cursorX <= right and cursorY >= bottom and cursorY <= top
 end
 
 function MR:ApplyPanelHeaderAutoHide(frame, titleBar, shouldHideFunc)
     if not frame or not titleBar then return end
+    titleBar._mrExpandedHeight = titleBar:GetHeight()
 
     if not frame._mrPanelHeaderAutoHideHooked then
         frame._mrHeaderHoverElapsed = 0
@@ -876,6 +877,14 @@ function MR:ApplyPanelHeaderAutoHide(frame, titleBar, shouldHideFunc)
                 self:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(self))
             end
         end)
+        frame:HookScript("OnUpdate", function(self, elapsed)
+            if not self._mrPanelHeaderAutoHideEnabled then return end
+            self._mrHeaderHoverElapsed = self._mrHeaderHoverElapsed + elapsed
+            if self._mrHeaderHoverElapsed >= 0.08 then
+                self._mrHeaderHoverElapsed = 0
+                self:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(self))
+            end
+        end)
         frame._mrPanelHeaderAutoHideHooked = true
     end
 
@@ -884,11 +893,25 @@ function MR:ApplyPanelHeaderAutoHide(frame, titleBar, shouldHideFunc)
         if shouldHideFunc then
             hideHeaders = hideHeaders or shouldHideFunc(self)
         end
-        titleBar:SetAlpha((hideHeaders and not isHovering) and 0 or 1)
-        self._mrHeaderHovering = isHovering
+        self._mrPanelHeaderAutoHideEnabled = hideHeaders
+        local show = not hideHeaders or isHovering or self:GetHeight() <= titleBar._mrExpandedHeight + 1
+        if titleBar:IsShown() == show then return end
+        titleBar:SetHeight(show and titleBar._mrExpandedHeight or 1)
+        titleBar:SetShown(show)
+        if self.OnPanelHeaderLayoutChanged then
+            self:OnPanelHeaderLayoutChanged()
+        end
+        ns.RefreshPanelTitleBorder(self)
     end
 
     frame:UpdatePanelHeaderVisibility(MR:IsCursorWithinBounds(frame))
+end
+
+function MR:SetPanelHeaderHeight(titleBar, height)
+    titleBar._mrExpandedHeight = height
+    if titleBar:IsShown() then
+        titleBar:SetHeight(height)
+    end
 end
 
 function MR:RefreshPanelHeaderVisibility(frame)

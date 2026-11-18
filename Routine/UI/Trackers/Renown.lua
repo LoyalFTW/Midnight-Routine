@@ -488,9 +488,20 @@ local function BuildRenownFrame()
         AddReputationResizeGrip(f)
     end
 
-    local rowParent = f.reputationContent or f
+    local rowParent = f.reputationContent
+    if not rowParent then
+        rowParent = CreateFrame("Frame", nil, f)
+        if headerBottom then
+            rowParent:SetPoint("TOPLEFT", f, "TOPLEFT")
+            rowParent:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT")
+        else
+            rowParent:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT")
+            rowParent:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT")
+        end
+    end
+    f.rowParent = rowParent
     local rowInset = f.reputationContent and 0 or PAD
-    local rowStart = f.reputationContent and PAD or (HEADER_H + PAD)
+    local rowStart = PAD
     local yOff = emblemMode and 1 or rowStart
 
     for i, faction in ipairs(GetOrderedFactions()) do
@@ -720,8 +731,8 @@ local function BuildRenownFrame()
     local divider = f:CreateTexture(nil, "ARTWORK")
     f.divider = divider
     if headerBottom then
-        divider:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  3, HEADER_H + 3)
-        divider:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, HEADER_H + 3)
+        divider:SetPoint("BOTTOMLEFT",  titleBar, "TOPLEFT",  3, 3)
+        divider:SetPoint("BOTTOMRIGHT", titleBar, "TOPRIGHT", -3, 3)
     else
         divider:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  3, 3)
         divider:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, 3)
@@ -831,9 +842,9 @@ RefreshRenownFrame = function(onHeightFinished)
     local headerBottom = renownFrame.headerBottom == true
     local scroll = renownFrame.reputationScroll
     local content = renownFrame.reputationContent
-    local rowParent = content or renownFrame
+    local rowParent = renownFrame.rowParent
     local rowInset = content and 0 or pad
-    local rowStart = content and pad or (headerH + pad)
+    local rowStart = pad
 
     if minimized then
         if scroll then
@@ -848,7 +859,7 @@ RefreshRenownFrame = function(onHeightFinished)
         if renownFrame.divider then
             renownFrame.divider:Hide()
         end
-        renownFrame:SetHeight((renownFrame.titleBar and renownFrame.titleBar:GetHeight()) or 24)
+        renownFrame:SetHeight(headerH)
         return
     end
 

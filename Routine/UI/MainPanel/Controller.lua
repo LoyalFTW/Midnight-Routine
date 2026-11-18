@@ -232,7 +232,7 @@ local function IsMainCombatDisabled()
     return MR and MR.IsCombatUpdatesDisabled and MR:IsCombatUpdatesDisabled()
 end
 
-local function ApplyMainFrameLayout(frame, preserveScreenPosition)
+local function ApplyMainFrameLayout(frame, preserveScreenPosition, headerOnly)
     if not frame then
         return
     end
@@ -317,7 +317,7 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
         end
     end
 
-    if minimized then
+    if minimized and not headerOnly then
         frame:SetHeight(GetMainFrameCollapsedHeight())
     end
     if MR and MR._combatDisabledFrame then
@@ -326,7 +326,9 @@ local function ApplyMainFrameLayout(frame, preserveScreenPosition)
     if MR and MR.titleCount then
         MR.titleCount:SetShown(not combatDisabled)
     end
-    ApplyMainFrameAnchor(frame, GetMainHeaderPosition(), preserveScreenPosition == true)
+    if not headerOnly then
+        ApplyMainFrameAnchor(frame, GetMainHeaderPosition(), preserveScreenPosition == true)
+    end
 end
 
 ns.GetMainHeaderPosition     = GetMainHeaderPosition
@@ -443,7 +445,6 @@ function MR:BuildUI()
             MR:PositionConfigFrame(configFrame)
         end
     end)
-    if MR.ApplyPanelHeaderAutoHide then MR:ApplyPanelHeaderAutoHide(f, titleBar) end
 
     local titleAccent = titleBar:CreateTexture(nil, "ARTWORK")
     MR._titleAccent = titleAccent
@@ -786,7 +787,7 @@ function MR:BuildUI()
 
     local function RefreshMainHeaderChrome()
         local metrics = GetMainHeaderMetrics()
-        titleBar:SetHeight(metrics.headerHeight)
+        MR:SetPanelHeaderHeight(titleBar, metrics.headerHeight)
         closeBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
         minBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
         cfgBtn:SetSize(metrics.buttonSize, metrics.buttonSize)
@@ -992,6 +993,10 @@ function MR:BuildUI()
     tickFrame:SetShown(self:HasVisibleMainTrackingSurface())
     if tickFrame:IsShown() then UpdateTimerRowTicker() end
 
+    f.OnPanelHeaderLayoutChanged = function(frame)
+        ApplyMainFrameLayout(frame, false, true)
+    end
+    MR:ApplyPanelHeaderAutoHide(f, titleBar)
     ApplyMainFrameLayout(f)
     if self.ActivateVisibleTrackingSurface then
         self:ActivateVisibleTrackingSurface()

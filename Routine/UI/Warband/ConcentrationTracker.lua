@@ -64,7 +64,7 @@ local function WBApplyConcentrationTrackerLayout(frame)
     local headerHeight = math.max(24, GetFontSize() + 11)
     WBApplyConcentrationTrackerTheme(frame)
     if frame.titleBar then
-        frame.titleBar:SetHeight(headerHeight)
+        MR:SetPanelHeaderHeight(frame.titleBar, headerHeight)
     end
     if frame.body then frame.body:SetShown(not minimized) end
     if frame.summary then frame.summary:SetShown(not minimized and not WBIsConcentrationTrackerCompact()) end
@@ -206,14 +206,14 @@ function MR:ToggleConcentrationTracker()
 
         local summary = frame:CreateFontString(nil, "OVERLAY")
         summary:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        summary:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -30)
-        summary:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, -30)
+        summary:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 14, -6)
+        summary:SetPoint("TOPRIGHT", titleBar, "BOTTOMRIGHT", -14, -6)
         summary:SetJustifyH("LEFT")
         summary:SetTextColor(0.64, 0.74, 0.84)
 
         local scroll, content, scrollUpdate, scrollTrack = WBCreateScrollArea(
             frame,
-            { "TOPLEFT", frame, "TOPLEFT", 14, -54 },
+            { "TOPLEFT", titleBar, "BOTTOMLEFT", 14, -30 },
             { "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -18, 14 }
         )
         content:SetSize(400, 1)

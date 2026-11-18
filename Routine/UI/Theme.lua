@@ -575,7 +575,7 @@ end
 local function JoinPanelBorderToTitle(frame, border, theme)
     local title = frame._mrNativeTitleOwner
     local anchor = title and title:GetPoint()
-    local join = theme and title and anchor and anchor:find("^TOP")
+    local join = theme and title and title:IsShown() and anchor and anchor:find("^TOP")
     for _, name in ipairs({ "TopLeftCorner", "TopRightCorner", "TopEdge" }) do
         local piece = border[name]
         if piece then piece:SetShown(not join) end
@@ -591,6 +591,12 @@ local function JoinPanelBorderToTitle(frame, border, theme)
                 edge:SetPoint(point, corner, "BOTTOM" .. side:upper(), 0, 0)
             end
         end
+    end
+end
+
+function ns.RefreshPanelTitleBorder(frame)
+    if frame._mrNativeBorder then
+        JoinPanelBorderToTitle(frame, frame._mrNativeBorder, GetBackdropTheme(frame))
     end
 end
 
