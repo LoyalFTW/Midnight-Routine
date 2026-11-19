@@ -52,6 +52,7 @@ UI/Trackers/Forever.lua
 UI/Trackers/Darkmoon.lua
 UI/Trackers/CurrencyBrowser.lua
 UI/Trackers/Renown.lua
+UI/Trackers/Skills.lua
 UI/Trackers/Rares.lua
 UI/Trackers/ProfessionKnowledge/ProfessionKnowledge.xml
 

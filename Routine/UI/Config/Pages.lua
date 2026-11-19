@@ -238,6 +238,9 @@ function MR:PopulateConfigFrame(f)
             MR.renownFrame:ClearAllPoints()
             RestoreFramePos(MR.renownFrame, "renownPos", 300, 0)
         end
+        if MR.skillsFrame then
+            MR.skillsFrame:RefreshSavedLayout()
+        end
         if MR.gatheringLocationsFrame then
             MR.gatheringLocationsFrame:ClearAllPoints()
             RestoreFramePos(MR.gatheringLocationsFrame, "gatheringLocPos", 860, 0)
@@ -327,6 +330,19 @@ function MR:PopulateConfigFrame(f)
                 if v and MR.EnsureRenownShown then MR:EnsureRenownShown()
                 elseif not v and MR.HideRenown then MR:HideRenown() end
             end, "#d9b82e")
+
+        if MR.isForever then
+            Checkbox(L["Forever_OpenSkills"],
+                function() return MR:GetManagedWindowOpen("skillsOpen") end,
+                function(v)
+                    if v then
+                        MR:ClearManagedWindowsBundleHidden()
+                        MR:EnsureSkillsShown()
+                    else
+                        MR:HideSkills()
+                    end
+                end, "#d9b82e")
+        end
 
         if not MR.isForever or not ns.Forever.hideRares then
         Checkbox(L["Config_OpenRares"],
@@ -431,6 +447,7 @@ function MR:PopulateConfigFrame(f)
                 if MR.RefreshPanelHeaderVisibility then
                     MR:RefreshPanelHeaderVisibility(MR.frame)
                     MR:RefreshPanelHeaderVisibility(MR.renownFrame)
+                    MR:RefreshPanelHeaderVisibility(MR.skillsFrame)
                     MR:RefreshPanelHeaderVisibility(MR.raresFrame)
                     MR:RefreshPanelHeaderVisibility(MR.gatheringLocationsFrame)
                     MR:RefreshPanelHeaderVisibility(MR.concentrationTrackerFrame)
@@ -698,6 +715,9 @@ function MR:PopulateConfigFrame(f)
                 end
                 if MR.RebuildRenownFrame then
                     MR:RebuildRenownFrame()
+                end
+                if MR.skillsFrame then
+                    MR.skillsFrame:RefreshHeaderPosition()
                 end
                 if MR.RebuildGatheringLocationsFrame then
                     MR:RebuildGatheringLocationsFrame()

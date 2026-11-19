@@ -131,6 +131,7 @@ local DEFAULTS = {
         collapsedPosition = nil,
         panelOpen          = true,
         renownOpen          = false,
+        skillsOpen          = false,
         raresOpen           = false,
         concentrationTrackerOpen = false,
         raresPos            = nil,
@@ -227,6 +228,7 @@ local DEFAULTS = {
         patchStates = {},
     },
     char = {
+        skillsPinned = {},
         progress = {},
         professions = {},
         professionsScanned = false,

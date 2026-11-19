@@ -860,6 +860,7 @@ function MR:CaptureManagedWindowState()
     return {
         panel = self.frame and self.frame:IsShown() or false,
         renown = self.renownFrame and self.renownFrame:IsShown() or false,
+        skills = self.skillsFrame and self.skillsFrame:IsShown() or nil,
         rares = self.raresFrame and self.raresFrame:IsShown() or false,
         gathering = self.gatheringLocationsFrame and self.gatheringLocationsFrame:IsShown() or false,
         concentration = self.concentrationTrackerFrame and self.concentrationTrackerFrame:IsShown() or false,
@@ -871,6 +872,7 @@ function MR:ManagedWindowStateHasVisibleFrames(state)
     if not state then return false end
     return state.panel
         or state.renown
+        or state.skills
         or state.rares
         or state.gathering
         or state.concentration
@@ -928,6 +930,7 @@ function MR:PersistManagedWindowState(state)
 
     self:SetMainPanelOpen(state.panel, true)
     self:SetManagedWindowOpen("renownOpen", state.renown)
+    if self.isForever then self:SetManagedWindowOpen("skillsOpen", state.skills) end
     self:SetManagedWindowOpen("raresOpen", state.rares)
     self:SetManagedWindowOpen("gatheringLocOpen", state.gathering)
     self:SetManagedWindowOpen("concentrationTrackerOpen", state.concentration)
@@ -967,6 +970,7 @@ function MR:HideManagedWindows(persistState)
     if self.HideConfig then self:HideConfig() end
     if self.welcomeFrame then self.welcomeFrame:Hide() end
     if self.HideRenown then self:HideRenown(false) end
+    if self.HideSkills then self:HideSkills(false) end
     if self.HideRares then self:HideRares(false) end
     if self.HideGatheringLocations then self:HideGatheringLocations(false) end
     if self.HideConcentrationTracker then self:HideConcentrationTracker(false) end
@@ -978,6 +982,7 @@ function MR:AutoHideManagedWindowsOnLogin()
     local state = self:CaptureManagedWindowState()
     state.panel = self:GetMainPanelOpen()
     state.renown = self:GetManagedWindowOpen("renownOpen")
+    state.skills = self.isForever and self:GetManagedWindowOpen("skillsOpen") or nil
     state.rares = self:GetManagedWindowOpen("raresOpen")
     state.gathering = self:GetManagedWindowOpen("gatheringLocOpen")
     state.concentration = self:GetManagedWindowOpen("concentrationTrackerOpen")
@@ -1005,6 +1010,9 @@ function MR:RestoreManagedWindows(state, persistState)
 
     if state.renown and self.EnsureRenownShown then
         self:EnsureRenownShown()
+    end
+    if state.skills and self.EnsureSkillsShown then
+        self:EnsureSkillsShown()
     end
     if state.rares and self.EnsureRaresShown then
         self:EnsureRaresShown()

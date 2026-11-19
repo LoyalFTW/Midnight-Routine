@@ -179,6 +179,7 @@ local function PeekFrameList()
     if MR.frame                  then list[#list+1] = MR.frame end
     if MR.raresFrame             then list[#list+1] = MR.raresFrame end
     if MR.renownFrame            then list[#list+1] = MR.renownFrame end
+    if MR.skillsFrame            then list[#list+1] = MR.skillsFrame end
     if MR.gatheringLocationsFrame then list[#list+1] = MR.gatheringLocationsFrame end
     if MR.detachedFrames then
         for _, f in pairs(MR.detachedFrames) do

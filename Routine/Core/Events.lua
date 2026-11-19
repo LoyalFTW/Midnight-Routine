@@ -8,6 +8,7 @@ function MR:RestoreSavedManagedWindows()
     end
     local windows = {
         { "renownOpen", "renownFrame", "EnsureRenownShown" },
+        { "skillsOpen", "skillsFrame", "EnsureSkillsShown" },
         { "raresOpen", "raresFrame", "EnsureRaresShown" },
         { "gatheringLocOpen", "gatheringLocationsFrame", "EnsureGatheringLocationsShown" },
         { "concentrationTrackerOpen", "concentrationTrackerFrame", "EnsureConcentrationTrackerShown" },
@@ -102,6 +103,9 @@ function MR:OnEnteringWorld()
     if not shouldHideFrames and not temporarilyHidden and not self:IsManagedWindowsBundleHidden() then
         if self:GetManagedWindowOpen("renownOpen") and self.EnsureRenownShown then
             self:EnsureRenownShown()
+        end
+        if self.EnsureSkillsShown and self:GetManagedWindowOpen("skillsOpen") then
+            self:EnsureSkillsShown()
         end
         if self:GetManagedWindowOpen("raresOpen") and self.EnsureRaresShown then
             self:EnsureRaresShown()

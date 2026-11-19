@@ -43,6 +43,7 @@ function MR:ApplyScaleToAll(v)
     self.db.profile.renownScale    = v
     self.db.profile.gatheringScale = v
     if self.frame then self.frame:SetScale(v) end
+    if self.skillsFrame then self.skillsFrame:SetScale(v) end
     local rf = self.raresFrame
     if rf and rf:IsShown() then rf:SetScale(v) end
     local rnf = self.renownFrame
@@ -572,6 +573,7 @@ function MR:SetManagedWindowOpen(key, value)
     if self._instanceFramesHidden then
         local stateKey = ({
             renownOpen = "renown",
+            skillsOpen = "skills",
             raresOpen = "rares",
             gatheringLocOpen = "gathering",
             concentrationTrackerOpen = "concentration",
