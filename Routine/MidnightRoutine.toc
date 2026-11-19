@@ -25,6 +25,7 @@ Core/Dependencies.lua
 UI/Theme.lua
 UI/Components/Tooltip.lua
 UI/Components/Header.lua
+UI/Components/RowReorder.lua
 UI/Components/ScrollArea.lua
 UI/Components/Dropdown.lua
 UI/Components/WidgetCache.lua
