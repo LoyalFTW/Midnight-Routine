@@ -148,8 +148,12 @@ local function AddCurrencyLines(tooltip, currencyID)
             entries[#entries + 1] = currentEntry
         end
         currentEntry.quantity = quantity
-        currentEntry.weekly = SafeNumber(info.quantityEarnedThisWeek) or 0
-        currentEntry.maxWeekly = SafeNumber(info.maxWeeklyQuantity) or 0
+        local weekly = SafeNumber(info.quantityEarnedThisWeek)
+        if weekly ~= nil then
+            currentEntry.weekly = weekly
+            currentEntry.weeklyFresh = true
+        end
+        currentEntry.maxWeekly = SafeNumber(info.maxWeeklyQuantity) or currentEntry.maxWeekly or 0
     end
     if #entries == 0 then return end
 
@@ -160,15 +164,12 @@ local function AddCurrencyLines(tooltip, currencyID)
     end
     SortOwners(entries)
     AddSection(tooltip, L["Tooltip_CurrencyBalances"], total)
-    local lastReset = RoutineData:GetLastWeeklyReset()
     local shown = RoutineData:GetTooltipCharacterLimit(#entries)
     for index = 1, shown do
         local entry = entries[index]
         tooltip:AddDoubleLine(OwnerLabel(entry, current), FormatCount(entry.total), 0.90, 0.93, 0.96, 0.90, 0.93, 0.96)
         if entry.maxWeekly > 0 then
-            local record = RoutineData.db.characters[entry.key]
-            local updated = record and record.updatedAt and record.updatedAt.currencies or 0
-            if entry.key ~= current and updated < lastReset then
+            if not entry.weeklyFresh then
                 tooltip:AddLine("  " .. L["Tooltip_WeeklyNeedsLogin"], 0.85, 0.66, 0.35, true)
             else
                 local remaining = math.max(0, entry.maxWeekly - entry.weekly)

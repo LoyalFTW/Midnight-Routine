@@ -18,15 +18,17 @@ local function Label(key, default)
     return RoutineData:GetLabel(key, default)
 end
 
-local function SnapshotContainer(bagID, name, icon)
-    if not (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo) then return nil end
+local function SnapshotContainer(bagID, name, icon, requireComplete)
+    if not (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo) then return nil, true end
     local bagIndex = Enum and Enum.BagIndex or {}
     local getSlots = GetKeyRingSize and bagID == (bagIndex.Keyring or -2) and GetKeyRingSize or C_Container.GetContainerNumSlots
     local ok, slots = pcall(getSlots, bagID)
-    if not ok or type(slots) ~= "number" or slots <= 0 then return nil end
+    if not ok or type(slots) ~= "number" or slots < 0 then return nil, true end
+    if slots == 0 then return nil end
     local tab = { name = name, icon = icon, slots = slots, items = {} }
     for slot = 1, slots do
         local success, info = pcall(C_Container.GetContainerItemInfo, bagID, slot)
+        if requireComplete and (not success or (info and not info.itemID)) then return nil, true end
         if success and info and info.itemID then
             local link = info.hyperlink
             tab.items[slot] = {
@@ -86,26 +88,35 @@ local function CollectBags()
     return #tabs > 0 and tabs or nil
 end
 
+local function CollectPurchasedBank(bankType)
+    local metadata = BankMetadata(bankType)
+    if not metadata or #metadata == 0 then return nil end
+    local tabs = {}
+    for index, info in ipairs(metadata) do
+        local tab = SnapshotContainer(info.ID, info.name or string.format(Label("AltBoard_BankTab", "Tab %d"), index), info.icon, true)
+        if not tab then return nil end
+        tabs[index] = tab
+    end
+    return tabs
+end
+
 local function CollectCharacterBank()
     local bagIndex = Enum and Enum.BagIndex or {}
     local tabs = {}
     if not bagIndex.CharacterBankTab_1 then
-        AddTab(tabs, SnapshotContainer(bagIndex.Bank or -1, Label("AltBoard_BankMain", "Bank")))
+        local main = SnapshotContainer(bagIndex.Bank or -1, Label("AltBoard_BankMain", "Bank"), nil, true)
+        if not main then return nil end
+        tabs[1] = main
         for index = 1, 7 do
             local bagID = NUM_BAG_SLOTS and (NUM_BAG_SLOTS + index)
             if bagID then
-                AddTab(tabs, SnapshotContainer(bagID, string.format(Label("AltBoard_BankBag", "Bank bag %d"), index)))
+                local tab, unavailable = SnapshotContainer(bagID, string.format(Label("AltBoard_BankBag", "Bank bag %d"), index), nil, true)
+                if unavailable then return nil end
+                AddTab(tabs, tab)
             end
         end
     else
-        local metadata = BankMetadata(Enum and Enum.BankType and Enum.BankType.Character)
-        for index = 1, 9 do
-            local bagID = bagIndex["CharacterBankTab_" .. index]
-            if bagID then
-                local info = metadata and metadata[index]
-                AddTab(tabs, SnapshotContainer(bagID, (info and info.name) or string.format(Label("AltBoard_BankTab", "Tab %d"), index), info and info.icon))
-            end
-        end
+        return CollectPurchasedBank(Enum.BankType and Enum.BankType.Character)
     end
     return #tabs > 0 and tabs or nil
 end
@@ -117,25 +128,21 @@ local function CollectWarbandBank()
         local ok, reason = pcall(C_Bank.FetchBankLockedReason, Enum.BankType.Account)
         if not ok or (reason ~= nil and reason ~= (Enum.BankLockedReason and Enum.BankLockedReason.None or 0)) then return nil end
     end
-    local metadata = BankMetadata(Enum.BankType.Account)
-    local tabs = {}
-    for index = 1, 9 do
-        local bagID = Enum.BagIndex["AccountBankTab_" .. index]
-        if bagID then
-            local info = metadata and metadata[index]
-            AddTab(tabs, SnapshotContainer(bagID, (info and info.name) or string.format(Label("AltBoard_BankTab", "Tab %d"), index), info and info.icon))
-        end
-    end
-    return #tabs > 0 and tabs or nil
+    return CollectPurchasedBank(Enum.BankType.Account)
 end
 
 local function CollectMail()
     if not (GetInboxNumItems and GetInboxHeaderInfo and GetInboxItem) then return nil end
     local tab = { name = INBOX or "Inbox", items = {} }
     local slot = 0
-    for index = 1, GetInboxNumItems() or 0 do
-        local itemCount = select(8, GetInboxHeaderInfo(index))
-        if (tonumber(itemCount) or 0) > 0 then
+    local numItems, totalItems = GetInboxNumItems()
+    if type(numItems) ~= "number" or (numItems == 0 and (totalItems or 0) > 0) then return nil end
+    for index = 1, numItems do
+        local _, _, sender, subject, _, _, _, itemCount = GetInboxHeaderInfo(index)
+        if sender == nil and subject == nil then return nil end
+        itemCount = tonumber(itemCount) or 0
+        if itemCount > 0 then
+            local firstSlot = slot
             for attachment = 1, ATTACHMENTS_MAX_RECEIVE or MAIL_ATTACHMENTS do
                 local name, itemID, texture, count, quality = GetInboxItem(index, attachment)
                 if itemID then
@@ -151,6 +158,7 @@ local function CollectMail()
                     }
                 end
             end
+            if slot - firstSlot < itemCount then return nil end
         end
     end
     tab.slots = slot
@@ -265,12 +273,35 @@ function RoutineData:RefreshCharacterGuild()
     self:Fire("ItemsUpdated", charKey, "guild")
 end
 
+local function CollectGuildTab(index, name, icon, now)
+    if not GetGuildBankItemLink then return nil end
+    local tab = { name = name, icon = icon, slots = GUILD_TAB_SLOTS, items = {}, updatedAt = now }
+    for slot = 1, GUILD_TAB_SLOTS do
+        local texture, count, _, _, quality = GetGuildBankItemInfo(index, slot)
+        if texture then
+            local link = GetGuildBankItemLink(index, slot)
+            if not link then return nil end
+            tab.items[slot] = {
+                id = tonumber(link:match("item:(%d+)")),
+                link = link,
+                name = link:match("%[(.-)%]"),
+                icon = texture,
+                count = tonumber(count) or 1,
+                quality = quality,
+            }
+        end
+    end
+    return tab
+end
+
 -- Only the tab currently open can be read, so other tabs keep their last snapshot.
-function RoutineData:CaptureGuildBank()
+function RoutineData:CaptureGuildBank(readItems)
     if not (GetNumGuildBankTabs and GetGuildBankTabInfo and GetGuildBankItemInfo) then return end
     local guildName, realm, guildKey = CurrentGuildIdentity()
     local charKey = self:GetCurrentCharacterKey()
     if not guildKey or not charKey then return end
+    local numTabs = GetNumGuildBankTabs()
+    if not numTabs or numTabs <= 0 then return end
 
     self.db.characterGuilds[charKey] = guildKey
     local guild = self.db.guilds[guildKey]
@@ -290,51 +321,30 @@ function RoutineData:CaptureGuildBank()
     snapshot.money = GetGuildBankMoney and GetGuildBankMoney() or snapshot.money
     self.db.snapshots.guildBanks[charKey] = snapshot
 
-    local numTabs = GetNumGuildBankTabs() or 0
-    if numTabs == 0 then
-        self:Fire("ItemsUpdated", charKey, "guild")
-        return
-    end
     snapshot.numTabs = numTabs
-    local currentTab = GetCurrentGuildBankTab and GetCurrentGuildBankTab()
+    local currentTab = readItems and GetCurrentGuildBankTab and GetCurrentGuildBankTab()
+    local now = Now()
     for index = 1, numTabs do
         local name, icon, canView = GetGuildBankTabInfo(index)
         local tabName = name or string.format(Label("AltBoard_BankTab", "Tab %d"), index)
         local old = snapshot.tabs[index]
-        if not canView then
-            guild.tabs[index] = nil
+        local tab = canView and index == currentTab and CollectGuildTab(index, tabName, icon, now)
+        if canView == false then
             snapshot.tabs[index] = nil
-        elseif index == currentTab then
-            local tab = { name = tabName, icon = icon, slots = GUILD_TAB_SLOTS, items = {} }
-            for slot = 1, GUILD_TAB_SLOTS do
-                local texture, count, _, _, quality = GetGuildBankItemInfo(index, slot)
-                if texture then
-                    local link = GetGuildBankItemLink and GetGuildBankItemLink(index, slot)
-                    tab.items[slot] = {
-                        id = link and tonumber(link:match("item:(%d+)")),
-                        link = link,
-                        name = link and link:match("%[(.-)%]"),
-                        icon = texture,
-                        count = tonumber(count) or 1,
-                        quality = quality,
-                    }
-                end
-            end
+        elseif tab then
             snapshot.tabs[index] = tab
             guild.tabs[index] = CountTab(tab)
-        elseif not old then
+            guild.tabUpdatedAt = guild.tabUpdatedAt or {}
+            guild.tabUpdatedAt[index] = now
+            guild.updatedAt = now
+            snapshot.updatedAt = now
+        elseif canView and not old then
             snapshot.tabs[index] = { name = tabName, icon = icon, slots = GUILD_TAB_SLOTS, items = {}, uncaptured = true }
-        else
+        elseif old then
             old.name = name or old.name
             old.icon = icon or old.icon
         end
     end
-    for index in pairs(guild.tabs) do
-        if index > numTabs then guild.tabs[index] = nil end
-    end
-    local now = Now()
-    guild.updatedAt = now
-    snapshot.updatedAt = now
     self:Fire("ItemsUpdated", charKey, "guild")
 end
 
@@ -342,18 +352,38 @@ end
 
 local state = {}
 
-local function Debounced(key, func)
-    if state[key] then return end
-    state[key] = true
+local function Debounced(key, func, sessionKey)
+    local queue = sessionKey and state[sessionKey] or (not sessionKey and state)
+    if not queue or queue[key] then return end
+    queue[key] = true
     C_Timer.After(CAPTURE_DEBOUNCE, function()
-        state[key] = nil
-        func()
+        queue[key] = nil
+        if not sessionKey or state[sessionKey] == queue then func(RoutineData) end
     end)
 end
 
 local function CaptureOpenBank()
     RoutineData:CaptureCharacterBank()
     RoutineData:CaptureWarbandBank()
+end
+
+local function QueueBankUpdate(bankType)
+    local types = Enum and Enum.BankType
+    if not types or bankType == nil or bankType == types.Character then
+        Debounced("bank", RoutineData.CaptureCharacterBank, "bankOpen")
+    end
+    if not types or bankType == nil or bankType == types.Account then
+        Debounced("warband", RoutineData.CaptureWarbandBank, "bankOpen")
+    end
+end
+
+local function OpenGuildBank()
+    if state.guildBankOpen then return end
+    local session = {}
+    state.guildBankOpen = session
+    C_Timer.After(0.4, function()
+        if state.guildBankOpen == session then RoutineData:CaptureGuildBank() end
+    end)
 end
 
 local handlers = {
@@ -381,60 +411,56 @@ local handlers = {
         RoutineData:RefreshCharacterGuild()
     end,
     BANKFRAME_OPENED = function()
-        state.bankOpen = true
+        if state.bankOpen then return end
+        local session = {}
+        state.bankOpen = session
         C_Timer.After(0.3, function()
-            if state.bankOpen then CaptureOpenBank() end
+            if state.bankOpen == session then CaptureOpenBank() end
         end)
     end,
     BANKFRAME_CLOSED = function()
         state.bankOpen = nil
     end,
     BAG_UPDATE_DELAYED = function()
-        Debounced("bags", function()
-            RoutineData:CaptureBags()
-            if state.bankOpen then CaptureOpenBank() end
-        end)
+        Debounced("bags", RoutineData.CaptureBags)
+        QueueBankUpdate()
     end,
     PLAYERBANKSLOTS_CHANGED = function()
-        if state.bankOpen then Debounced("bank", function() RoutineData:CaptureCharacterBank() end) end
+        Debounced("bank", RoutineData.CaptureCharacterBank, "bankOpen")
     end,
     PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED = function()
-        if state.bankOpen then Debounced("warband", function() RoutineData:CaptureWarbandBank() end) end
+        Debounced("warband", RoutineData.CaptureWarbandBank, "bankOpen")
     end,
+    BANK_TABS_CHANGED = QueueBankUpdate,
+    BANK_TAB_SETTINGS_UPDATED = QueueBankUpdate,
     MAIL_SHOW = function()
-        state.mailOpen = true
+        state.mailOpen = state.mailOpen or {}
     end,
     MAIL_CLOSED = function()
         state.mailOpen = nil
     end,
     MAIL_INBOX_UPDATE = function()
-        if state.mailOpen then Debounced("mail", function() RoutineData:CaptureMail() end) end
+        Debounced("mail", RoutineData.CaptureMail, "mailOpen")
     end,
     GUILDBANKFRAME_OPENED = function()
-        state.guildBankOpen = true
-        C_Timer.After(0.4, function()
-            if state.guildBankOpen then RoutineData:CaptureGuildBank() end
-        end)
+        OpenGuildBank()
     end,
     GUILDBANKFRAME_CLOSED = function()
         state.guildBankOpen = nil
     end,
     GUILDBANKBAGSLOTS_CHANGED = function()
-        if state.guildBankOpen then Debounced("guild", function() RoutineData:CaptureGuildBank() end) end
+        if state.guildBankOpen then RoutineData:CaptureGuildBank(true) end
     end,
     GUILDBANK_UPDATE_TABS = function()
-        if state.guildBankOpen then Debounced("guild", function() RoutineData:CaptureGuildBank() end) end
+        Debounced("guild", RoutineData.CaptureGuildBank, "guildBankOpen")
     end,
     PLAYER_INTERACTION_MANAGER_FRAME_SHOW = function(interactionType)
-        if Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
-            state.guildBankOpen = true
-            C_Timer.After(0.4, function()
-                if state.guildBankOpen then RoutineData:CaptureGuildBank() end
-            end)
+        if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
+            OpenGuildBank()
         end
     end,
     PLAYER_INTERACTION_MANAGER_FRAME_HIDE = function(interactionType)
-        if Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
+        if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
             state.guildBankOpen = nil
         end
     end,

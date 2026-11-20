@@ -299,13 +299,14 @@ function API.GetCurrencyCounts(currencyID)
     for charKey, record in pairs(db.characters) do
         local entry = record.currencies and record.currencies[currencyID]
         if entry then
-            local fresh = (record.updatedAt.currencies or 0) >= lastReset
+            local fresh = entry.weeklyAt ~= nil and entry.weeklyAt >= lastReset
             result[#result + 1] = {
                 key = charKey,
                 classFile = record.classFile,
                 quantity = entry.q,
                 weekly = fresh and entry.w or 0,
                 maxWeekly = entry.mw or 0,
+                weeklyFresh = fresh,
             }
         end
     end
