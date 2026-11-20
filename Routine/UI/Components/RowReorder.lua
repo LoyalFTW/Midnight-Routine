@@ -1,6 +1,21 @@
 local _, ns = ...
 if ns.Inactive then return end
 
+function ns.GetRowReorderSlot(rows, cursorY)
+    for index, entry in ipairs(rows) do
+        local row = entry.frame or entry
+        local top, bottom = row:GetTop(), row:GetBottom()
+        if top and bottom and cursorY > (top + bottom) / 2 then
+            return index - 1
+        end
+    end
+    return #rows
+end
+
+function ns.GetRowReorderTarget(source, slot, count)
+    return math.max(1, math.min(count, slot + (source > slot and 1 or 0)))
+end
+
 function ns.CreateRowReorder(owner, body, padding)
     local view = owner._rowReorderView
     if not view then
@@ -47,14 +62,7 @@ function ns.CreateRowReorder(owner, body, padding)
         local offset = y - body:GetTop() + 10
         ghost:SetPoint("TOPLEFT", body, "TOPLEFT", padding, offset)
         ghost:SetPoint("TOPRIGHT", body, "TOPRIGHT", -padding, offset)
-        slot = #rows
-        for index, row in ipairs(rows) do
-            local top, bottom = row:GetTop(), row:GetBottom()
-            if top and bottom and y > (top + bottom) / 2 then
-                slot = index - 1
-                break
-            end
-        end
+        slot = ns.GetRowReorderSlot(rows, y)
         local row = rows[math.max(1, slot)]
         local edge = slot == 0 and "TOP" or "BOTTOM"
         line:SetPoint("TOPLEFT", row, edge .. "LEFT")
@@ -84,7 +92,7 @@ function ns.CreateRowReorder(owner, body, padding)
                 Update()
                 if IsMouseButtonDown("LeftButton") then return end
                 local from, callback = source, drop
-                local target = slot and math.max(1, slot + (source > slot and 1 or 0))
+                local target = slot and ns.GetRowReorderTarget(source, slot, #rows)
                 Cancel()
                 if target and from ~= target then callback(from, target) end
             end)

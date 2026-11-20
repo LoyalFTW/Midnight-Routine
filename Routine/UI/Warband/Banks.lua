@@ -12,11 +12,19 @@ local BANK_CELL_STRIDE = 46
 
 tracking.RegisterCallback(MR, "BankSnapshotChanged", function(_, source)
     local frame = MR.altBoardFrame
-    if frame and frame:IsShown() and frame.bankPane and frame.bankPane.bankSource == source
+    if frame and frame:IsShown() and frame.bankPane
+        and (frame.bankPane.bankSource == source or frame.bankPane.bankSource == "search")
         and MR.db and MR.db.profile and MR.db.profile.altBoardView == "banks" then
         MR:RefreshAltBankPane(frame.bankPane)
     end
 end)
+
+local function InventorySearch()
+    local api = _G.RoutineData and _G.RoutineData.API
+    if api and api.SearchInventory and api.IsDataReady and api.IsDataReady() then
+        return api.SearchInventory
+    end
+end
 
 local function MakeSourceButton(parent, label, key, index)
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -33,7 +41,18 @@ local function MakeSourceButton(parent, label, key, index)
     text:SetText(label)
     button._label = text
     button:SetScript("OnClick", function()
+        if parent.bankSource == key then return end
+        if parent.bankSource == "search" then
+            parent.inventoryQuery = parent.search:GetText()
+            parent.search:SetText("")
+        end
         parent.bankSource = key
+        parent.storageOwner = nil
+        if key == "search" then
+            parent.search:SetText(parent.inventoryQuery or "")
+            parent.search:SetFocus()
+        end
+        parent.scroll:SetVerticalScroll(0)
         MR:RefreshWarbandBoardSelection()
     end)
     return button
@@ -62,6 +81,8 @@ function MR:CreateAltBankPane(frame, rightPane, tabBar)
         pane.sourceButtons.guild = MakeSourceButton(pane, L["AltBoard_BankGuild"] or "Guild bank", "guild", 3)
     end
     pane.sourceOrder[#pane.sourceOrder + 1] = "guild"
+    pane.sourceButtons.search = MakeSourceButton(pane, L["AltBoard_BankAllStorage"] or "All Storage", "search", #pane.sourceOrder + 1)
+    pane.sourceButtons.search:Hide()
     local search = CreateFrame("EditBox", nil, pane, "BackdropTemplate")
     search:SetSize(190, 24)
     search:SetPoint("TOPLEFT", pane, "TOPLEFT", 12, -48)
@@ -73,13 +94,26 @@ function MR:CreateAltBankPane(frame, rightPane, tabBar)
     search:SetTextInsets(9, 9, 0, 0)
     search:SetTextColor(0.9, 0.95, 1)
     search:SetAutoFocus(false)
-    search:SetScript("OnTextChanged", function() MR:RefreshAltBankPane(pane) end)
+    search:SetScript("OnTextChanged", function(_, userInput)
+        if not userInput then return end
+        pane.scroll:SetVerticalScroll(0)
+        if pane.bankSource ~= "search" then
+            MR:RefreshAltBankPane(pane)
+            return
+        end
+        if pane.searchTimer then pane.searchTimer:Cancel() end
+        pane.searchTimer = C_Timer.NewTimer(0.15, function()
+            pane.searchTimer = nil
+            if pane:IsVisible() and pane.bankSource == "search" then MR:RefreshAltBankPane(pane) end
+        end)
+    end)
     search:SetScript("OnEscapePressed", function(selfBox) selfBox:ClearFocus() end)
     pane.search = search
     local searchHint = pane:CreateFontString(nil, "OVERLAY")
     searchHint:SetFont(ns.FONT_ROWS, math.max(8, Warband.GetFontSize() - 2), Warband.GetFontFlags())
     searchHint:SetPoint("LEFT", search, "RIGHT", 9, 0)
     searchHint:SetText(L["AltBoard_BankSearch"] or "Search items")
+    pane.searchHint = searchHint
     ns.RegisterThemedFontString(searchHint, 0.55, 0.69, 0.74)
     local heading = pane:CreateFontString(nil, "OVERLAY")
     heading:SetFont(ns.FONT_HEADERS, math.max(10, Warband.GetFontSize()), Warband.GetFontFlags())
@@ -97,11 +131,11 @@ function MR:CreateAltBankPane(frame, rightPane, tabBar)
     pane.update = update
     pane.headers = GetWidgetCache(pane, "headers")
     pane.cells = GetWidgetCache(pane, "cells")
+    pane.searchRows = GetWidgetCache(pane, "searchRows")
     frame.bankPane = pane
 end
 
-local function GetSnapshot(pane, selected)
-    local store = MR:GetBankSnapshots()
+local function GetSnapshot(pane, selected, store)
     if not store then return nil end
     if pane.bankSource == "warband" then return store.warband end
     if pane.bankSource == "guild" then
@@ -112,6 +146,98 @@ local function GetSnapshot(pane, selected)
     end
     if pane.bankSource == "bags" then return selected and store.bags and store.bags[selected.key] or nil end
     return selected and store.characters[selected.key] or nil
+end
+
+local function EnsureSearchRow(pane, index)
+    local row = pane.searchRows[index]
+    if row then return row end
+    row = CreateFrame("Button", nil, pane.content, "BackdropTemplate")
+    row:SetBackdrop(ns.MakeBackdrop())
+    Warband.WBApplySurface(row, "soft")
+    row:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(27, 27)
+    row.icon:SetPoint("LEFT", 8, 0)
+    row.count = row:CreateFontString(nil, "OVERLAY")
+    row.count:SetFont(ns.FONT_ROWS, math.max(9, Warband.GetFontSize()), Warband.GetFontFlags())
+    row.count:SetPoint("RIGHT", -10, 0)
+    row.title = row:CreateFontString(nil, "OVERLAY")
+    row.title:SetFont(ns.FONT_HEADERS, math.max(9, Warband.GetFontSize()), Warband.GetFontFlags())
+    row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 2)
+    row.title:SetPoint("RIGHT", row.count, "LEFT", -8, 0)
+    row.title:SetJustifyH("LEFT")
+    row.title:SetWordWrap(false)
+    row.detail = row:CreateFontString(nil, "OVERLAY")
+    row.detail:SetFont(ns.FONT_ROWS, math.max(8, Warband.GetFontSize() - 2), Warband.GetFontFlags())
+    row.detail:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
+    row.detail:SetPoint("RIGHT", row.count, "LEFT", -8, 0)
+    row.detail:SetJustifyH("LEFT")
+    row.detail:SetWordWrap(false)
+    ns.RegisterThemedFontString(row.detail, 0.57, 0.73, 0.77)
+    row:SetScript("OnClick", function(selfRow)
+        local result, frame = selfRow.result, MR.altBoardFrame
+        if not result or not frame then return end
+        if result.link and IsModifiedClick and IsModifiedClick("CHATLINK") then
+            HandleModifiedItemClick(result.link)
+            return
+        end
+        if result.characterKey then
+            local inRoster
+            for _, entry in ipairs(frame._data or {}) do
+                if entry.key == result.characterKey then inRoster = true break end
+            end
+            if inRoster then
+                frame.selectedCharKey = result.characterKey
+                frame.characterSearchText = ""
+                if frame.characterSearchBox then frame.characterSearchBox:ClearFocus() end
+            else
+                pane.storageOwner = { key = result.characterKey, name = result.characterKey, selection = frame.selectedCharKey }
+            end
+        end
+        pane.inventoryQuery = pane.search:GetText()
+        pane.search:SetText("")
+        pane.search:ClearFocus()
+        pane.bankSource = result.source
+        pane.jumpTab = result.tabIndex
+        MR:RefreshWarbandBoardSelection()
+    end)
+    pane.searchRows[index] = row
+    return row
+end
+
+local function RefreshInventorySearch(pane, searchInventory, contentWidth)
+    local query = (pane.search:GetText() or ""):match("^%s*(.-)%s*$")
+    local results = searchInventory(query)
+    local names = {}
+    for _, entry in ipairs(MR.altBoardFrame and MR.altBoardFrame._data or {}) do
+        names[entry.key] = entry.name
+    end
+    local index = 0
+    for _, result in ipairs(results) do
+        local source = pane.sourceButtons[result.source]
+        local owner = names[result.characterKey] or result.characterKey
+        if source then
+            index = index + 1
+            local row = EnsureSearchRow(pane, index)
+            row.result = result
+            SetOneAnchor(row, "TOPLEFT", pane.content, "TOPLEFT", 0, -(index - 1) * 44)
+            row:SetSize(contentWidth, 40)
+            row.icon:SetTexture(result.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.title:SetText(result.name or ("#" .. tostring(result.itemID)))
+            local detail = { source._label:GetText() }
+            if result.guildName or owner then detail[#detail + 1] = result.guildName or owner end
+            if result.tabName then detail[#detail + 1] = result.tabName end
+            if result.updatedAt then detail[#detail + 1] = Warband.WBFormatTimestamp(result.updatedAt) end
+            row.detail:SetText(table.concat(detail, "  ·  "))
+            row.count:SetText(BreakUpLargeNumbers and BreakUpLargeNumbers(result.quantity) or tostring(result.quantity))
+            row:Show()
+        end
+    end
+    HideUnusedWidgets(pane.searchRows, index)
+    pane.heading:SetText(query ~= "" and index == 0 and (L["AltBoard_BankNoMatches"] or "No matching items")
+        or (L["AltBoard_BankAllStorage"] or "All Storage"))
+    pane.content:SetHeight(math.max(index * 44, 1))
+    pane.update()
 end
 
 local function EnsureHeader(pane, index)
@@ -183,6 +309,7 @@ end
 function MR:ResetAltBankPane(pane)
     if not pane then return end
     HideUnusedWidgets(pane.headers, 0)
+    HideUnusedWidgets(pane.searchRows, 0)
     HideUnusedWidgets(pane.cells, 0, function(cell)
         cell.item = nil
         ns.HideOwnedTooltip(cell)
@@ -197,18 +324,44 @@ function MR:RefreshAltBankPane(pane, selected)
             if entry.key == self.altBoardFrame.selectedCharKey then selected = entry break end
         end
     end
+    local storageOwner = pane.storageOwner
+    if storageOwner then
+        if self.altBoardFrame and storageOwner.selection == self.altBoardFrame.selectedCharKey then
+            selected = storageOwner
+        else
+            pane.storageOwner = nil
+        end
+    end
     if self.isForever and pane.bankSource == "warband" then pane.bankSource = "character" end
-    local sourceWidth = math.max(80, math.floor(((pane:GetWidth() > 0 and pane:GetWidth() or 540) - 24 - (#pane.sourceOrder - 1) * 6) / #pane.sourceOrder))
+    local searchInventory = InventorySearch()
+    if not searchInventory and pane.bankSource == "search" then pane.bankSource = "character" end
+    local sourceCount = #pane.sourceOrder + (searchInventory and 1 or 0)
+    local sourceWidth = math.max(1, math.floor(((pane:GetWidth() > 0 and pane:GetWidth() or 540) - 24 - (sourceCount - 1) * 6) / sourceCount))
     for index, key in ipairs(pane.sourceOrder) do
         local button = pane.sourceButtons[key]
         button:SetWidth(sourceWidth)
         SetOneAnchor(button, "TOPLEFT", pane, "TOPLEFT", 12 + (index - 1) * (sourceWidth + 6), -12)
         Warband.WBStylePillButton(button, key == pane.bankSource)
     end
+    local searchButton = pane.sourceButtons.search
+    searchButton:SetShown(searchInventory ~= nil)
+    searchButton:SetWidth(sourceWidth)
+    SetOneAnchor(searchButton, "TOPLEFT", pane, "TOPLEFT", 12 + #pane.sourceOrder * (sourceWidth + 6), -12)
+    Warband.WBStylePillButton(searchButton, pane.bankSource == "search")
+    pane.searchHint:SetText(pane.bankSource == "search" and (L["AltBoard_BankSearchAllPrompt"] or "Enter an item name or ID")
+        or (L["AltBoard_BankSearch"] or "Search items"))
+    local contentWidth = math.max(490, pane.scroll:GetWidth() - 18)
+    pane.content:SetWidth(contentWidth)
+    if pane.bankSource == "search" then
+        self:ResetAltBankPane(pane)
+        RefreshInventorySearch(pane, searchInventory, contentWidth)
+        return
+    end
+    HideUnusedWidgets(pane.searchRows, 0)
     local store = MR:GetBankSnapshots()
     local guildState = selected and store and store.characterGuilds[selected.key]
     local guildName = type(guildState) == "string" and guildState:match(":(.+)$")
-    local snapshot = GetSnapshot(pane, selected)
+    local snapshot = GetSnapshot(pane, selected, store)
     local name = pane.bankSource == "bags" and (selected and string.format(L["AltBoard_BagOwner"] or "%s's bags", selected.name) or (L["AltBoard_BankBags"] or "Bags"))
         or pane.bankSource == "character" and (selected and selected.name or (L["AltBoard_Characters"] or "Character"))
         or pane.bankSource == "guild" and (selected and (selected.name .. "  |  " .. (guildName or (guildState == false and (L["AltBoard_GuildNone"] or "No guild") or (L["AltBoard_GuildUnknown"] or "Guild not recorded")))) or (L["AltBoard_BankGuild"] or "Guild bank"))
@@ -221,9 +374,9 @@ function MR:RefreshAltBankPane(pane, selected)
         .. (updated and ("  |cff728892|  " .. updated .. "|r") or ""))
     local query = (pane.search:GetText() or ""):lower()
     local headerIndex, cellIndex, y = 0, 0, 0
-    local contentWidth = math.max(490, pane.scroll:GetWidth() - 18)
     local columns = math.max(1, math.floor((contentWidth - 4) / BANK_CELL_STRIDE))
-    pane.content:SetWidth(contentWidth)
+    local jumpTab, jumpOffset = pane.jumpTab
+    pane.jumpTab = nil
     for tabIndex = 1, snapshot and (snapshot.numTabs or #snapshot.tabs) or 0 do
         local tab = snapshot.tabs[tabIndex]
         if tab then
@@ -242,6 +395,7 @@ function MR:RefreshAltBankPane(pane, selected)
                 end
             end
             if query == "" or #items > 0 then
+                if tabIndex == jumpTab then jumpOffset = y end
                 headerIndex = headerIndex + 1
                 local header = EnsureHeader(pane, headerIndex)
                 SetOneAnchor(header, "TOPLEFT", pane.content, "TOPLEFT", 0, -y)
@@ -261,7 +415,7 @@ function MR:RefreshAltBankPane(pane, selected)
                     cell.tabName = tab.name
                     cell.sourceLabel = pane.sourceButtons[pane.bankSource]._label:GetText()
                     cell.storageOwner = pane.bankSource == "warband" and "" or pane.bankSource == "guild" and guildName or selected and selected.name or ""
-                    cell.snapshotUpdated = snapshot.updatedAt
+                    cell.snapshotUpdated = tab.updatedAt or snapshot.updatedAt
                     cell.icon:SetTexture(item.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
                     cell.count:SetText((item.count or 1) > 1 and item.count or "")
                     local color = item.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[item.quality]
@@ -309,4 +463,7 @@ function MR:RefreshAltBankPane(pane, selected)
     end
     pane.content:SetHeight(math.max(y, 1))
     pane.update()
+    if jumpOffset then
+        pane.scroll:SetVerticalScroll(math.min(jumpOffset, math.max(0, pane.content:GetHeight() - pane.scroll:GetHeight())))
+    end
 end

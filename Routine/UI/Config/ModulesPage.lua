@@ -672,19 +672,7 @@ function Config.BuildModulesPage(ctx)
         dragGhost:Show()
 
         local screenCY = cy / UIParent:GetEffectiveScale()
-        local slot = #rows
-        for i, row in ipairs(rows) do
-            local rTop = row.frame:GetTop()
-            local rBot = row.frame:GetBottom()
-            if rTop and rBot then
-                local mid = (rTop + rBot) / 2
-                if screenCY > mid then
-                    slot = i - 1
-                    break
-                end
-            end
-        end
-        slot = math.max(0, math.min(slot, #rows))
+        local slot = ns.GetRowReorderSlot(rows, screenCY)
         drag.targetIdx = slot
 
         local lineRefFrame
@@ -781,9 +769,7 @@ function Config.BuildModulesPage(ctx)
         end
         if not srcIdx then MR:PopulateConfigFrame(f); return end
 
-        local insertAt = slot + 1
-        if srcIdx < insertAt then insertAt = insertAt - 1 end
-        insertAt = math.max(1, math.min(insertAt, #visMods))
+        local insertAt = ns.GetRowReorderTarget(srcIdx, slot, #visMods)
 
         if srcIdx ~= insertAt then
             local moved = table.remove(visMods, srcIdx)

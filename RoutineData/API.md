@@ -49,6 +49,7 @@ The initial read also supports older RoutineData releases if your addon loads af
 | `GetTotalItemCount(itemID)` | Combined item count across saved character, Warband, and guild storage. |
 | `GetCurrencyCounts(currencyID)` | Rows with key, classFile, quantity, weekly, and maxWeekly. Weekly earned amounts from before the current weekly reset are returned as zero. |
 | `GetBankSnapshots()` | A copy of the saved detail. Fields include characters (personal banks), bags, mail, warband, characterGuilds, and characterGuildBanks. Each captured storage snapshot can include tabs and updatedAt. The function returns nil before the saved store is available. |
+| `SearchInventory(query)` | Searches saved bags, character banks, Warband bank, and guild bank tabs by case-insensitive item name substring, exact item ID, or item link. Returns one row per item and storage tab with `itemID`, `name`, `link`, `icon`, `quantity`, `source` (`bags`, `character`, `warband`, or `guild`), `characterKey`, `guildKey`, `guildName`, `tabIndex`, `tabName`, `slot` (first matching slot), and `updatedAt` where available. Shared guild tabs use the most recently captured tab. Empty or unavailable searches return an empty list. |
 
 Saved quantities reflect the last time a source was captured. Visiting a character's bank or mailbox can fill in missing data for that source.
 

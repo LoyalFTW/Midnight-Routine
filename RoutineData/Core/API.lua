@@ -205,6 +205,79 @@ function API.GetBankSnapshots()
     return view and CopyTable(view) or nil
 end
 
+function API.SearchInventory(query)
+    local results = {}
+    if type(query) ~= "string" and type(query) ~= "number" then return results end
+    query = tostring(query):match("^%s*(.-)%s*$"):lower()
+    local store = RoutineData:GetBankSnapshotView()
+    if query == "" or not store then return results end
+    local itemID = tonumber(query:match("^%d+$") or query:match("^item:(%d+)$") or query:match("|hitem:(%d+)"))
+
+    local function SearchTab(source, charKey, guildKey, guildName, tabIndex, tab, updatedAt)
+        if tab.uncaptured then return end
+        local matches = {}
+        for slot, item in pairs(tab.items or {}) do
+            local name = item.name or (item.id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(item.id))
+            if (itemID and item.id == itemID) or (not itemID and name and name:lower():find(query, 1, true)) then
+                local key = item.id or item.link or name
+                local result = matches[key]
+                if not result then
+                    result = {
+                        itemID = item.id, name = name, link = item.link, icon = item.icon, quantity = 0,
+                        source = source, characterKey = charKey, guildKey = guildKey, guildName = guildName,
+                        tabIndex = tabIndex, tabName = tab.name, updatedAt = updatedAt, slot = slot,
+                    }
+                    matches[key] = result
+                    results[#results + 1] = result
+                end
+                result.quantity = result.quantity + (tonumber(item.count) or 1)
+                result.slot = math.min(result.slot, slot)
+            end
+        end
+    end
+
+    local function SearchSnapshot(source, charKey, snapshot)
+        for index, tab in pairs(snapshot and snapshot.tabs or {}) do
+            SearchTab(source, charKey, nil, nil, index, tab, tab.updatedAt or snapshot.updatedAt)
+        end
+    end
+    for charKey, snapshot in pairs(store.bags or {}) do SearchSnapshot("bags", charKey, snapshot) end
+    for charKey, snapshot in pairs(store.characters or {}) do SearchSnapshot("character", charKey, snapshot) end
+    SearchSnapshot("warband", nil, store.warband)
+
+    local guildTabs = {}
+    for charKey, snapshot in pairs(store.characterGuildBanks or {}) do
+        local guildKey = snapshot.guildKey
+        if guildKey and store.characterGuilds[charKey] == guildKey then
+            local tabs = guildTabs[guildKey] or {}
+            guildTabs[guildKey] = tabs
+            for index, tab in pairs(snapshot.tabs or {}) do
+                if not tab.uncaptured then
+                    local updated = tab.updatedAt or snapshot.updatedAt
+                    local previous = tabs[index]
+                    if not previous or (updated or 0) > (previous.updated or 0)
+                        or ((updated or 0) == (previous.updated or 0) and charKey < previous.charKey) then
+                        tabs[index] = { tab = tab, updated = updated, charKey = charKey, guildName = snapshot.name }
+                    end
+                end
+            end
+        end
+    end
+    for guildKey, tabs in pairs(guildTabs) do
+        for index, entry in pairs(tabs) do
+            SearchTab("guild", entry.charKey, guildKey, entry.guildName, index, entry.tab, entry.updated)
+        end
+    end
+    table.sort(results, function(a, b)
+        if a.name ~= b.name then return (a.name or "") < (b.name or "") end
+        if a.source ~= b.source then return a.source < b.source end
+        if a.characterKey ~= b.characterKey then return (a.characterKey or "") < (b.characterKey or "") end
+        if a.tabIndex ~= b.tabIndex then return a.tabIndex < b.tabIndex end
+        return a.slot < b.slot
+    end)
+    return results
+end
+
 local bridge = {}
 
 tracking.RegisterCallback(bridge, "ResetApplied", function(_, resetType)

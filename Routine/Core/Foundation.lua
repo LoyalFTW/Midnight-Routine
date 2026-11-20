@@ -229,6 +229,9 @@ local DEFAULTS = {
     },
     char = {
         skillsPinned = {},
+        skillsHidden = {},
+        skillsColors = {},
+        skillsOrder = {},
         progress = {},
         professions = {},
         professionsScanned = false,
