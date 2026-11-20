@@ -29,10 +29,22 @@ local RenderFrame = PK.RenderFrame
 local RenderFontString = PK.RenderFontString
 local RenderTexture = PK.RenderTexture
 
-local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, cr, cg, cb, db, entry, sectionKey)
+local function ToggleManualCompletion(moduleKey, rowKey, maxValue)
+    local currentOverride = MR:GetManualOverride(moduleKey, rowKey) or 0
+    MR:SetManualOverride(moduleKey, rowKey, currentOverride >= maxValue and 0 or maxValue, maxValue)
+    PK.RebuildGatheringLocationsFrame()
+    if MR.RefreshUI then
+        MR:RefreshUI()
+    end
+end
+
+local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, cr, cg, cb, db, entry, sectionKey, moduleKey)
     local current, required = Progress(entry)
     local done = current >= required
     if done and db.gatheringHideCompleted then return cardY end
+    local rowKey = moduleKey and ns.GetEntryMainMenuKey(sectionKey, entry)
+    local forcedComplete = rowKey ~= nil and (MR:GetManualOverride(moduleKey, rowKey) or 0) >= required
+    done = done or forcedComplete
 
     local row = RenderFrame("Button", card, "BackdropTemplate")
     row:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -cardY)
@@ -46,7 +58,7 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     hover:SetAllPoints()
     hover:SetColorTexture(cr, cg, cb, 0)
 
-    local statusBox = RenderFrame("Frame", row, "BackdropTemplate")
+    local statusBox = RenderFrame(rowKey and "Button" or "Frame", row, "BackdropTemplate")
     statusBox:SetSize(14, 14)
     statusBox:SetPoint("LEFT", row, "LEFT", 5, 0)
     statusBox:SetBackdrop(MakeBackdrop())
@@ -68,6 +80,18 @@ local function RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAl
     statusCheck:SetText("x")
     statusCheck:SetTextColor(0.03, 0.08, 0.04, 1)
     statusCheck:SetShown(done)
+
+    if rowKey then
+        statusBox:RegisterForClicks("LeftButtonUp")
+        statusBox:SetScript("OnClick", function()
+            ToggleManualCompletion(moduleKey, rowKey, required)
+        end)
+        if forcedComplete then
+            statusBox:SetBackdropBorderColor(0.88, 0.74, 0.22, 0.95 * chromeAlpha)
+            statusFill:SetColorTexture(0.88, 0.74, 0.22, 0.85 * contentAlpha)
+            statusCheck:SetTextColor(0.10, 0.08, 0.02, 1)
+        end
+    end
 
     local rowIcon = RenderTexture(row, "ARTWORK")
     rowIcon:SetSize(14, 14)
@@ -496,12 +520,7 @@ local function RenderProfessionTasksSection(card, cardW, cardY, fontSize, conten
         end)
         statusBtn:SetScript("OnClick", function()
             if not canManualToggle then return end
-            local currentOverride = MR:GetManualOverride(mod.key, row.key) or 0
-            MR:SetManualOverride(mod.key, row.key, currentOverride >= maxValue and 0 or maxValue, maxValue)
-            PK.RebuildGatheringLocationsFrame()
-            if MR.RefreshUI then
-                MR:RefreshUI()
-            end
+            ToggleManualCompletion(mod.key, row.key, maxValue)
         end)
         statusBtn:SetScript("OnEnter", function()
             if not canManualToggle then return end

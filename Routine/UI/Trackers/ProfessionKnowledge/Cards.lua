@@ -321,6 +321,10 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                         cardY = RenderProfessionTasksSection(card, cardW, cardY, fontSize, contentAlpha, chromeAlpha, accentAlpha, cr, cg, cb, db, profession)
                     else
                     local entryVisibility = db.gatheringEntryVisibility
+                    local manualModuleKey
+                    if not MR.isForever and (expansion.key == "dragonflight" or expansion.key == "tww") then
+                        manualModuleKey = ns.GetProfessionModuleKey(expansion.key, profession)
+                    end
                     local catchupRendered = false
                     for _, section in ipairs(GetOrderedProfessionSections(profession)) do
                         if ShouldShowProfessionSection(section) then
@@ -365,7 +369,7 @@ local function BuildProfessionCards(content, width, yOff, fontSize, contentAlpha
                             for _, entry in ipairs(VisibleSortedEntries(visibleEntries)) do
                                 local rr, rg, rb = GetMainMenuEntryColor(expansion.key, profession, section.key, entry, cr, cg, cb)
                                 if entry.questID or entry.questIDs or entry.spellID then
-                                    cardY = RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, rr, rg, rb, db, entry, section.key)
+                                    cardY = RenderEntryRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, accentAlpha, rr, rg, rb, db, entry, section.key, manualModuleKey)
                                 else
                                     cardY = RenderReferenceRow(card, cardW, cardY, rowHeight, fontSize, contentAlpha, chromeAlpha, rr, rg, rb, entry, section.key)
                                 end
