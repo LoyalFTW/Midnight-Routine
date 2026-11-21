@@ -29,7 +29,7 @@ end
 local function VisibleGold()
     local entries, total = {}, 0
     for _, entry in ipairs(API.GetGoldRanking()) do
-        if not RoutineData:IsCharacterHidden(entry.key) then
+        if entry.gold > 0 and not RoutineData:IsCharacterHidden(entry.key) then
             entries[#entries + 1] = entry
             total = total + entry.gold
         end
