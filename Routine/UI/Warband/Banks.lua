@@ -181,6 +181,7 @@ local function EnsureSearchRow(pane, index)
             HandleModifiedItemClick(result.link)
             return
         end
+        if not pane.sourceButtons[result.source] then return end
         if result.characterKey then
             local inRoster
             for _, entry in ipairs(frame._data or {}) do
@@ -201,6 +202,18 @@ local function EnsureSearchRow(pane, index)
         pane.jumpTab = result.tabIndex
         MR:RefreshWarbandBoardSelection()
     end)
+    row:SetScript("OnEnter", function(selfRow)
+        local result = selfRow.result
+        if not result or pane.sourceButtons[result.source] then return end
+        ns.ShowTooltip(selfRow, {
+            build = function(tooltip)
+                if result.link then tooltip:SetHyperlink(result.link)
+                elseif result.itemID then tooltip:SetItemByID(result.itemID)
+                else tooltip:SetText(result.name or "") end
+            end,
+        })
+    end)
+    row:SetScript("OnLeave", function(selfRow) ns.HideOwnedTooltip(selfRow) end)
     pane.searchRows[index] = row
     return row
 end
@@ -215,8 +228,11 @@ local function RefreshInventorySearch(pane, searchInventory, contentWidth)
     local index = 0
     for _, result in ipairs(results) do
         local source = pane.sourceButtons[result.source]
+        local sourceLabel = source and source._label:GetText()
+        if result.source == "mail" then sourceLabel = INBOX or "Inbox" end
+        if result.source == "equipped" then sourceLabel = EQUIPPED or "Equipped" end
         local owner = names[result.characterKey] or result.characterKey
-        if source then
+        if sourceLabel then
             index = index + 1
             local row = EnsureSearchRow(pane, index)
             row.result = result
@@ -224,9 +240,9 @@ local function RefreshInventorySearch(pane, searchInventory, contentWidth)
             row:SetSize(contentWidth, 40)
             row.icon:SetTexture(result.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
             row.title:SetText(result.name or ("#" .. tostring(result.itemID)))
-            local detail = { source._label:GetText() }
+            local detail = { sourceLabel }
             if result.guildName or owner then detail[#detail + 1] = result.guildName or owner end
-            if result.tabName then detail[#detail + 1] = result.tabName end
+            if result.tabName and result.tabName ~= sourceLabel then detail[#detail + 1] = result.tabName end
             if result.updatedAt then detail[#detail + 1] = Warband.WBFormatTimestamp(result.updatedAt) end
             row.detail:SetText(table.concat(detail, "  ·  "))
             row.count:SetText(BreakUpLargeNumbers and BreakUpLargeNumbers(result.quantity) or tostring(result.quantity))

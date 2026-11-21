@@ -109,7 +109,7 @@ function RoutineData:MigrateLegacyCharacterKey(key)
     if not (db and legacy and legacy ~= key and db.characters[legacy] and not db.characters[key]) then return end
 
     db.characters[key], db.characters[legacy] = db.characters[legacy], nil
-    for _, store in ipairs({ db.characterGuilds, db.snapshots.characters, db.snapshots.bags, db.snapshots.mail, db.snapshots.guildBanks }) do
+    for _, store in ipairs({ db.characterGuilds, db.snapshots.characters, db.snapshots.bags, db.snapshots.mail, db.snapshots.equipped, db.snapshots.guildBanks }) do
         if store[legacy] ~= nil and store[key] == nil then
             store[key], store[legacy] = store[legacy], nil
         end
@@ -148,6 +148,7 @@ function RoutineData:ForgetCharacter(charKey)
     self.db.snapshots.characters[charKey] = nil
     self.db.snapshots.bags[charKey] = nil
     self.db.snapshots.mail[charKey] = nil
+    self.db.snapshots.equipped[charKey] = nil
     self.db.snapshots.guildBanks[charKey] = nil
     self:Fire("CharacterRemoved", charKey)
     return true
@@ -169,6 +170,7 @@ function RoutineData:GetBankSnapshotView()
         characters = db.snapshots.characters,
         bags = db.snapshots.bags,
         mail = db.snapshots.mail,
+        equipped = db.snapshots.equipped,
         warband = db.snapshots.warband,
         characterGuilds = db.characterGuilds,
         characterGuildBanks = db.snapshots.guildBanks,
@@ -341,7 +343,7 @@ frame:SetScript("OnEvent", function(_, event, loadedName)
             if type(db[key]) ~= "table" then db[key] = {} end
         end
         if type(db.warband.tabs) ~= "table" then db.warband.tabs = {} end
-        for _, key in ipairs({ "characters", "bags", "mail", "guildBanks" }) do
+        for _, key in ipairs({ "characters", "bags", "mail", "equipped", "guildBanks" }) do
             if type(db.snapshots[key]) ~= "table" then db.snapshots[key] = {} end
         end
         MergeMissing(db, DEFAULTS)

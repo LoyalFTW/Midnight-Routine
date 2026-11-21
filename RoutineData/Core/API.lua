@@ -243,6 +243,8 @@ function API.SearchInventory(query)
     end
     for charKey, snapshot in pairs(store.bags or {}) do SearchSnapshot("bags", charKey, snapshot) end
     for charKey, snapshot in pairs(store.characters or {}) do SearchSnapshot("character", charKey, snapshot) end
+    for charKey, snapshot in pairs(store.mail or {}) do SearchSnapshot("mail", charKey, snapshot) end
+    for charKey, snapshot in pairs(store.equipped or {}) do SearchSnapshot("equipped", charKey, snapshot) end
     SearchSnapshot("warband", nil, store.warband)
 
     local guildTabs = {}

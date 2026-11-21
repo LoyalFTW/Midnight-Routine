@@ -171,12 +171,19 @@ end
 
 local function CollectEquipped()
     if not GetInventoryItemID then return nil end
-    local counts = {}
+    local tab = { items = {} }
     local function Add(slot, stacked)
         local itemID = GetInventoryItemID("player", slot)
         if not itemID then return end
         local count = stacked and GetInventoryItemCount and GetInventoryItemCount("player", slot)
-        counts[itemID] = (counts[itemID] or 0) + (tonumber(count) or 1)
+        local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
+        tab.items[slot] = {
+            id = itemID,
+            link = link,
+            name = link and link:match("%[(.-)%]"),
+            icon = GetInventoryItemTexture and GetInventoryItemTexture("player", slot),
+            count = tonumber(count) or 1,
+        }
     end
     for slot = INVSLOT_FIRST_EQUIPPED or 1, LastEquippedSlot() do
         Add(slot)
@@ -184,7 +191,7 @@ local function CollectEquipped()
     if INVSLOT_AMMO and INVSLOT_AMMO < (INVSLOT_FIRST_EQUIPPED or 1) then
         Add(INVSLOT_AMMO, true)
     end
-    return counts
+    return tab
 end
 
 local function CurrentGuildIdentity()
@@ -251,11 +258,13 @@ end
 
 function RoutineData:CaptureEquipped()
     local charKey = self:GetCurrentCharacterKey()
-    local counts = CollectEquipped()
-    if not charKey or not counts then return end
+    local tab = CollectEquipped()
+    if not charKey or not tab then return end
+    local now = Now()
     local record = self:GetCharacterRecord(charKey, true)
-    record.equipped = counts
-    record.updatedAt.equipped = Now()
+    record.equipped = CountTab(tab)
+    record.updatedAt.equipped = now
+    self.db.snapshots.equipped[charKey] = { tabs = { tab }, updatedAt = now }
     self:Fire("ItemsUpdated", charKey, "equipped")
 end
 
