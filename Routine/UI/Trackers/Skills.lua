@@ -219,6 +219,7 @@ end
 
 local function CreateSkillsOptions(frame)
     local options = ns.StyledFrame(UIParent, nil, "DIALOG", 15)
+    MR:RegisterPriorityFrame(options)
     options:Hide()
     options:SetSize(295, 366)
     local title = ns.TitleBar(options, HEADER_HEIGHT)

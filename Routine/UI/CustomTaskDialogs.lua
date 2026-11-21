@@ -48,7 +48,7 @@ local function ApplyCustomTaskDialogTheme(frame)
     local editFont  = math.max(9,  fontSize)
 
 
-    frame:SetSize(420, 670)
+    frame:SetSize(420, 694)
 
     local function sf(fs, size) if fs then fs:SetFont(ns.FONT_ROWS, size, GetFontFlags()) end end
     sf(frame.title,           math.max(10, fontSize + 1))
@@ -68,7 +68,7 @@ local function ApplyCustomTaskDialogTheme(frame)
 
     if frame.title then frame.title:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
 
-    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.categorySeparateModuleCheck, frame.orderedQuestCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck }
+    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.categorySeparateModuleCheck, frame.orderedQuestCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck, frame.cityReminderCheck }
     for _, cb in ipairs(checks) do
         if cb and cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
     end
@@ -632,6 +632,18 @@ local function EnsureCustomTaskDialog()
     frame.accountCompleteCheck = accountCompleteCheck
     BindHelp(accountCompleteCheck, "CustomTasks_AccountCompleteTooltip", "Shares this task's completion across all characters. This is available only when Show on all alts is enabled.")
 
+    local cityReminderCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+    ns.ThemeCheckButton(cityReminderCheck)
+    cityReminderCheck:SetSize(20, 20)
+    cityReminderCheck:SetPoint("TOPLEFT", accountCompleteCheck, "TOPLEFT", 182, 0)
+    local cityReminderText = frame:CreateFontString(nil, "OVERLAY")
+    cityReminderText:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
+    cityReminderText:SetPoint("LEFT", cityReminderCheck, "RIGHT", 2, 0)
+    cityReminderText:SetText(L["CustomTasks_CityReminder"])
+    cityReminderText:SetTextColor(0.84, 0.90, 0.96)
+    cityReminderCheck._text = cityReminderText
+    frame.cityReminderCheck = cityReminderCheck
+    BindHelp(cityReminderCheck, "CustomTasks_CityReminderTooltip", L["CustomTasks_CityReminderTooltip"])
 
     local function CreateDialogButton(width, label, color, borderColor)
         local btn = CreateFrame("Button", nil, frame, "BackdropTemplate")
@@ -820,12 +832,13 @@ local function EnsureCustomTaskDialog()
         end
 
         local category = (self.categoryInput and self.categoryInput:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        local remindInCity = self.cityReminderCheck:GetChecked() and true or false
         local saved
         local savedTaskId = self.taskId
         if self.taskId then
-            saved, savedTaskId = MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete, self.orderedQuestSequence, category)
+            saved, savedTaskId = MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete, self.orderedQuestSequence, category, remindInCity)
         else
-            savedTaskId = MR:AddCustomTask(text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete, self.orderedQuestSequence, category)
+            savedTaskId = MR:AddCustomTask(text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete, self.orderedQuestSequence, category, remindInCity)
             saved = savedTaskId ~= nil
         end
         if saved and category ~= "" and MR.SetCustomTaskCategorySeparateModule then
@@ -833,6 +846,7 @@ local function EnsureCustomTaskDialog()
             MR:SetCustomTaskCategorySeparateModule(savedTask and savedTask.resetType or self.resetType, category, self.categorySeparateModuleCheck:GetChecked())
         end
         self:Hide()
+        if saved and remindInCity then MR:QueueCityTaskReminder() end
     end
 
     saveBtn:SetScript("OnClick",  function() frame:Commit() end)
@@ -868,6 +882,7 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
     dialog.orderedQuestSequence = task and task.orderedQuestSequence or false
     dialog.autoUpdateInstances = task and task.autoUpdateInstances or false
     dialog.accountWideComplete = task and task.accountWideComplete or false
+    dialog.cityReminderCheck:SetChecked(task and task.remindInCity == true)
     if dialog.autoUpdateCheck then
         dialog.autoUpdateCheck:SetChecked(dialog.autoUpdateInstances)
     end
@@ -1273,4 +1288,273 @@ function MR:RefreshCustomTaskDialogThemes()
     if self.customTaskCategoryDialog then
         ApplyCustomTaskCategoryDialogTheme(self.customTaskCategoryDialog)
     end
+end
+
+do
+    local CITY_MAPS = {
+        [84] = 84,
+        [85] = 85,
+        [86] = 85,
+        [87] = 87,
+        [88] = 88,
+        [89] = 89,
+        [90] = 90,
+        [103] = 103,
+        [110] = 110,
+        [111] = 111,
+        [1453] = 84,
+        [1454] = 85,
+        [1455] = 87,
+        [1456] = 88,
+        [1457] = 89,
+        [1458] = 90,
+        [2112] = 2112,
+        [2339] = 2339,
+        [2393] = 2393,
+    }
+    local WIDTH, CONTENT_INSET, MAX_CONTENT_HEIGHT = 350, 32, 230
+    local dialog, currentCity, shownThisVisit, pendingTimer, waitingForCombat
+    local visibleRowCount = 0
+
+    local function ResolveCityMap(mapID)
+        for _ = 1, 12 do
+            if not mapID or mapID == 0 then return end
+            if CITY_MAPS[mapID] then return CITY_MAPS[mapID] end
+            local info = C_Map.GetMapInfo(mapID)
+            if not info then return end
+            mapID = info.parentMapID
+        end
+    end
+
+    local function GetCurrentCity()
+        if IsInInstance() then return false end
+        local playerMap = C_Map.GetBestMapForUnit("player")
+        local minimap = C_Minimap and C_Minimap.GetUiMapID and C_Minimap.GetUiMapID()
+        local city = ResolveCityMap(playerMap) or ResolveCityMap(minimap)
+        if city then return city end
+        local realZone, zone = GetRealZoneText(), GetZoneText()
+        for cityMapID, cityID in pairs(CITY_MAPS) do
+            if cityMapID == cityID then
+                local info = C_Map.GetMapInfo(cityMapID)
+                if info and info.name and info.name ~= "" and (info.name == realZone or info.name == zone) then
+                    return cityID
+                end
+            end
+        end
+        if playerMap or minimap or (realZone and realZone ~= "") then return false end
+    end
+
+    local function IsReminderLocked()
+        return MR:GetWindowLayoutValue("cityReminderLocked") == true
+    end
+
+    local function LayoutReminderRows()
+        local rows = ns.GetWidgetCache(dialog, "reminderRows")
+        local width = dialog:GetWidth() - CONTENT_INSET
+        local height = 0
+        dialog.content:SetWidth(width)
+        for index = 1, visibleRowCount do
+            local row = rows[index]
+            row:SetWidth(width)
+            ns.SetOneAnchor(row, "TOPLEFT", dialog.content, "TOPLEFT", 0, -height)
+            height = height + row:GetStringHeight() + 6
+        end
+        dialog.content:SetHeight(height)
+        return height
+    end
+
+    local function ApplyReminderSize()
+        local size = MR:GetWindowLayoutValue("cityReminderSize") or {}
+        dialog:SetWidth(size.width or WIDTH)
+        local contentHeight = LayoutReminderRows()
+        dialog:SetHeight(size.height or math.max(70, 46 + math.min(MAX_CONTENT_HEIGHT, contentHeight)))
+        dialog.updateScroll()
+    end
+
+    local function CreateReminderOptions()
+        local options = ns.StyledFrame(dialog, nil, "DIALOG", dialog:GetFrameLevel() + 20)
+        MR:RegisterPriorityFrame(options)
+        options:SetSize(230, 107)
+        options:SetPoint("TOPLEFT", dialog, "TOPRIGHT", 5, 0)
+        local header = ns.TitleBar(options, 26)
+        local label = header:CreateFontString(nil, "OVERLAY")
+        label:SetFont(ns.FONT_HEADERS, 12, ns.GetFontFlags())
+        label:SetPoint("LEFT", 10, 0)
+        label:SetText(L["CustomTasks_CityReminderOptions"])
+        ns.CloseButton(header, function() options:Hide() end)
+        local y = ns.OptionsCheckbox(options, -35, L["Config_LockPosition"], IsReminderLocked, function(value)
+            MR:SetWindowLayoutValue("cityReminderLocked", value and true or false)
+        end, nil, nil, nil, 8, nil, 12)
+        ns.OptionsBtn(options, y - 8, L["CustomTasks_CityReminderResetWindow"], function()
+            MR:SetWindowLayoutValue("cityReminderPos", { point = "CENTER", relPoint = "CENTER", x = 0, y = 140 })
+            MR:SetWindowLayoutValue("cityReminderSize", {})
+            ns.RestoreManagedFramePos(dialog, "cityReminderPos", 0, 140)
+            ApplyReminderSize()
+        end, 214, 8, 12)
+        return options
+    end
+
+    local function ShowReminder(tasks)
+        local fontSize = math.min(16, math.max(11, ns.GetFontSize()))
+        if not dialog then
+            dialog = ns.StyledFrame(UIParent, nil, "DIALOG", 20)
+            MR:RegisterPriorityFrame(dialog)
+            dialog:EnableMouse(true)
+            local header = ns.TitleBar(dialog, 28)
+            local moving
+            local function FinishMove()
+                if not moving then return end
+                moving = nil
+                dialog:StopMovingOrSizing()
+                ns.SyncManagedFramePos(dialog, "cityReminderPos", "top")
+            end
+            header:SetScript("OnDragStart", function()
+                if IsReminderLocked() then return end
+                moving = true
+                dialog:StartMoving()
+            end)
+            header:SetScript("OnDragStop", FinishMove)
+            local title = header:CreateFontString(nil, "OVERLAY")
+            title:SetPoint("LEFT", 10, 0)
+            dialog.title = title
+            local close = ns.CloseButton(header, function() dialog:Hide() end)
+            local options
+            local gear = ns.HeaderIconButton(header, "Interface\\Buttons\\UI-OptionsButton",
+                { 0.85, 0.65, 0.20 }, { 1, 1, 1 }, L["CustomTasks_CityReminderOptions"], function()
+                    if options and options:IsShown() then
+                        options:Hide()
+                        return
+                    end
+                    options = options or CreateReminderOptions()
+                    options:Show()
+                    options:Raise()
+                end)
+            gear:SetPoint("RIGHT", close, "LEFT", -5, 0)
+            dialog.scroll, dialog.content, dialog.updateScroll = ns.CreateScrollArea(dialog,
+                { "TOPLEFT", header, "BOTTOMLEFT", 10, -8 },
+                { "BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -22, 10 },
+                { contentWidth = WIDTH - CONTENT_INSET })
+            local grip = ns.CreateManagedResizeGrip(dialog, false, IsReminderLocked)
+            local resizing
+            local function FinishResize()
+                if not resizing then return end
+                resizing = nil
+                grip:SetScript("OnUpdate", nil)
+                MR:SetWindowLayoutValue("cityReminderSize", { width = dialog:GetWidth(), height = dialog:GetHeight() })
+            end
+            grip:SetScript("OnMouseDown", function(_, button)
+                if button ~= "LeftButton" or IsReminderLocked() then return end
+                ns.SyncManagedFramePos(dialog, "cityReminderPos", "top")
+                local startX, startY = GetCursorPosition()
+                local startW, startH = dialog:GetWidth(), dialog:GetHeight()
+                resizing = true
+                grip:SetScript("OnUpdate", function()
+                    if IsReminderLocked() or not IsMouseButtonDown("LeftButton") then
+                        FinishResize()
+                        return
+                    end
+                    local x, y = GetCursorPosition()
+                    local scale = dialog:GetEffectiveScale()
+                    local width = math.max(260, math.min(720, math.floor(startW + (x - startX) / scale)))
+                    local height = math.max(70, math.min(650, math.floor(startH + (startY - y) / scale)))
+                    if width == dialog:GetWidth() and height == dialog:GetHeight() then return end
+                    local widthChanged = width ~= dialog:GetWidth()
+                    dialog:SetSize(width, height)
+                    if widthChanged then LayoutReminderRows() end
+                    dialog.updateScroll()
+                end)
+            end)
+            grip:SetScript("OnMouseUp", function(_, button)
+                if button == "LeftButton" then FinishResize() end
+            end)
+            dialog:HookScript("OnHide", function()
+                FinishMove()
+                FinishResize()
+                if options then options:Hide() end
+            end)
+        end
+
+        dialog.title:SetFont(ns.FONT_HEADERS, fontSize + 1, ns.GetFontFlags())
+        dialog.title:SetText(L["CustomTasks_CityReminderTitle"])
+        local rows = ns.GetWidgetCache(dialog, "reminderRows")
+        for index, task in ipairs(tasks) do
+            local row = rows[index]
+            if not row then
+                row = dialog.content:CreateFontString(nil, "OVERLAY")
+                row:SetJustifyH("LEFT")
+                row:SetJustifyV("TOP")
+                row:SetWordWrap(true)
+                rows[index] = row
+            end
+            row:SetFont(ns.FONT_ROWS, fontSize, ns.GetFontFlags())
+            row:SetText("• " .. task)
+            row:Show()
+        end
+        visibleRowCount = #tasks
+        ns.HideUnusedWidgets(rows, visibleRowCount)
+        ns.RestoreManagedFramePos(dialog, "cityReminderPos", 0, 140)
+        ApplyReminderSize()
+        dialog:Show()
+        dialog:Raise()
+        dialog.scroll:SetVerticalScroll(0)
+        dialog.updateScroll()
+    end
+
+    local function CheckCity(retries)
+        pendingTimer = nil
+        if not MR.db then return end
+        local city = GetCurrentCity()
+        if not city and retries > 0 then
+            pendingTimer = C_Timer.NewTimer(1, function() CheckCity(retries - 1) end)
+            return
+        end
+        if city == nil then return end
+        if city ~= currentCity then
+            currentCity, shownThisVisit = city, false
+            if dialog then dialog:Hide() end
+        end
+        waitingForCombat = nil
+        if not city or shownThisVisit then return end
+        if InCombatLockdown() then
+            waitingForCombat = true
+            return
+        end
+        local tasks = MR:GetPendingCityReminderTasks()
+        if #tasks == 0 then return end
+        ShowReminder(tasks)
+        shownThisVisit = true
+    end
+
+    function MR:QueueCityTaskReminder()
+        if pendingTimer then return end
+        pendingTimer = C_Timer.NewTimer(0.75, function() CheckCity(2) end)
+    end
+
+    function MR:PrintCityTaskReminderStatus()
+        if not self.db then
+            print("Routine city reminders: settings are still loading.")
+            return
+        end
+        local city = GetCurrentCity()
+        local tasks, optedIn = self:GetPendingCityReminderTasks()
+        local _, instanceType = IsInInstance()
+        local minimap = C_Minimap and C_Minimap.GetUiMapID and C_Minimap.GetUiMapID()
+        print(("Routine city reminders: zone=%s, map=%s, minimap=%s, city=%s, instance=%s, opted in=%d, unfinished=%d, shown this visit=%s, visible=%s"):format(
+            tostring(GetRealZoneText()), tostring(C_Map.GetBestMapForUnit("player")), tostring(minimap),
+            tostring(city), tostring(instanceType), optedIn, #tasks,
+            tostring(city == currentCity and shownThisVisit == true), tostring(dialog and dialog:IsVisible() or false)))
+        self:QueueCityTaskReminder()
+    end
+
+    local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    watcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    watcher:RegisterEvent("ZONE_CHANGED")
+    watcher:RegisterEvent("ZONE_CHANGED_INDOORS")
+    watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+    watcher:SetScript("OnEvent", function(_, event)
+        if event ~= "PLAYER_REGEN_ENABLED" or waitingForCombat then
+            MR:QueueCityTaskReminder()
+        end
+    end)
 end

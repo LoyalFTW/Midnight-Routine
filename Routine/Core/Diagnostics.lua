@@ -535,7 +535,9 @@ SlashCmdList["MIDROUTE"] = function(msg)
         end
     end
 
-    if msg == "reset" then
+    if msg == "city status" then
+        MR:PrintCityTaskReminderStatus()
+    elseif msg == "reset" then
         MR:DoWeeklyReset(true)
     elseif msg == "lock" then
         MR.db.profile.locked = true

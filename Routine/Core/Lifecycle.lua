@@ -1097,6 +1097,7 @@ function MR:UpdateInstanceFrameVisibility()
 end
 
 function MR:OnEnable()
+    self:QueueCityTaskReminder()
     if ns.ValidateSavedFonts then
         ns.ValidateSavedFonts()
     end

@@ -192,6 +192,11 @@ tracking.installers["CustomTasks"] = function(owner, context)
         return n
     end
 
+    local function GetTaskTarget(task)
+        local difficultyCount = CountTrackedDifficulties(task)
+        return difficultyCount >= 2 and difficultyCount or task.max
+    end
+
     local function GetDiffProgress(self, taskId, scope)
         if not self.db then return {} end
         local task = self:GetCustomTaskById(taskId, scope)
@@ -796,6 +801,22 @@ tracking.installers["CustomTasks"] = function(owner, context)
         return tasks
     end
 
+    function MR:GetPendingCityReminderTasks()
+        local pending = {}
+        local optedIn = 0
+        for _, task in ipairs(self:GetCustomTasks()) do
+            if task.remindInCity == true then
+                optedIn = optedIn + 1
+                local rowKey = GetTaskRowKey(task.id, task.scope)
+                local progress = tonumber(self:GetProgress(CUSTOM_MODULE_KEY, rowKey)) or 0
+                if progress < GetTaskTarget(task) then
+                    pending[#pending + 1] = task.label
+                end
+            end
+        end
+        return pending, optedIn
+    end
+
     function MR:GetCustomTasksTitle()
         if not (self and self.db and self.db.char) then
             return L["CustomTasks_Title"] or "Custom Tasks"
@@ -960,9 +981,7 @@ tracking.installers["CustomTasks"] = function(owner, context)
                         )
                     end
                     noteText = string.format("%s\n%s\n%s", scopeLabel, completionScopeLabel, noteText)
-                    local effectiveMax = task.max
-                    local diffCount = CountTrackedDifficulties(task)
-                    if diffCount >= 2 then effectiveMax = diffCount end
+                    local effectiveMax = GetTaskTarget(task)
                     rows[#rows + 1] = {
                         key = rowKey,
                         label = rewardText and ("|cffffd36a" .. task.label .. "|r") or task.label,
@@ -1087,9 +1106,7 @@ tracking.installers["CustomTasks"] = function(owner, context)
                     local categoryDone = 0
                     local categoryProgressEntries = {}
                     for _, task in ipairs(groupTasks) do
-                        local effectiveMax = NormalizeTaskMax(task.max)
-                        local diffCount = CountTrackedDifficulties(task)
-                        if diffCount >= 2 then effectiveMax = diffCount end
+                        local effectiveMax = GetTaskTarget(task)
                         local rowKey = GetTaskRowKey(task.id, task.scope)
                         categoryProgressEntries[#categoryProgressEntries + 1] = { key = rowKey, max = effectiveMax }
                         if tonumber(MR:GetProgress(CUSTOM_MODULE_KEY, rowKey)) >= effectiveMax then
@@ -1174,7 +1191,7 @@ tracking.installers["CustomTasks"] = function(owner, context)
         }
     end
 
-    function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, accountWideComplete, orderedQuestSequence, category)
+    function MR:AddCustomTask(label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, accountWideComplete, orderedQuestSequence, category, remindInCity)
         scope = NormalizeTaskScope(scope)
         local tasks = GetTaskStorage(scope)
         local cleanLabel = TrimText(label)
@@ -1218,6 +1235,7 @@ tracking.installers["CustomTasks"] = function(owner, context)
             orderedQuestSequence = orderedQuestSequence,
             encounterDifficulties = encounterDifficulties,
             category = NormalizeCategory(category),
+            remindInCity = remindInCity == true or nil,
         }
 
         if self.RefreshCustomTasksModule then
@@ -1230,7 +1248,7 @@ tracking.installers["CustomTasks"] = function(owner, context)
         return taskId
     end
 
-    function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, originalScope, accountWideComplete, orderedQuestSequence, category)
+    function MR:UpdateCustomTask(taskId, label, resetType, maxValue, questIds, allowManualQuestClicks, encounterIds, autoUpdateInstances, encounterDifficulties, scope, originalScope, accountWideComplete, orderedQuestSequence, category, remindInCity)
         scope = NormalizeTaskScope(scope)
         originalScope = NormalizeTaskScope(originalScope or scope)
         local task = self:GetCustomTaskById(taskId, originalScope)
@@ -1334,6 +1352,9 @@ tracking.installers["CustomTasks"] = function(owner, context)
         task.orderedQuestSequence = orderedQuestSequence
         task.encounterDifficulties = NormalizeEncounterDifficulties(encounterDifficulties)
         task.category = NormalizeCategory(category)
+        if remindInCity ~= nil then
+            task.remindInCity = remindInCity == true or nil
+        end
         if accountWideComplete then
             WriteCustomTaskValue(GetAccountWideProgressStorage(), newRowKey, existingProgressValue)
             WriteCustomTaskValue(GetAccountWideManualOverrideStorage(), newRowKey, existingOverrideValue)
