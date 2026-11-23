@@ -131,17 +131,18 @@ local function CollectWarbandBank()
     return CollectPurchasedBank(Enum.BankType.Account)
 end
 
-local function CollectMail()
+local function CollectMail(now)
     if not (GetInboxNumItems and GetInboxHeaderInfo and GetInboxItem) then return nil end
     local tab = { name = INBOX or "Inbox", items = {} }
     local slot = 0
     local numItems, totalItems = GetInboxNumItems()
     if type(numItems) ~= "number" or (numItems == 0 and (totalItems or 0) > 0) then return nil end
     for index = 1, numItems do
-        local _, _, sender, subject, _, _, _, itemCount = GetInboxHeaderInfo(index)
+        local _, _, sender, subject, _, _, daysLeft, itemCount = GetInboxHeaderInfo(index)
         if sender == nil and subject == nil then return nil end
         itemCount = tonumber(itemCount) or 0
         if itemCount > 0 then
+            local expiresAt = type(daysLeft) == "number" and now + daysLeft * 86400 or nil
             local firstSlot = slot
             for attachment = 1, ATTACHMENTS_MAX_RECEIVE or MAIL_ATTACHMENTS do
                 local name, itemID, texture, count, quality = GetInboxItem(index, attachment)
@@ -155,6 +156,7 @@ local function CollectMail()
                         icon = texture,
                         count = tonumber(count) or 1,
                         quality = quality,
+                        expiresAt = expiresAt,
                     }
                 end
             end
@@ -246,9 +248,9 @@ end
 
 function RoutineData:CaptureMail()
     local charKey = self:GetCurrentCharacterKey()
-    local tab = CollectMail()
-    if not charKey or not tab then return end
     local now = Now()
+    local tab = CollectMail(now)
+    if not charKey or not tab then return end
     local record = self:GetCharacterRecord(charKey, true)
     record.mail = CountTab(tab)
     record.updatedAt.mail = now

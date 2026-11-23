@@ -202,7 +202,19 @@ end
 
 function API.GetBankSnapshots()
     local view = RoutineData:GetBankSnapshotView()
-    return view and CopyTable(view) or nil
+    if not view then return nil end
+    local snapshots = CopyTable(view)
+    local now = (GetServerTime and GetServerTime()) or time()
+    for _, snapshot in pairs(snapshots.mail or {}) do
+        for _, tab in pairs(snapshot.tabs or {}) do
+            for slot, item in pairs(tab.items or {}) do
+                if RoutineData:IsMailAttachmentExpired(item, now) then
+                    tab.items[slot] = nil
+                end
+            end
+        end
+    end
+    return snapshots
 end
 
 function API.SearchInventory(query)
@@ -213,12 +225,14 @@ function API.SearchInventory(query)
     if query == "" or not store then return results end
     local itemID = tonumber(query:match("^%d+$") or query:match("^item:(%d+)$") or query:match("|hitem:(%d+)"))
 
+    local now = (GetServerTime and GetServerTime()) or time()
     local function SearchTab(source, charKey, guildKey, guildName, tabIndex, tab, updatedAt)
         if tab.uncaptured then return end
         local matches = {}
         for slot, item in pairs(tab.items or {}) do
             local name = item.name or (item.id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(item.id))
-            if (itemID and item.id == itemID) or (not itemID and name and name:lower():find(query, 1, true)) then
+            local matchesQuery = (itemID and item.id == itemID) or (not itemID and name and name:lower():find(query, 1, true))
+            if matchesQuery and (source ~= "mail" or not RoutineData:IsMailAttachmentExpired(item, now)) then
                 local key = item.id or item.link or name
                 local result = matches[key]
                 if not result then

@@ -163,6 +163,10 @@ function RoutineData:GetLabel(key, default)
     return provider and provider(key) or default
 end
 
+function RoutineData:IsMailAttachmentExpired(item, now)
+    return item.expiresAt ~= nil and item.expiresAt <= now
+end
+
 function RoutineData:GetBankSnapshotView()
     local db = self.db
     if not (db and db.snapshots) then return nil end
@@ -236,6 +240,18 @@ local function SumTabs(tabs, itemID)
     return total
 end
 
+local function CountMail(snapshot, itemID, now)
+    local total = 0
+    for _, tab in pairs(snapshot.tabs or {}) do
+        for _, item in pairs(tab.items or {}) do
+            if item.id == itemID and not RoutineData:IsMailAttachmentExpired(item, now) then
+                total = total + (tonumber(item.count) or 1)
+            end
+        end
+    end
+    return total
+end
+
 -- Returns { characters = { {key, classFile, bags, bank, mail, equipped}, ... }, warband = n, guilds = { {key, name, realm, count}, ... } }
 -- Only characters/guilds that hold the item are listed.
 function API.GetItemCounts(itemID)
@@ -243,10 +259,13 @@ function API.GetItemCounts(itemID)
     local result = { characters = {}, warband = 0, guilds = {} }
     if not db or type(itemID) ~= "number" then return result end
 
+    local now = (GetServerTime and GetServerTime()) or time()
+    local mailSnapshots = db.snapshots and db.snapshots.mail
     for charKey, record in pairs(db.characters) do
         local bags = record.bags[itemID] or 0
         local bank = record.bank[itemID] or 0
-        local mail = record.mail and record.mail[itemID] or 0
+        local snapshot = mailSnapshots and mailSnapshots[charKey]
+        local mail = snapshot and CountMail(snapshot, itemID, now) or (record.mail and record.mail[itemID] or 0)
         local equipped = record.equipped and record.equipped[itemID] or 0
         if bags > 0 or bank > 0 or mail > 0 or equipped > 0 then
             result.characters[#result.characters + 1] = {
