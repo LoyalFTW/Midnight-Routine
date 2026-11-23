@@ -20,6 +20,7 @@ tracking.installers["Delves"] = function(owner, context)
         265714,
     }
 
+    local LABYRINTH_QUEST_IDS = { 98951, 98963, 98962, 98961, 98960, 98959 }
     local QUEST_DELVERS_BOUNTY_LOOTED = 86371
     local L = context.labels
 
@@ -104,6 +105,49 @@ tracking.installers["Delves"] = function(owner, context)
 
         return C_QuestLog.IsQuestFlaggedCompleted(questId) == true
     end
+
+    local function SyncWahduProgress(turnedInQuestId, adjustment)
+        local progress = MR.db and MR.db.char and MR.db.char.progress
+        if not progress then return false end
+
+        progress.labyrinth = progress.labyrinth or {}
+        local labyrinth = progress.labyrinth
+        labyrinth.wahdu_completed_quests = labyrinth.wahdu_completed_quests or {}
+        local completed = labyrinth.wahdu_completed_quests
+        local count = 0
+        for _, questId in ipairs(LABYRINTH_QUEST_IDS) do
+            if questId == turnedInQuestId or IsQuestCompleted(questId) then
+                completed[questId] = true
+            end
+            if completed[questId] then
+                count = count + 1
+            end
+        end
+        local manualCount = labyrinth.wahdu_manual_count or 0
+        if adjustment then
+            manualCount = math.max(count, math.min(#LABYRINTH_QUEST_IDS, math.max(count, manualCount) + adjustment))
+            labyrinth.wahdu_manual_count = manualCount > count and manualCount or nil
+        end
+        return MR:WriteScanProgress("labyrinth", "wahdu_questline", math.max(count, manualCount))
+    end
+
+    local function RefreshWahduProgress(turnedInQuestId, adjustment)
+        if SyncWahduProgress(turnedInQuestId, adjustment) then
+            MR._moduleStatsCache = nil
+            MR:RefreshUI()
+        end
+    end
+
+    local wahduTurnInFrame = CreateFrame("Frame")
+    wahduTurnInFrame:RegisterEvent("QUEST_TURNED_IN")
+    wahduTurnInFrame:SetScript("OnEvent", function(_, _, questId)
+        for _, trackedQuestId in ipairs(LABYRINTH_QUEST_IDS) do
+            if trackedQuestId == questId then
+                RefreshWahduProgress(questId)
+                return
+            end
+        end
+    end)
 
     local function HasDelversBounty()
         if not (C_Item and C_Item.GetItemCount) then
@@ -388,7 +432,8 @@ tracking.installers["Delves"] = function(owner, context)
             end
 
             UpdateGildedStashProgress(mdb, gildedStashRow)
-            return HasChanges()
+            local changed = SyncWahduProgress()
+            return HasChanges() or changed
         end,
 
         rows = {
@@ -454,6 +499,30 @@ tracking.installers["Delves"] = function(owner, context)
                         tip:AddLine(L["Delves_GildedStash_Refresh"] or "Open the Gilded Stash at the end of a completed Tier 11 Delve to update this weekly count.", 0.6, 0.6, 0.6, true)
                     else
                         tip:AddLine(L["Delves_GildedStash_Refresh"] or "Open the Gilded Stash at the end of a completed Tier 11 Delve to update this weekly count.", 0.6, 0.6, 0.6, true)
+                    end
+                end,
+            },
+            {
+                key = "wahdu_questline",
+                label = "|cff58c9d4" .. L["Labyrinth_Questline_Label"] .. "|r",
+                note = L["Labyrinth_Questline_Note"],
+                patchKey = "12.1.5",
+                max = #LABYRINTH_QUEST_IDS,
+                progressModuleKey = "labyrinth",
+                resetType = "none",
+                onLeftClick = function()
+                    RefreshWahduProgress(nil, 1)
+                end,
+                onRightClick = function()
+                    RefreshWahduProgress(nil, -1)
+                end,
+                tooltipFunc = function(tip)
+                    for _, questId in ipairs(LABYRINTH_QUEST_IDS) do
+                        if C_QuestLog.IsOnQuest(questId) then
+                            tip:AddLine(" ")
+                            tip:AddLine(MR:GetQuestName(questId), 1, 0.9, 0.3, true)
+                            break
+                        end
                     end
                 end,
             },
