@@ -21,6 +21,8 @@ tracking.installers["Delves"] = function(owner, context)
     }
 
     local LABYRINTH_QUEST_IDS = { 98951, 98963, 98962, 98961, 98960, 98959 }
+    local MYTHICAL_SOUL_FRAGMENT_ITEM_ID = 285065
+    local MYTHICAL_SOUL_FRAGMENT_CAP = 6
     local QUEST_DELVERS_BOUNTY_LOOTED = 86371
     local L = context.labels
 
@@ -433,6 +435,8 @@ tracking.installers["Delves"] = function(owner, context)
 
             UpdateGildedStashProgress(mdb, gildedStashRow)
             local changed = SyncWahduProgress()
+            local fragments = C_Item.GetItemCount(MYTHICAL_SOUL_FRAGMENT_ITEM_ID, true, false, true, true) or 0
+            changed = MR:WriteScanProgress("labyrinth", "mythical_soul_fragments", math.min(fragments, MYTHICAL_SOUL_FRAGMENT_CAP)) or changed
             return HasChanges() or changed
         end,
 
@@ -525,6 +529,20 @@ tracking.installers["Delves"] = function(owner, context)
                         end
                     end
                 end,
+            },
+            {
+                key = "mythical_soul_fragments",
+                label = "|cff58c9d4" .. L["Labyrinth_Fragments_Label"] .. "|r",
+                patchKey = "12.1.5",
+                max = MYTHICAL_SOUL_FRAGMENT_CAP,
+                itemId = MYTHICAL_SOUL_FRAGMENT_ITEM_ID,
+                visibilityModuleKey = "s1_weekly",
+                noItemProgress = true,
+                progressModuleKey = "labyrinth",
+                resetType = "none",
+                hideStatus = true,
+                control = true,
+                configurable = true,
             },
             {
                 key     = "delve_bounty",

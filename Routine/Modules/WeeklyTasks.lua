@@ -730,8 +730,6 @@ tracking.installers["WeeklyTasks"] = function(owner, context)
                     migrated = MoveKithixProgress(character, currentWeek) or migrated
                 end
             end
-            local fragments = C_Item.GetItemCount(285065, true, false, true, true) or 0
-            migrated = MR:WriteScanProgress("labyrinth", "mythical_soul_fragments", math.min(fragments, 3)) or migrated
             migrated = SyncKithixProgress() or migrated
             migrated = MoveKithixProgress(MR.db.char, not resetAt or resetAt <= (tonumber(MR.db.char.lastResetAt) or 0) + 300) or migrated
             local db = MR.db.char.progress
@@ -1259,19 +1257,6 @@ tracking.installers["WeeklyTasks"] = function(owner, context)
         end,
 
         rows = {
-            {
-                key = "mythical_soul_fragments",
-                label = "|cff58c9d4" .. L["Labyrinth_Fragments_Label"] .. "|r",
-                patchKey = "12.1.5",
-                max = 3,
-                itemId = 285065,
-                noItemProgress = true,
-                progressModuleKey = "labyrinth",
-                resetType = "none",
-                hideStatus = true,
-                control = true,
-                configurable = true,
-            },
             {
                 key      = "void_assaults",
                 label    = L["Weekly_VoidAssaults_Label"] or "|cff2ae7c6Void Assaults:|r",
