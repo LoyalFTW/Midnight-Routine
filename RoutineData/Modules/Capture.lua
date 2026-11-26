@@ -381,6 +381,8 @@ local function CollectOwnedAuctions(tab, now, auctionHouse)
                 name = link and link:match("%[(.-)%]"),
                 icon = C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID),
                 count = auction.quantity,
+                petSpeciesID = auction.itemKey.battlePetSpeciesID and auction.itemKey.battlePetSpeciesID > 0
+                    and auction.itemKey.battlePetSpeciesID or nil,
                 expiresAt = auction.timeLeftSeconds and now + auction.timeLeftSeconds,
             }
         end

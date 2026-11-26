@@ -219,27 +219,70 @@ function API.GetBankSnapshots()
     return snapshots
 end
 
+local function InventoryLinkKey(link)
+    if not link then return nil end
+    local payload = (link:match("|[Hh](.-)|[Hh]") or link):lower()
+    local kind, id = payload:match("^([%a]+):(%d+)")
+    if not id then return nil end
+    if kind == "battlepet" then
+        local variant = payload:match("^(battlepet:%d+:%d+:%d+:%d+:%d+:%d+)") or payload
+        return variant, nil, "battlepet:" .. id
+    end
+    if kind == "keystone" then return payload end
+    if kind ~= "item" then return nil end
+
+    local fields = {}
+    for field in (payload:sub(6) .. ":"):gmatch("(.-):") do
+        fields[#fields + 1] = field
+    end
+    for index = 2, math.min(#fields, 13) do
+        if (index >= 8 and index <= 10) or fields[index] == "" then
+            fields[index] = "0"
+        end
+    end
+    while #fields > 1 and #fields <= 13 and fields[#fields] == "0" do
+        fields[#fields] = nil
+    end
+    return "item:" .. table.concat(fields, ":"), tonumber(id)
+end
+
 function API.SearchInventory(query)
     local results = {}
     if type(query) ~= "string" and type(query) ~= "number" then return results end
     query = tostring(query):match("^%s*(.-)%s*$"):lower()
     local store = RoutineData:GetBankSnapshotView()
     if query == "" or not store then return results end
-    local itemID = tonumber(query:match("^%d+$") or query:match("^item:(%d+)$") or query:match("|hitem:(%d+)"))
+    local itemID = tonumber(query:match("^%d+$") or query:match("^item:(%d+)$"))
+    local queryVariant, _, querySpecies = InventoryLinkKey(query)
 
     local now = (GetServerTime and GetServerTime()) or time()
     local function SearchTab(source, charKey, guildKey, guildName, tabIndex, tab, updatedAt)
         if tab.uncaptured then return end
         local matches = {}
         for slot, item in pairs(tab.items or {}) do
-            local name = item.name or (item.id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(item.id))
-            local matchesQuery = (itemID and item.id == itemID) or (not itemID and name and name:lower():find(query, 1, true))
+            local variant, linkedID, species = InventoryLinkKey(item.link)
+            local id = item.id or linkedID
+            if not species and item.petSpeciesID then
+                species = "battlepet:" .. item.petSpeciesID
+            end
+            local name = item.name or (item.link and item.link:match("%[(.-)%]"))
+                or (id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id))
+            local matchesQuery
+            if itemID then
+                matchesQuery = id == itemID
+            elseif querySpecies then
+                matchesQuery = species == querySpecies
+            elseif queryVariant then
+                matchesQuery = variant == queryVariant
+            else
+                matchesQuery = name and name:lower():find(query, 1, true)
+            end
             if matchesQuery and not RoutineData:IsItemExpired(item, now) then
-                local key = source == "auctions" and slot or item.id or item.link or name
+                local key = source == "auctions" and slot or variant or species or id or item.link or name
                 local result = matches[key]
                 if not result then
                     result = {
-                        itemID = item.id, name = name, link = item.link, icon = item.icon, quantity = 0,
+                        itemID = id, name = name, link = item.link, icon = item.icon, quantity = 0,
                         source = source, characterKey = charKey, guildKey = guildKey, guildName = guildName,
                         tabIndex = tabIndex, tabName = tab.name, updatedAt = updatedAt, slot = slot, expiresAt = source == "auctions" and item.expiresAt or nil,
                     }
@@ -247,7 +290,12 @@ function API.SearchInventory(query)
                     results[#results + 1] = result
                 end
                 result.quantity = result.quantity + (tonumber(item.count) or 1)
-                result.slot = math.min(result.slot, slot)
+                if slot < result.slot then
+                    result.slot = slot
+                    result.link = item.link
+                    result.icon = item.icon
+                    result.name = name
+                end
             end
         end
     end
