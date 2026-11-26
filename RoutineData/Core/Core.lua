@@ -88,11 +88,14 @@ function RoutineData:ResolveCharacterKey()
     else
         name = UnitName("player")
     end
-    local realm = GetRealmName()
-    if type(name) ~= "string" or name == "" or name == UNKNOWNOBJECT or type(realm) ~= "string" or realm == "" then
+    if type(name) ~= "string" or name == "" or name == UNKNOWNOBJECT then
         return nil
     end
     if not regional then
+        local realm = GetRealmName()
+        if type(realm) ~= "string" or realm == "" then
+            return nil
+        end
         return name .. " - " .. realm
     end
     if type(surname) == "string" then
