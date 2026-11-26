@@ -90,8 +90,10 @@ function MR:PopulateConfigFrame(f)
         f.body = body
     end
     local widgetPool = ns.StartWidgetPool(body)
+    local searchTargets = {}
+    f.searchTargets = searchTargets
 
-    local yOff = f.scroll and -4 or -26
+    local yOff = f.scroll and -4 or (f.RefreshConfigSearch and -62 or -26)
     local cfgFs = GetFontSize()
     local moduleHeaderFs = math.max(FONT_SIZE_MIN, cfgFs - 1)
     local moduleRowFs = math.max(FONT_SIZE_MIN, cfgFs - 2)
@@ -103,14 +105,19 @@ function MR:PopulateConfigFrame(f)
 
     local function Gap(h)          yOff = OptionsGap(body, yOff, h) end
     local function Divider()       yOff = OptionsDivider(body, yOff, 4) end
-    local function SectionLabel(t) yOff = OptionsSectionLabel(body, yOff, t, 8, cfgFs) end
+    local function TrackSearch(label)
+        if label then searchTargets[label] = yOff end
+        return label
+    end
+    local function SectionLabel(t) yOff = OptionsSectionLabel(body, yOff, TrackSearch(t), 8, cfgFs) end
     local function Checkbox(label, getVal, setVal, color, themed)
         local r, g, b
         if color then r, g, b = hex(color) end
-        yOff = OptionsCheckbox(body, yOff, label, getVal, setVal, r, g, b, 4, nil, cfgFs, themed)
+        yOff = OptionsCheckbox(body, yOff, TrackSearch(label), getVal, setVal, r, g, b, 4, nil, cfgFs, themed)
     end
-    local function Btn(label, onClick, style) yOff = OptionsBtn(body, yOff, label, onClick, math.max(192, contentW), 8, cfgFs, style) end
+    local function Btn(label, onClick, style) yOff = OptionsBtn(body, yOff, TrackSearch(label), onClick, math.max(192, contentW), 8, cfgFs, style) end
     local function ChoiceDropdown(label, choices, getVal, setVal, getResetValue)
+        TrackSearch(label)
         local caption = ns.AcquireFontString(body, "pagesText10", "OVERLAY")
         caption:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
         caption:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
@@ -369,7 +376,7 @@ function MR:PopulateConfigFrame(f)
         Gap(2)
         local bindingKey = GetBindingKey and GetBindingKey(ns.TOGGLE_WINDOWS_BINDING)
         local bindingText = bindingKey and GetBindingText and GetBindingText(bindingKey, "KEY_") or bindingKey
-        local bindingLabel = (L["Config_SetKeyBinding"] or "Set Show / Hide Key") .. ": "
+        local bindingLabel = TrackSearch(L["Config_SetKeyBinding"] or "Set Show / Hide Key") .. ": "
             .. (bindingText or L["Config_KeyBindingNotBound"] or "Not Bound")
         Btn(bindingLabel, function()
             MR:ShowToggleWindowsKeybindDialog()
@@ -607,7 +614,7 @@ function MR:PopulateConfigFrame(f)
         Divider()
         SectionLabel(L["Config_Display"])
 
-        yOff = OptionsSlider(body, yOff, L["WIDTH"], PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, 10,
+        yOff = OptionsSlider(body, yOff, TrackSearch(L["WIDTH"]), PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, 10,
             function() return MR.db.profile.width or 260 end,
             function(v)
                 MR.ApplyWidth(v)
@@ -620,7 +627,7 @@ function MR:PopulateConfigFrame(f)
             0.16, 0.78, 0.75, 8, nil, cfgFs)
 
         Gap(6)
-        yOff = OptionsSlider(body, yOff, L["HEIGHT"], PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT, 10,
+        yOff = OptionsSlider(body, yOff, TrackSearch(L["HEIGHT"]), PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT, 10,
             function() return MR.db.profile.height or 400 end,
             function(v)
                 MR.ApplyHeight(v)
@@ -633,7 +640,7 @@ function MR:PopulateConfigFrame(f)
             0.16, 0.75, 0.78, 8, nil, cfgFs)
 
         Gap(6)
-        yOff = OptionsSlider(body, yOff, L["SCALE"], 0.5, 2.0, 0.05,
+        yOff = OptionsSlider(body, yOff, TrackSearch(L["SCALE"]), 0.5, 2.0, 0.05,
             function() return MR.db.profile.scale or 1.0 end,
             function(v)
                 if MR.db.profile.syncWindowScale then
@@ -646,7 +653,7 @@ function MR:PopulateConfigFrame(f)
             0.55, 0.22, 0.82, 8, nil, cfgFs)
 
         Gap(2)
-        yOff = OptionsCheckbox(body, yOff, L["Config_SyncScale"],
+        yOff = OptionsCheckbox(body, yOff, TrackSearch(L["Config_SyncScale"]),
             function() return MR.db.profile.syncWindowScale end,
             function(v)
                 MR.db.profile.syncWindowScale = v
@@ -656,7 +663,7 @@ function MR:PopulateConfigFrame(f)
             0.55, 0.22, 0.82, 8, nil, cfgFs)
 
         Gap(6)
-        yOff = OptionsSlider(body, yOff, L["BACKGROUND"], 0, 1, 0.05,
+        yOff = OptionsSlider(body, yOff, TrackSearch(L["BACKGROUND"]), 0, 1, 0.05,
             function() return MR.db.profile.frameAlpha or 1.0 end,
             function(v)
                 MR.db.profile.frameAlpha = v
@@ -667,7 +674,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(2)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowIcons"] or "Show Icons",
+            TrackSearch(L["Config_ShowIcons"] or "Show Icons"),
             function() return MR.db.profile.keepIconsVisibleInTextMode ~= false end,
             function(v)
                 MR.db.profile.keepIconsVisibleInTextMode = v
@@ -677,7 +684,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(2)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_HideStatusBoxes"] or "Hide Clickable Boxes",
+            TrackSearch(L["Config_HideStatusBoxes"] or "Hide Clickable Boxes"),
             function() return MR.db.profile.hideStatusBoxes == true end,
             function(v)
                 MR.db.profile.hideStatusBoxes = v and true or false
@@ -744,7 +751,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(2)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowMainCharacterBar"] or "Show Character Switcher Bar",
+            TrackSearch(L["Config_ShowMainCharacterBar"] or "Show Character Switcher Bar"),
             function() return MR.db.profile.showMainCharacterBar ~= false end,
             function(v)
                 MR.db.profile.showMainCharacterBar = v and true or false
@@ -762,7 +769,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(2)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_AnimatedMinimize"] or "Animated Minimize / Restore",
+            TrackSearch(L["Config_AnimatedMinimize"] or "Animated Minimize / Restore"),
             function() return IsAnimatedMinimizeEnabled() end,
             function(v)
                 SetWindowLayoutValue("animatedMinimize", v and true or false)
@@ -771,7 +778,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(2)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowSectionHeaders"] or "Show Section Headers",
+            TrackSearch(L["Config_ShowSectionHeaders"] or "Show Section Headers"),
             function() return MR.db.profile.keepHeadersVisibleInTextMode ~= false end,
             function(v)
                 MR.db.profile.keepHeadersVisibleInTextMode = v
@@ -783,7 +790,7 @@ function MR:PopulateConfigFrame(f)
         Gap(4); Divider()
 
         Gap(6)
-        yOff = OptionsSlider(body, yOff, L["Config_FontSize"], FONT_SIZE_MIN, FONT_SIZE_MAX, 1,
+        yOff = OptionsSlider(body, yOff, TrackSearch(L["Config_FontSize"]), FONT_SIZE_MIN, FONT_SIZE_MAX, 1,
             function() return GetFontSize() end,
             function(v)
                 if MR.db.profile.syncWindowFontSize then
@@ -838,7 +845,7 @@ function MR:PopulateConfigFrame(f)
         yOff = yOff - 40
 
         Gap(2)
-        yOff = OptionsCheckbox(body, yOff, L["Config_SyncFontSize"],
+        yOff = OptionsCheckbox(body, yOff, TrackSearch(L["Config_SyncFontSize"]),
             function() return MR.db.profile.syncWindowFontSize end,
             function(v)
                 MR.db.profile.syncWindowFontSize = v
@@ -851,6 +858,7 @@ function MR:PopulateConfigFrame(f)
         SectionLabel(L["Config_ThemeColor"] or "Theme Color")
 
         do
+            TrackSearch(L["Config_UseClassColor"] or "Use Class Color")
             local classBtn, classLbl, resetBtn, resetLbl
             local function RefreshThemeChoiceButtons()
                 if classBtn and classLbl then
@@ -1080,7 +1088,7 @@ function MR:PopulateConfigFrame(f)
 
         Gap(4)
         yOff = OptionsCheckbox(body, yOff,
-            L["Config_ShowWarbandTooltips"] or "Show Warband Info in Tooltips",
+            TrackSearch(L["Config_ShowWarbandTooltips"] or "Show Warband Info in Tooltips"),
             function() return MR.db.profile.showWarbandTooltips ~= false end,
             function(v) MR.db.profile.showWarbandTooltips = v end,
             0.24, 0.82, 0.70, 8, nil, cfgFs, true)
@@ -1114,6 +1122,7 @@ function MR:PopulateConfigFrame(f)
 
     if activePage == "support" then
         local function CopyableLinkRow(label, url, accentHex)
+            TrackSearch(label)
             local capLabel = ns.AcquireFontString(body, "pagesText16", "OVERLAY")
             capLabel:SetFont(ns.FONT_ROWS, cfgFs, GetFontFlags())
             capLabel:SetPoint("TOPLEFT", body, "TOPLEFT", 8, yOff)
@@ -1261,13 +1270,15 @@ function MR:PopulateConfigFrame(f)
     ns.FinishWidgetPool(widgetPool)
 
     local totalH = math.abs(yOff) + 8
-    local maxBodyH = math.max(220, math.min(PANEL_MAX_HEIGHT - 22, (UIParent:GetHeight() or 768) - 120))
+    local headerHeight = f.RefreshConfigSearch and 58 or 22
+    local maxBodyH = math.max(220, math.min(PANEL_MAX_HEIGHT - headerHeight, (UIParent:GetHeight() or 768) - 120))
     body:SetHeight(totalH)
     bodyParent:SetHeight(totalH)
     if f.scroll then
-        f:SetHeight(math.min(totalH + 22, maxBodyH + 22))
+        f:SetHeight(math.min(totalH + headerHeight, maxBodyH + headerHeight))
         if f.UpdateScrollBar then f.UpdateScrollBar() end
     else
         f:SetHeight(totalH)
     end
+    if f.RefreshConfigSearch then f.RefreshConfigSearch() end
 end

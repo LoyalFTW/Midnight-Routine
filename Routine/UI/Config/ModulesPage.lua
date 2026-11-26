@@ -9,6 +9,18 @@ local OptionsColorSwatch = ns.OptionsColorSwatch
 local hex = ns.Hex
 local GetFontFlags = Config.GetFontFlags
 
+function Config.IsStoryModule(mod)
+    return mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_"))
+end
+
+function Config.IsModuleShown(mod)
+    return MR:MeetsModuleLevelRequirement(mod, MR.db.char) and (not mod.isVisible or mod:isVisible())
+end
+
+function Config.IsProfessionModuleKnown(mod, source)
+    return not mod.profSkillLine or not MR.HasProfessionForModule or MR:HasProfessionForModule(mod.profSkillLine, source)
+end
+
 function Config.BuildModulesPage(ctx)
     local f = ctx.frame
     local body = ctx.body
@@ -22,11 +34,10 @@ function Config.BuildModulesPage(ctx)
     local contentW = ctx.contentW
     local function Gap(h) yOff = OptionsGap(body, yOff, h) end
 
-    local function IsStoryConfigModule(mod)
-        return mod and (mod.configGroup == "story" or (type(mod.key) == "string" and mod.key:match("^story_campaign_")))
-    end
+    local IsStoryConfigModule = Config.IsStoryModule
 
     Gap(4)
+    f.searchTargets[L["Config_TabModules"]] = yOff
     local toolbarH = math.max(46, cfgFs + moduleSubFs + 25)
     local toolbar = ns.AcquireFrame(body, "modulesFrame1", "Frame", "BackdropTemplate")
     toolbar:SetPoint("TOPLEFT", body, "TOPLEFT", 4, yOff)
@@ -815,10 +826,7 @@ function Config.BuildModulesPage(ctx)
         return not MR.HasProfessionForModule or MR:HasProfessionForModule(profession.skillLine, professionSource)
     end
     local function IsProfessionModuleKnownForConfig(mod)
-        if not mod or not mod.profSkillLine then
-            return true
-        end
-        return not MR.HasProfessionForModule or MR:HasProfessionForModule(mod.profSkillLine, professionSource)
+        return Config.IsProfessionModuleKnown(mod, professionSource)
     end
     for _, expansion in ipairs(ns.AllExpansions or {}) do
         for _, profession in ipairs(expansion.professions or {}) do
@@ -1145,7 +1153,7 @@ function Config.BuildModulesPage(ctx)
     for _, mod in ipairs(_allMods) do
         local currentMod = mod
         local key = currentMod.key
-        local optVisible = MR:MeetsModuleLevelRequirement(mod, MR.db.char) and (not mod.isVisible or mod:isVisible())
+        local optVisible = Config.IsModuleShown(mod)
         local isStoryConfigModule = IsStoryConfigModule(mod)
         local patchKey = MR:GetModulePatchKey(mod)
 
@@ -1191,6 +1199,7 @@ function Config.BuildModulesPage(ctx)
         end
 
         if optVisible then
+            f.searchTargets["module:" .. key] = yOff
             local moduleAvailable = MR:IsModuleAvailable(currentMod)
             local moduleHeight = currentMod.profSkillLine and math.max(24, moduleHeaderFs + 14) or moduleHeaderH
             local moduleFrame = Config.CreateModuleControl({

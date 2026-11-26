@@ -341,14 +341,16 @@ function MR:BuildConfigFrame()
         titleEdge:SetShown(not theme)
     end)
 
+    ns.ConfigInternal.BuildSearch(f)
+
     local scroll = CreateFrame("ScrollFrame", nil, f)
-    scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -22)
+    scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -58)
     scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 0)
     local scrollContent = CreateFrame("Frame", nil, scroll)
     scrollContent:SetSize(f:GetWidth() or 344, 1)
 
     local track = CreateFrame("Frame", nil, f)
-    track:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -25)
+    track:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -61)
     track:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, 3)
     track:SetWidth(4)
 

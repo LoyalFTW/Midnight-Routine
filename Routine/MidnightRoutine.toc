@@ -74,6 +74,7 @@ UI/MainPanel/Sections.lua
 UI/MainPanel/Controller.lua
 UI/MainPanel/DetachedWindows.lua
 UI/Config/Frame.lua
+UI/Config/Search.lua
 UI/Config/ModuleControls.lua
 UI/Config/ModulesPage.lua
 UI/Config/Pages.lua
@@ -82,4 +83,3 @@ UI/MinimapButton.lua
 UI/ForeverController.lua
 Core/CompletionSounds.lua
 Core/Bootstrap.lua
-
