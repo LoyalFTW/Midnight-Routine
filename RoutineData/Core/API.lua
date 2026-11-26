@@ -205,11 +205,13 @@ function API.GetBankSnapshots()
     if not view then return nil end
     local snapshots = CopyTable(view)
     local now = (GetServerTime and GetServerTime()) or time()
-    for _, snapshot in pairs(snapshots.mail or {}) do
-        for _, tab in pairs(snapshot.tabs or {}) do
-            for slot, item in pairs(tab.items or {}) do
-                if RoutineData:IsMailAttachmentExpired(item, now) then
-                    tab.items[slot] = nil
+    for _, source in ipairs({ "mail", "auctions" }) do
+        for _, snapshot in pairs(snapshots[source] or {}) do
+            for _, tab in pairs(snapshot.tabs or {}) do
+                for slot, item in pairs(tab.items or {}) do
+                    if RoutineData:IsItemExpired(item, now) then
+                        tab.items[slot] = nil
+                    end
                 end
             end
         end
@@ -232,14 +234,14 @@ function API.SearchInventory(query)
         for slot, item in pairs(tab.items or {}) do
             local name = item.name or (item.id and C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(item.id))
             local matchesQuery = (itemID and item.id == itemID) or (not itemID and name and name:lower():find(query, 1, true))
-            if matchesQuery and (source ~= "mail" or not RoutineData:IsMailAttachmentExpired(item, now)) then
-                local key = item.id or item.link or name
+            if matchesQuery and not RoutineData:IsItemExpired(item, now) then
+                local key = source == "auctions" and slot or item.id or item.link or name
                 local result = matches[key]
                 if not result then
                     result = {
                         itemID = item.id, name = name, link = item.link, icon = item.icon, quantity = 0,
                         source = source, characterKey = charKey, guildKey = guildKey, guildName = guildName,
-                        tabIndex = tabIndex, tabName = tab.name, updatedAt = updatedAt, slot = slot,
+                        tabIndex = tabIndex, tabName = tab.name, updatedAt = updatedAt, slot = slot, expiresAt = source == "auctions" and item.expiresAt or nil,
                     }
                     matches[key] = result
                     results[#results + 1] = result
@@ -259,6 +261,7 @@ function API.SearchInventory(query)
     for charKey, snapshot in pairs(store.characters or {}) do SearchSnapshot("character", charKey, snapshot) end
     for charKey, snapshot in pairs(store.mail or {}) do SearchSnapshot("mail", charKey, snapshot) end
     for charKey, snapshot in pairs(store.equipped or {}) do SearchSnapshot("equipped", charKey, snapshot) end
+    for charKey, snapshot in pairs(store.auctions or {}) do SearchSnapshot("auctions", charKey, snapshot) end
     SearchSnapshot("warband", nil, store.warband)
 
     local guildTabs = {}

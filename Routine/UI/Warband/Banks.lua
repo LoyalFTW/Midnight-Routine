@@ -230,6 +230,7 @@ local function RefreshInventorySearch(pane, searchInventory, contentWidth)
         local source = pane.sourceButtons[result.source]
         local sourceLabel = source and source._label:GetText()
         if result.source == "mail" then sourceLabel = INBOX or "Inbox" end
+        if result.source == "auctions" then sourceLabel = result.tabName or AUCTIONS or "Auctions" end
         if result.source == "equipped" then sourceLabel = EQUIPPED or "Equipped" end
         local owner = names[result.characterKey] or result.characterKey
         if sourceLabel then

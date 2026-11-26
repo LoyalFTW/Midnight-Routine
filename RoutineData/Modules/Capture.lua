@@ -361,7 +361,102 @@ end
 
 -- Events -----------------------------------------------------------------------
 
+local function ModernAuctionHouse()
+    return C_AuctionHouse and C_AuctionHouse.GetOwnedAuctionInfo and C_AuctionHouse.GetNumOwnedAuctions
+        and Enum and Enum.AuctionStatus and C_AuctionHouse
+end
+
+local function CollectOwnedAuctions(tab, now, auctionHouse)
+    if auctionHouse.HasFullOwnedAuctionResults and not auctionHouse.HasFullOwnedAuctionResults() then return false end
+    for index = 1, auctionHouse.GetNumOwnedAuctions() do
+        local auction = auctionHouse.GetOwnedAuctionInfo(index)
+        if not auction or auction.status == nil then return false end
+        if auction.status == Enum.AuctionStatus.Active then
+            local itemID = auction.itemKey and auction.itemKey.itemID
+            if not itemID or not auction.quantity then return false end
+            local link = auction.itemLink
+            tab.items[index] = {
+                id = itemID,
+                link = link,
+                name = link and link:match("%[(.-)%]"),
+                icon = C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID),
+                count = auction.quantity,
+                expiresAt = auction.timeLeftSeconds and now + auction.timeLeftSeconds,
+            }
+        end
+    end
+    return true
+end
+
+local LEGACY_AUCTION_MAX_SECONDS = { 1800, 7200, 43200, 172800 }
+
+local function CollectLegacyAuctions(tab, now)
+    if not (GetNumAuctionItems and GetAuctionItemInfo and GetAuctionItemTimeLeft) then return false end
+    local count, total = GetNumAuctionItems("owner")
+    if not count or (total and total > count) then return false end
+    for index = 1, count do
+        local name, icon, quantity, quality, _, _, _, _, _, _, _, _, _, _, _, saleStatus, itemID = GetAuctionItemInfo("owner", index)
+        if saleStatus == nil then return false end
+        if saleStatus == 0 then
+            if not itemID or not quantity then return false end
+            local seconds = LEGACY_AUCTION_MAX_SECONDS[GetAuctionItemTimeLeft("owner", index)]
+            tab.items[index] = {
+                id = itemID,
+                link = GetAuctionItemLink and GetAuctionItemLink("owner", index),
+                name = name,
+                icon = icon,
+                quality = quality,
+                count = quantity,
+                expiresAt = seconds and now + seconds,
+            }
+        end
+    end
+    return true
+end
+
+function RoutineData:CaptureAuctions()
+    local charKey = self:GetCurrentCharacterKey()
+    if not charKey then return end
+    local now = Now()
+    local tab = { name = AUCTIONS or "Auctions", items = {} }
+    local auctionHouse = ModernAuctionHouse()
+    local complete
+    if auctionHouse then
+        complete = CollectOwnedAuctions(tab, now, auctionHouse)
+    else
+        complete = CollectLegacyAuctions(tab, now)
+    end
+    if not complete then return end
+    self:GetCharacterRecord(charKey, true)
+    self.db.snapshots.auctions[charKey] = { tabs = { tab }, updatedAt = now }
+    self:Fire("ItemsUpdated", charKey, "auctions")
+end
+
 local state = {}
+
+local function QueryOwnedAuctions()
+    local session = state.auctionHouse
+    local auctionHouse = ModernAuctionHouse()
+    if not (session and not session.queried and auctionHouse and auctionHouse.QueryOwnedAuctions) then return end
+    session.queried = true
+    auctionHouse.QueryOwnedAuctions({})
+end
+
+local function OpenAuctionHouse()
+    if state.auctionHouse then return end
+    local session = {}
+    state.auctionHouse = session
+    if ModernAuctionHouse() then
+        C_Timer.After(CAPTURE_DEBOUNCE, function()
+            if state.auctionHouse == session and C_AuctionHouse.IsThrottledMessageSystemReady
+                and C_AuctionHouse.IsThrottledMessageSystemReady() then
+                QueryOwnedAuctions()
+            end
+        end)
+    elseif GetOwnerAuctionItems then
+        GetOwnerAuctionItems()
+    end
+end
 
 local function Debounced(key, func, sessionKey)
     local queue = sessionKey and state[sessionKey] or (not sessionKey and state)
@@ -465,12 +560,29 @@ local handlers = {
     GUILDBANK_UPDATE_TABS = function()
         Debounced("guild", RoutineData.CaptureGuildBank, "guildBankOpen")
     end,
+    AUCTION_HOUSE_SHOW = OpenAuctionHouse,
+    AUCTION_HOUSE_CLOSED = function()
+        state.auctionHouse = nil
+    end,
+    AUCTION_HOUSE_THROTTLED_SYSTEM_READY = QueryOwnedAuctions,
+    OWNED_AUCTIONS_UPDATED = function()
+        if state.auctionHouse and ModernAuctionHouse() then RoutineData:CaptureAuctions() end
+    end,
+    AUCTION_OWNED_LIST_UPDATE = function()
+        if state.auctionHouse and not ModernAuctionHouse() then RoutineData:CaptureAuctions() end
+    end,
     PLAYER_INTERACTION_MANAGER_FRAME_SHOW = function(interactionType)
+        if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.Auctioneer then
+            OpenAuctionHouse()
+        end
         if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
             OpenGuildBank()
         end
     end,
     PLAYER_INTERACTION_MANAGER_FRAME_HIDE = function(interactionType)
+        if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.Auctioneer then
+            state.auctionHouse = nil
+        end
         if Enum and Enum.PlayerInteractionType and interactionType == Enum.PlayerInteractionType.GuildBanker then
             state.guildBankOpen = nil
         end

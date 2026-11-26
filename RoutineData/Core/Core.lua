@@ -32,6 +32,7 @@ local DEFAULTS = {
         tooltipBags = true,
         tooltipBank = true,
         tooltipMail = true,
+        tooltipAuctions = true,
         tooltipEquipped = true,
         tooltipWarband = true,
         tooltipGuild = true,
@@ -109,7 +110,7 @@ function RoutineData:MigrateLegacyCharacterKey(key)
     if not (db and legacy and legacy ~= key and db.characters[legacy] and not db.characters[key]) then return end
 
     db.characters[key], db.characters[legacy] = db.characters[legacy], nil
-    for _, store in ipairs({ db.characterGuilds, db.snapshots.characters, db.snapshots.bags, db.snapshots.mail, db.snapshots.equipped, db.snapshots.guildBanks }) do
+    for _, store in ipairs({ db.characterGuilds, db.snapshots.characters, db.snapshots.bags, db.snapshots.mail, db.snapshots.auctions, db.snapshots.equipped, db.snapshots.guildBanks }) do
         if store[legacy] ~= nil and store[key] == nil then
             store[key], store[legacy] = store[legacy], nil
         end
@@ -148,6 +149,7 @@ function RoutineData:ForgetCharacter(charKey)
     self.db.snapshots.characters[charKey] = nil
     self.db.snapshots.bags[charKey] = nil
     self.db.snapshots.mail[charKey] = nil
+    self.db.snapshots.auctions[charKey] = nil
     self.db.snapshots.equipped[charKey] = nil
     self.db.snapshots.guildBanks[charKey] = nil
     self:Fire("CharacterRemoved", charKey)
@@ -163,7 +165,7 @@ function RoutineData:GetLabel(key, default)
     return provider and provider(key) or default
 end
 
-function RoutineData:IsMailAttachmentExpired(item, now)
+function RoutineData:IsItemExpired(item, now)
     return item.expiresAt ~= nil and item.expiresAt <= now
 end
 
@@ -174,6 +176,7 @@ function RoutineData:GetBankSnapshotView()
         characters = db.snapshots.characters,
         bags = db.snapshots.bags,
         mail = db.snapshots.mail,
+        auctions = db.snapshots.auctions,
         equipped = db.snapshots.equipped,
         warband = db.snapshots.warband,
         characterGuilds = db.characterGuilds,
@@ -240,11 +243,12 @@ local function SumTabs(tabs, itemID)
     return total
 end
 
-local function CountMail(snapshot, itemID, now)
+local function CountUnexpiredItems(snapshot, itemID, now)
+    if not snapshot then return 0 end
     local total = 0
     for _, tab in pairs(snapshot.tabs or {}) do
         for _, item in pairs(tab.items or {}) do
-            if item.id == itemID and not RoutineData:IsMailAttachmentExpired(item, now) then
+            if item.id == itemID and not RoutineData:IsItemExpired(item, now) then
                 total = total + (tonumber(item.count) or 1)
             end
         end
@@ -261,19 +265,22 @@ function API.GetItemCounts(itemID)
 
     local now = (GetServerTime and GetServerTime()) or time()
     local mailSnapshots = db.snapshots and db.snapshots.mail
+    local auctionSnapshots = db.snapshots and db.snapshots.auctions
     for charKey, record in pairs(db.characters) do
         local bags = record.bags[itemID] or 0
         local bank = record.bank[itemID] or 0
         local snapshot = mailSnapshots and mailSnapshots[charKey]
-        local mail = snapshot and CountMail(snapshot, itemID, now) or (record.mail and record.mail[itemID] or 0)
+        local mail = snapshot and CountUnexpiredItems(snapshot, itemID, now) or (record.mail and record.mail[itemID] or 0)
         local equipped = record.equipped and record.equipped[itemID] or 0
-        if bags > 0 or bank > 0 or mail > 0 or equipped > 0 then
+        local auctions = CountUnexpiredItems(auctionSnapshots and auctionSnapshots[charKey], itemID, now)
+        if bags > 0 or bank > 0 or mail > 0 or equipped > 0 or auctions > 0 then
             result.characters[#result.characters + 1] = {
                 key = charKey,
                 classFile = record.classFile,
                 bags = bags,
                 bank = bank,
                 mail = mail,
+                auctions = auctions,
                 equipped = equipped,
             }
         end
@@ -339,7 +346,7 @@ function API.GetTotalItemCount(itemID)
     local counts = API.GetItemCounts(itemID)
     local total = counts.warband
     for _, entry in ipairs(counts.characters) do
-        total = total + entry.bags + entry.bank + entry.mail + entry.equipped
+        total = total + entry.bags + entry.bank + entry.mail + entry.equipped + entry.auctions
     end
     for _, entry in ipairs(counts.guilds) do
         total = total + entry.count
@@ -362,7 +369,7 @@ frame:SetScript("OnEvent", function(_, event, loadedName)
             if type(db[key]) ~= "table" then db[key] = {} end
         end
         if type(db.warband.tabs) ~= "table" then db.warband.tabs = {} end
-        for _, key in ipairs({ "characters", "bags", "mail", "equipped", "guildBanks" }) do
+        for _, key in ipairs({ "characters", "bags", "mail", "equipped", "guildBanks", "auctions" }) do
             if type(db.snapshots[key]) ~= "table" then db.snapshots[key] = {} end
         end
         MergeMissing(db, DEFAULTS)
