@@ -3,6 +3,7 @@ local RoutineData = ns.RoutineData
 if not RoutineData then return end
 
 local CAPTURE_DEBOUNCE = 0.5
+local INVENTORY_CAPTURE_INTERVAL = 0.12
 local GUILD_TAB_SLOTS = 98
 local MAIL_ATTACHMENTS = 16
 
@@ -18,7 +19,7 @@ local function Label(key, default)
     return RoutineData:GetLabel(key, default)
 end
 
-local function SnapshotContainer(bagID, name, icon, requireComplete)
+local function SnapshotContainer(bagID, name, icon, requireComplete, probeEmptySlots)
     if not (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerItemInfo) then return nil, true end
     local bagIndex = Enum and Enum.BagIndex or {}
     local getSlots = GetKeyRingSize and bagID == (bagIndex.Keyring or -2) and GetKeyRingSize or C_Container.GetContainerNumSlots
@@ -26,19 +27,26 @@ local function SnapshotContainer(bagID, name, icon, requireComplete)
     if not ok or type(slots) ~= "number" or slots < 0 then return nil, true end
     if slots == 0 then return nil end
     local tab = { name = name, icon = icon, slots = slots, items = {} }
+    local getItemID = probeEmptySlots and getSlots ~= GetKeyRingSize and C_Container.GetContainerItemID
     for slot = 1, slots do
-        local success, info = pcall(C_Container.GetContainerItemInfo, bagID, slot)
-        if requireComplete and (not success or (info and not info.itemID)) then return nil, true end
-        if success and info and info.itemID then
-            local link = info.hyperlink
-            tab.items[slot] = {
-                id = info.itemID,
-                link = link,
-                name = (link and link:match("%[(.-)%]")) or (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(info.itemID)),
-                icon = info.iconFileID,
-                count = tonumber(info.stackCount) or 1,
-                quality = info.quality,
-            }
+        local checked, itemID
+        if getItemID then checked, itemID = pcall(getItemID, bagID, slot) end
+        if not checked or itemID ~= nil then
+            local success, info = pcall(C_Container.GetContainerItemInfo, bagID, slot)
+            if requireComplete and (not success or (info and not info.itemID) or (itemID and (not info or info.itemID ~= itemID))) then
+                return nil, true
+            end
+            if success and info and info.itemID then
+                local link = info.hyperlink
+                tab.items[slot] = {
+                    id = info.itemID,
+                    link = link,
+                    name = (link and link:match("%[(.-)%]")) or (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(info.itemID)),
+                    icon = info.iconFileID,
+                    count = tonumber(info.stackCount) or 1,
+                    quality = info.quality,
+                }
+            end
         end
     end
     return tab
@@ -54,8 +62,8 @@ local function AddTab(tabs, tab)
     if tab then tabs[#tabs + 1] = tab end
 end
 
-local function CountTab(tab)
-    local counts = {}
+local function CountTab(tab, counts)
+    counts = counts or {}
     for _, item in pairs(tab and tab.items or {}) do
         if type(item) == "table" and item.id then
             counts[item.id] = (counts[item.id] or 0) + (tonumber(item.count) or 1)
@@ -67,68 +75,79 @@ end
 local function CountTabs(tabs)
     local combined = {}
     for _, tab in pairs(tabs) do
-        for itemID, count in pairs(CountTab(tab)) do
-            combined[itemID] = (combined[itemID] or 0) + count
-        end
+        CountTab(tab, combined)
     end
     return combined
 end
 
-local function CollectBags()
+local bagContainers, bagSnapshot, dirtyBags
+
+local function CollectBags(previous, dirty)
     local bagIndex = Enum and Enum.BagIndex or {}
-    local tabs = {}
-    AddTab(tabs, SnapshotContainer(bagIndex.Backpack or 0, Label("AltBoard_BankBackpack", "Backpack")))
+    local tabs, containers = {}, {}
+    local complete = true
+    local function ReadBag(bagID, name)
+        local tab = previous and previous[bagID]
+        if not previous or tab == nil or dirty[bagID] then
+            local unavailable
+            tab, unavailable = SnapshotContainer(bagID, name, nil, true, previous and previous[bagID] ~= nil)
+            if unavailable then complete = false end
+        end
+        containers[bagID] = tab or false
+        AddTab(tabs, tab)
+    end
+    ReadBag(bagIndex.Backpack or 0, Label("AltBoard_BankBackpack", "Backpack"))
     for index = 1, 5 do
         local bagID = bagIndex["Bag_" .. index] or index
-        AddTab(tabs, SnapshotContainer(bagID, string.format(Label("AltBoard_BagSlot", "Bag %d"), index)))
+        ReadBag(bagID, string.format(Label("AltBoard_BagSlot", "Bag %d"), index))
     end
     if GetKeyRingSize then
-        AddTab(tabs, SnapshotContainer(bagIndex.Keyring or -2, KEYRING or "Keyring"))
+        ReadBag(bagIndex.Keyring or -2, KEYRING or "Keyring")
     end
-    return #tabs > 0 and tabs or nil
+    return #tabs > 0 and tabs or nil, complete and containers or nil
 end
 
-local function CollectPurchasedBank(bankType)
+local function CollectPurchasedBank(bankType, probeEmptySlots)
     local metadata = BankMetadata(bankType)
     if not metadata or #metadata == 0 then return nil end
     local tabs = {}
     for index, info in ipairs(metadata) do
-        local tab = SnapshotContainer(info.ID, info.name or string.format(Label("AltBoard_BankTab", "Tab %d"), index), info.icon, true)
+        local tab = SnapshotContainer(info.ID, info.name or string.format(Label("AltBoard_BankTab", "Tab %d"), index), info.icon, true, probeEmptySlots)
         if not tab then return nil end
         tabs[index] = tab
     end
     return tabs
 end
 
-local function CollectCharacterBank()
+local function CollectCharacterBank(probeEmptySlots)
     local bagIndex = Enum and Enum.BagIndex or {}
     local tabs = {}
     if not bagIndex.CharacterBankTab_1 then
-        local main = SnapshotContainer(bagIndex.Bank or -1, Label("AltBoard_BankMain", "Bank"), nil, true)
+        local main = SnapshotContainer(bagIndex.Bank or -1, Label("AltBoard_BankMain", "Bank"), nil, true, probeEmptySlots)
         if not main then return nil end
         tabs[1] = main
         for index = 1, 7 do
             local bagID = NUM_BAG_SLOTS and (NUM_BAG_SLOTS + index)
             if bagID then
-                local tab, unavailable = SnapshotContainer(bagID, string.format(Label("AltBoard_BankBag", "Bank bag %d"), index), nil, true)
+                local tab, unavailable = SnapshotContainer(bagID, string.format(Label("AltBoard_BankBag", "Bank bag %d"), index), nil, true, probeEmptySlots)
                 if unavailable then return nil end
                 AddTab(tabs, tab)
             end
         end
     else
-        return CollectPurchasedBank(Enum.BankType and Enum.BankType.Character)
+        return CollectPurchasedBank(Enum.BankType and Enum.BankType.Character, probeEmptySlots)
     end
     return #tabs > 0 and tabs or nil
 end
 
-local function CollectWarbandBank()
+local function CollectWarbandBank(probeEmptySlots)
     if not (Enum and Enum.BagIndex and Enum.BankType and Enum.BankType.Account and C_Bank) then return nil end
     if C_PlayerInfo and C_PlayerInfo.HasAccountInventoryLock and not C_PlayerInfo.HasAccountInventoryLock() then return nil end
     if C_Bank.FetchBankLockedReason then
         local ok, reason = pcall(C_Bank.FetchBankLockedReason, Enum.BankType.Account)
         if not ok or (reason ~= nil and reason ~= (Enum.BankLockedReason and Enum.BankLockedReason.None or 0)) then return nil end
     end
-    return CollectPurchasedBank(Enum.BankType.Account)
+    return CollectPurchasedBank(Enum.BankType.Account, probeEmptySlots)
 end
 
 local function CollectMail(now)
@@ -208,22 +227,33 @@ end
 
 -- Capture ----------------------------------------------------------------------
 
-function RoutineData:CaptureBags()
+function RoutineData:CaptureBags(useDirtyBags)
     local charKey = self:GetCurrentCharacterKey()
-    local tabs = CollectBags()
-    if not charKey or not tabs then return end
+    if not charKey then return end
+    local previous = self.db.snapshots.bags[charKey]
+    local dirty = useDirtyBags and dirtyBags
+    local cached = dirty and next(dirty) and previous == bagSnapshot and bagContainers
+    dirtyBags = nil
+    local tabs, containers = CollectBags(cached, dirty)
+    if not containers then
+        bagContainers = nil
+        return
+    end
+    if not tabs then return end
     local now = Now()
     local record = self:GetCharacterRecord(charKey, true)
     record.bags = CountTabs(tabs)
     record.classFile = select(2, UnitClass("player")) or record.classFile
     record.updatedAt.bags = now
-    self.db.snapshots.bags[charKey] = { tabs = tabs, updatedAt = now }
+    local snapshot = { tabs = tabs, updatedAt = now }
+    self.db.snapshots.bags[charKey] = snapshot
+    bagContainers, bagSnapshot = containers, snapshot
     self:Fire("ItemsUpdated", charKey, "bags")
 end
 
-function RoutineData:CaptureCharacterBank()
+function RoutineData:CaptureCharacterBank(probeEmptySlots)
     local charKey = self:GetCurrentCharacterKey()
-    local tabs = CollectCharacterBank()
+    local tabs = CollectCharacterBank(probeEmptySlots)
     if not charKey or not tabs then return end
     local now = Now()
     local record = self:GetCharacterRecord(charKey, true)
@@ -233,8 +263,8 @@ function RoutineData:CaptureCharacterBank()
     self:Fire("ItemsUpdated", charKey, "bank")
 end
 
-function RoutineData:CaptureWarbandBank()
-    local tabs = CollectWarbandBank()
+function RoutineData:CaptureWarbandBank(probeEmptySlots)
+    local tabs = CollectWarbandBank(probeEmptySlots)
     if not tabs then return end
     local now = Now()
     local counts = {}
@@ -460,14 +490,26 @@ local function OpenAuctionHouse()
     end
 end
 
-local function Debounced(key, func, sessionKey)
+local function Debounced(key, func, sessionKey, minimumInterval)
     local queue = sessionKey and state[sessionKey] or (not sessionKey and state)
     if not queue or queue[key] then return end
+    local delay = CAPTURE_DEBOUNCE
+    if minimumInterval then
+        queue.lastCapture = queue.lastCapture or {}
+        local last = queue.lastCapture[key]
+        delay = last and math.max(0, last + minimumInterval - GetTime()) or 0
+    end
     queue[key] = true
-    C_Timer.After(CAPTURE_DEBOUNCE, function()
+    C_Timer.After(delay, function()
         queue[key] = nil
-        if not sessionKey or state[sessionKey] == queue then func(RoutineData) end
+        if sessionKey and state[sessionKey] ~= queue then return end
+        if minimumInterval then queue.lastCapture[key] = GetTime() end
+        func(RoutineData)
     end)
+end
+
+local function CaptureUpdatedBags(self)
+    self:CaptureBags(true)
 end
 
 local function CaptureOpenBank()
@@ -475,13 +517,21 @@ local function CaptureOpenBank()
     RoutineData:CaptureWarbandBank()
 end
 
+local function CaptureUpdatedCharacterBank(self)
+    self:CaptureCharacterBank(true)
+end
+
+local function CaptureUpdatedWarbandBank(self)
+    self:CaptureWarbandBank(true)
+end
+
 local function QueueBankUpdate(bankType)
     local types = Enum and Enum.BankType
     if not types or bankType == nil or bankType == types.Character then
-        Debounced("bank", RoutineData.CaptureCharacterBank, "bankOpen")
+        Debounced("bank", CaptureUpdatedCharacterBank, "bankOpen", INVENTORY_CAPTURE_INTERVAL)
     end
     if not types or bankType == nil or bankType == types.Account then
-        Debounced("warband", RoutineData.CaptureWarbandBank, "bankOpen")
+        Debounced("warband", CaptureUpdatedWarbandBank, "bankOpen", INVENTORY_CAPTURE_INTERVAL)
     end
 end
 
@@ -527,17 +577,30 @@ local handlers = {
         end)
     end,
     BANKFRAME_CLOSED = function()
+        local session = state.bankOpen
         state.bankOpen = nil
+        if not session then return end
+        if session.bank then RoutineData:CaptureCharacterBank() end
+        if session.warband then RoutineData:CaptureWarbandBank() end
+    end,
+    BAG_UPDATE = function(bagID)
+        if not bagContainers or bagContainers[bagID] == nil then return end
+        dirtyBags = dirtyBags or {}
+        dirtyBags[bagID] = true
+    end,
+    BAG_CONTAINER_UPDATE = function()
+        bagContainers = nil
+        Debounced("bags", CaptureUpdatedBags, nil, INVENTORY_CAPTURE_INTERVAL)
     end,
     BAG_UPDATE_DELAYED = function()
-        Debounced("bags", RoutineData.CaptureBags)
+        Debounced("bags", CaptureUpdatedBags, nil, INVENTORY_CAPTURE_INTERVAL)
         QueueBankUpdate()
     end,
     PLAYERBANKSLOTS_CHANGED = function()
-        Debounced("bank", RoutineData.CaptureCharacterBank, "bankOpen")
+        Debounced("bank", CaptureUpdatedCharacterBank, "bankOpen", INVENTORY_CAPTURE_INTERVAL)
     end,
     PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED = function()
-        Debounced("warband", RoutineData.CaptureWarbandBank, "bankOpen")
+        Debounced("warband", CaptureUpdatedWarbandBank, "bankOpen", INVENTORY_CAPTURE_INTERVAL)
     end,
     BANK_TABS_CHANGED = QueueBankUpdate,
     BANK_TAB_SETTINGS_UPDATED = QueueBankUpdate,

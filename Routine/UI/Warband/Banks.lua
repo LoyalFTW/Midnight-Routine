@@ -135,19 +135,6 @@ function MR:CreateAltBankPane(frame, rightPane, tabBar)
     frame.bankPane = pane
 end
 
-local function GetSnapshot(pane, selected, store)
-    if not store then return nil end
-    if pane.bankSource == "warband" then return store.warband end
-    if pane.bankSource == "guild" then
-        local guildKey = selected and store.characterGuilds[selected.key]
-        local snapshot = selected and store.characterGuildBanks[selected.key]
-        if type(guildKey) ~= "string" or not snapshot or snapshot.guildKey ~= guildKey then return nil end
-        return snapshot
-    end
-    if pane.bankSource == "bags" then return selected and store.bags and store.bags[selected.key] or nil end
-    return selected and store.characters[selected.key] or nil
-end
-
 local function EnsureSearchRow(pane, index)
     local row = pane.searchRows[index]
     if row then return row end
@@ -375,10 +362,8 @@ function MR:RefreshAltBankPane(pane, selected)
         return
     end
     HideUnusedWidgets(pane.searchRows, 0)
-    local store = MR:GetBankSnapshots()
-    local guildState = selected and store and store.characterGuilds[selected.key]
+    local snapshot, guildState = MR:GetBankSnapshot(pane.bankSource, selected and selected.key)
     local guildName = type(guildState) == "string" and guildState:match(":(.+)$")
-    local snapshot = GetSnapshot(pane, selected, store)
     local name = pane.bankSource == "bags" and (selected and string.format(L["AltBoard_BagOwner"] or "%s's bags", selected.name) or (L["AltBoard_BankBags"] or "Bags"))
         or pane.bankSource == "character" and (selected and selected.name or (L["AltBoard_Characters"] or "Character"))
         or pane.bankSource == "guild" and (selected and (selected.name .. "  |  " .. (guildName or (guildState == false and (L["AltBoard_GuildNone"] or "No guild") or (L["AltBoard_GuildUnknown"] or "Guild not recorded")))) or (L["AltBoard_BankGuild"] or "Guild bank"))

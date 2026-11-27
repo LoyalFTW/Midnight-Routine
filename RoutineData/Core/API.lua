@@ -200,6 +200,26 @@ function API.GetCurrentWeekKey()
     return engine and engine:GetCurrentWeekKey() or 0
 end
 
+function API.GetBankSnapshot(source, charKey)
+    local view = RoutineData:GetBankSnapshotView()
+    if not view then return nil end
+    local guildKey = charKey and view.characterGuilds[charKey]
+    local snapshot
+    if source == "warband" then
+        snapshot = view.warband
+    elseif charKey then
+        if source == "bags" then
+            snapshot = view.bags[charKey]
+        elseif source == "character" then
+            snapshot = view.characters[charKey]
+        elseif source == "guild" and type(guildKey) == "string" then
+            snapshot = view.characterGuildBanks[charKey]
+            if snapshot and snapshot.guildKey ~= guildKey then snapshot = nil end
+        end
+    end
+    return snapshot and CopyTable(snapshot), guildKey
+end
+
 function API.GetBankSnapshots()
     local view = RoutineData:GetBankSnapshotView()
     if not view then return nil end
