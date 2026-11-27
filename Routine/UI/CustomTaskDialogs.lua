@@ -48,11 +48,11 @@ local function ApplyCustomTaskDialogTheme(frame)
     local editFont  = math.max(9,  fontSize)
 
 
-    frame:SetSize(420, 694)
-
-    local function sf(fs, size) if fs then fs:SetFont(ns.FONT_ROWS, size, GetFontFlags()) end end
+    local function sf(fs, size)
+        if fs then SetFontForText(fs, fs:GetText(), size, GetFontFlags()) end
+    end
     sf(frame.title,           math.max(10, fontSize + 1))
-    sf(frame.trackingHeader,  rowFont)
+    sf(frame.trackingLabel,   rowFont)
     sf(frame.progressHeader,  rowFont)
     sf(frame.behaviorHeader,  rowFont)
     sf(frame.nameLabel,       rowFont)
@@ -60,21 +60,25 @@ local function ApplyCustomTaskDialogTheme(frame)
     sf(frame.questLabel,      rowFont)
     sf(frame.encounterLabel,  rowFont)
     sf(frame.difficultyLabel, rowFont)
-    sf(frame.idHint,          hintFont)
     sf(frame.diffHint,        hintFont)
     sf(frame.targetLabel,     rowFont)
-    sf(frame.targetHint,      hintFont)
     sf(frame.resetLabel,      rowFont)
 
     if frame.title then frame.title:SetFont(ns.FONT_HEADERS, math.max(10, fontSize + 1), GetFontFlags()) end
 
-    local checks = { frame.weeklyCheck, frame.dailyCheck, frame.noResetCheck, frame.categorySeparateModuleCheck, frame.orderedQuestCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck, frame.cityReminderCheck }
+    local checks = { frame.categorySeparateModuleCheck, frame.orderedQuestCheck, frame.manualQuestCheck, frame.autoUpdateCheck, frame.sharedTaskCheck, frame.accountCompleteCheck, frame.cityReminderCheck }
     for _, cb in ipairs(checks) do
-        if cb and cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
+        sf(cb._text, rowFont)
     end
     if frame.difficultyChecks then
         for _, cb in ipairs(frame.difficultyChecks) do
-            if cb._text then cb._text:SetFont(ns.FONT_ROWS, rowFont, GetFontFlags()) end
+            sf(cb._text, rowFont)
+        end
+    end
+
+    for _, group in ipairs(frame.choiceGroups) do
+        for _, button in ipairs(group) do
+            SetFontForText(button._label, button._label:GetText(), rowFont, GetFontFlags())
         end
     end
 
@@ -85,9 +89,10 @@ local function ApplyCustomTaskDialogTheme(frame)
     if frame.targetInput    then ApplyDialogEditBoxFont(frame.targetInput,    editFont) end
     if frame.categoryDropdown and frame.categoryDropdown.ApplyFonts then frame.categoryDropdown:ApplyFonts() end
 
-    if frame.saveBtn   and frame.saveBtn._label   then frame.saveBtn._label:SetFont(ns.FONT_HEADERS,   10, GetFontFlags()) end
-    if frame.cancelBtn and frame.cancelBtn._label then frame.cancelBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags()) end
-    if frame.deleteBtn and frame.deleteBtn._label then frame.deleteBtn._label:SetFont(ns.FONT_HEADERS, 10, GetFontFlags()) end
+    sf(frame.saveBtn._label, rowFont)
+    sf(frame.cancelBtn._label, rowFont)
+    sf(frame.deleteBtn._label, rowFont)
+    frame:LayoutFields()
 end
 
 local function ApplyCustomTasksTitleDialogTheme(frame)
@@ -162,20 +167,12 @@ local function EnsureCustomTaskDialog()
 
 
     local PAD  = 14
-    local GAP  = 10
+    local GAP  = 7
     local IGAP = 6
     local IH   = 28
-    local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-    frame:SetSize(400, 512)
+    local frame = ns.StyledFrame(UIParent, nil, "DIALOG", 80)
     MR:RegisterPriorityFrame(frame)
-    frame:SetFrameLevel(80)
-    frame:SetClampedToScreen(true)
-    frame:SetMovable(true)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-    frame:SetBackdrop(MakeBackdrop())
-    ns.HookBackdropFrame(frame)
-    frame:SetBackdropColor(0.03, 0.08, 0.14, 0.98)
-    frame:SetBackdropBorderColor(0.20, 0.44, 0.48, 1)
     frame:Hide()
 
     local function BindHelp(control, key, fallback)
@@ -187,32 +184,31 @@ local function EnsureCustomTaskDialog()
         end
     end
 
-    local dragRegion = CreateFrame("Frame", nil, frame)
-    dragRegion:SetPoint("TOPLEFT",  frame, "TOPLEFT",  8, -8)
-    dragRegion:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
-    dragRegion:SetHeight(26)
-    dragRegion:EnableMouse(true)
-    dragRegion:RegisterForDrag("LeftButton")
-    dragRegion:SetScript("OnDragStart", function() frame:StartMoving() end)
-    dragRegion:SetScript("OnDragStop",  function() frame:StopMovingOrSizing() end)
+    local header = ns.TitleBar(frame, 28)
+    header:SetScript("OnDragStart", function()
+        frame.moving = true
+        frame:SetClampedToScreen(false)
+        frame:StartMoving()
+    end)
+    local function StopMoving()
+        if not frame.moving then return end
+        frame.moving = nil
+        frame:StopMovingOrSizing()
+        if frame.layoutPending then frame:LayoutFields() end
+        frame:SetClampedToScreen(true)
+    end
+    header:SetScript("OnDragStop", StopMoving)
+    frame:SetScript("OnHide", StopMoving)
 
-
-    local title = frame:CreateFontString(nil, "OVERLAY")
+    local close = ns.CloseButton(header, function() frame:Hide() end)
+    local title = header:CreateFontString(nil, "OVERLAY")
     title:SetFont(ns.FONT_HEADERS, math.max(10, GetFontSize() + 1), GetFontFlags())
-    title:SetPoint("TOPLEFT",  frame, "TOPLEFT",  PAD, -PAD)
-    title:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -PAD)
+    title:SetPoint("LEFT", header, "LEFT", PAD, 0)
+    title:SetPoint("RIGHT", close, "LEFT", -6, 0)
     title:SetJustifyH("LEFT")
     title:SetText(L["CustomTasks_Title"] or "Custom Tasks")
     ns.RegisterThemedFontString(title, 0.92, 0.97, 1)
     frame.title = title
-
-
-    local sep = frame:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
-    sep:SetPoint("TOPLEFT",  title, "BOTTOMLEFT",  0, -8)
-    sep:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -8)
-    ns.RegisterThemedTexture(sep, 0.20, 0.44, 0.48, 0.5)
-
 
     local function MakeLabel(anchorFrame, anchorPoint, xOff, yOff, text)
         local lbl = frame:CreateFontString(nil, "OVERLAY")
@@ -220,25 +216,9 @@ local function EnsureCustomTaskDialog()
         lbl:SetPoint("TOPLEFT", anchorFrame, anchorPoint, xOff, yOff)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(text)
-        lbl:SetTextColor(0.55, 0.70, 0.82)
+        lbl:SetTextColor(0.74, 0.84, 0.92)
         return lbl
     end
-
-    local function MakeSectionHeader(anchorFrame, yOff, text)
-        local line = frame:CreateTexture(nil, "ARTWORK")
-        line:SetHeight(1)
-        line:SetWidth(392)
-        line:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, yOff)
-        ns.RegisterThemedTexture(line, 0.20, 0.44, 0.48, 0.34)
-        local header = frame:CreateFontString(nil, "OVERLAY")
-        header:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        header:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -6)
-        header:SetJustifyH("LEFT")
-        header:SetText(text)
-        ns.RegisterThemedFontString(header, 0.38, 0.78, 0.86)
-        return header
-    end
-
 
     local function MakeInputBg(anchorFrame, anchorPoint, xOff, yOff, w, h)
         local bg = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -258,7 +238,7 @@ local function EnsureCustomTaskDialog()
     end
 
     local function MakeEditBox(bg, maxLen, isNumeric)
-        local eb = CreateFrame("EditBox", nil, bg, "InputBoxTemplate")
+        local eb = CreateFrame("EditBox", nil, bg)
         eb:SetAutoFocus(false)
         eb:SetPoint("TOPLEFT",     bg, "TOPLEFT",     6, -6)
         eb:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -6,  6)
@@ -270,18 +250,13 @@ local function EnsureCustomTaskDialog()
         eb:SetScript("OnEscapePressed", function() frame:Hide() end)
         eb:SetScript("OnTextChanged", function(selfEdit)
             ApplyDialogEditBoxFont(selfEdit, GetFontSize())
-            if frame.RefreshSmartState then frame:RefreshSmartState() end
+            if frame.RefreshSmartState and not frame.loadingTask then frame:RefreshSmartState() end
         end)
         return eb
     end
 
 
-    local trackingHeader = MakeLabel(sep, "BOTTOMLEFT", 0, -8, Text("CustomTasks_TrackingHeader", "Tracking"))
-    ns.RegisterThemedFontString(trackingHeader, 0.38, 0.78, 0.86)
-    frame.trackingHeader = trackingHeader
-
-    local nameLabel = MakeLabel(trackingHeader, "BOTTOMLEFT", 0, -8, L["CustomTasks_NameLabel"] or "Task name")
-    nameLabel:SetTextColor(0.74, 0.84, 0.92)
+    local nameLabel = MakeLabel(header, "BOTTOMLEFT", 0, -8, L["CustomTasks_NameLabel"])
     local nameBg    = MakeInputBg(nameLabel, "BOTTOMLEFT", 0, -IGAP)
     local input     = MakeEditBox(nameBg, 120)
     input:SetScript("OnEscapePressed", function() frame:Hide() end)
@@ -292,16 +267,18 @@ local function EnsureCustomTaskDialog()
 
 
     local categoryLabel = MakeLabel(nameBg, "BOTTOMLEFT", 0, -GAP, Text("CustomTasks_CategoryLabel", "Category (optional)"))
-    categoryLabel:SetTextColor(0.74, 0.84, 0.92)
-    local categoryBg = MakeInputBg(categoryLabel, "BOTTOMLEFT", 0, -IGAP, 235, IH)
+    local categoryBg = MakeInputBg(categoryLabel, "BOTTOMLEFT", 0, -IGAP)
     local categoryInput = MakeEditBox(categoryBg, 80)
+    categoryInput:SetPoint("BOTTOMRIGHT", categoryBg, "BOTTOMRIGHT", -32, 6)
     frame.categoryLabel = categoryLabel
     frame.categoryBg = categoryBg
     frame.categoryInput = categoryInput
     BindHelp(categoryInput, "CustomTasks_CategoryTooltip", "Type a new category name or choose an existing category. Leave blank for no category.")
 
-    local categoryDropdown = ns.CreateDropdown(frame, {
-        width = 105,
+    local categoryDropdown = ns.CreateDropdown(categoryBg, {
+        width = 26,
+        arrowOnly = true,
+        menuAnchor = categoryBg,
         height = IH,
         fontSize = function() return math.max(8, GetFontSize() - 1) end,
         maxVisibleRows = 9,
@@ -332,7 +309,7 @@ local function EnsureCustomTaskDialog()
             end
         end,
     })
-    categoryDropdown:SetPoint("TOPLEFT", categoryLabel, "BOTTOMLEFT", 245, -IGAP)
+    categoryDropdown:SetPoint("RIGHT", categoryBg, "RIGHT", 0, 0)
     frame.categoryDropdown = categoryDropdown
 
     local categorySeparateModuleCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
@@ -359,12 +336,14 @@ local function EnsureCustomTaskDialog()
                 end
             end
         end
-        local visible = category ~= ""
-        self.categorySeparateModuleCheck:SetShown(visible)
-        self.categorySeparateModuleCheck._text:SetShown(visible)
-        if not visible then
+        self.categorySeparateModuleCheck:SetShown(category ~= "")
+        self.categorySeparateModuleCheck._text:SetShown(category ~= "")
+        if category == "" then
             self.categorySeparateModuleCheck:SetChecked(false)
             self.categorySeparateModuleCheck:Disable()
+            self.categorySeparateModuleCheck:SetAlpha(0.40)
+            self.categorySeparateModuleCheck._text:SetAlpha(0.40)
+            self.categorySeparateModuleCheck:EnableMouse(true)
             return
         end
         if exists then
@@ -383,37 +362,32 @@ local function EnsureCustomTaskDialog()
     categoryInput:SetScript("OnTextChanged", function(selfEdit)
         ApplyDialogEditBoxFont(selfEdit, GetFontSize())
         if frame.categoryDropdown then frame.categoryDropdown:Update() end
-        if frame.RefreshCategoryModuleState then frame:RefreshCategoryModuleState() end
+        local wasShown = categorySeparateModuleCheck:IsShown()
+        frame:RefreshCategoryModuleState()
+        if frame.LayoutFields and not frame.loadingTask and wasShown ~= categorySeparateModuleCheck:IsShown() then
+            frame:LayoutFields()
+        end
     end)
 
 
-    local COL2W = 170
+    local trackingLabel = MakeLabel(categorySeparateModuleCheck, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_TrackBy"])
+    frame.trackingLabel = trackingLabel
 
-    local questLabel = MakeLabel(categorySeparateModuleCheck, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_QuestIdsLabel"] or "Quest ID(s)")
-    local questBg    = MakeInputBg(questLabel, "BOTTOMLEFT", 0, -IGAP, COL2W, IH)
+    local questLabel = MakeLabel(trackingLabel, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_QuestIdsLabel"] or "Quest ID(s)")
+    local questBg    = MakeInputBg(questLabel, "BOTTOMLEFT", 0, -IGAP)
     local questInput = MakeEditBox(questBg, 120)
     frame.questLabel = questLabel
     frame.questBg    = questBg
     frame.questInput = questInput
     BindHelp(questInput, "CustomTasks_QuestIdsTooltip", "Enter one or more quest IDs separated by commas or spaces. Target 1 completes when any listed quest is done; increase Target to require more.")
 
-    local encounterLabel = MakeLabel(categorySeparateModuleCheck, "BOTTOMLEFT", COL2W + GAP, -GAP, L["CustomTasks_EncounterIdsLabel"] or "Encounter ID(s)")
-    local encounterBg    = MakeInputBg(encounterLabel, "BOTTOMLEFT", 0, -IGAP, COL2W, IH)
+    local encounterLabel = MakeLabel(trackingLabel, "BOTTOMLEFT", 0, -GAP, L["CustomTasks_EncounterIdsLabel"] or "Encounter ID(s)")
+    local encounterBg    = MakeInputBg(encounterLabel, "BOTTOMLEFT", 0, -IGAP)
     local encounterInput = MakeEditBox(encounterBg, 120)
     frame.encounterLabel  = encounterLabel
     frame.encounterBg     = encounterBg
     frame.encounterInput  = encounterInput
     BindHelp(encounterInput, "CustomTasks_EncounterIdsTooltip", "Enter one or more encounter IDs for automatic boss-kill tracking. Quest IDs and encounter IDs cannot be combined in one task.")
-
-
-    local idHint = frame:CreateFontString(nil, "OVERLAY")
-    idHint:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
-    idHint:SetPoint("TOPLEFT",  questBg, "BOTTOMLEFT",  0, -4)
-    idHint:SetPoint("TOPRIGHT", frame,   "TOPRIGHT",   -PAD, 0)
-    idHint:SetJustifyH("LEFT")
-    idHint:SetText("Enter quest IDs for quest tracking, or encounter IDs for boss-kill tracking. Cannot combine both.")
-    idHint:SetTextColor(0.46, 0.58, 0.70)
-    frame.idHint = idHint
 
 
     local DIFF_OPTIONS = {
@@ -422,8 +396,7 @@ local function EnsureCustomTaskDialog()
         { id = 15, label = "Heroic" },
         { id = 16, label = "Mythic" },
     }
-    local difficultyLabel = MakeLabel(idHint, "BOTTOMLEFT", 0, -GAP, Text("CustomTasks_EncounterDifficultyHeader", "Encounter difficulties"))
-    difficultyLabel:SetTextColor(0.74, 0.84, 0.92)
+    local difficultyLabel = MakeLabel(encounterBg, "BOTTOMLEFT", 0, -GAP, Text("CustomTasks_EncounterDifficultyHeader", "Encounter difficulties"))
     frame.difficultyLabel = difficultyLabel
 
     frame.difficultyChecks = {}
@@ -464,28 +437,72 @@ local function EnsureCustomTaskDialog()
 
 
 
-    local progressHeader = MakeSectionHeader(diffHint, -12, Text("CustomTasks_ProgressHeader", "Progress"))
+    local progressHeader = MakeLabel(header, "BOTTOMLEFT", 0, 0, L["CustomTasks_ProgressHeader"])
     frame.progressHeader = progressHeader
 
     local targetLabel = MakeLabel(progressHeader, "BOTTOMLEFT", 0, -8, L["CustomTasks_TargetLabel"] or "Target")
-    targetLabel:SetTextColor(0.74, 0.84, 0.92)
-    local targetBg    = MakeInputBg(targetLabel, "BOTTOMLEFT", 0, -IGAP, 60, IH)
+    local targetBg = MakeInputBg(targetLabel, "BOTTOMLEFT", 0, -IGAP)
     local targetInput = MakeEditBox(targetBg, 3, true)
-    targetInput:SetScript("OnTextChanged", function(selfEdit)
+    targetInput:ClearAllPoints()
+    targetInput:SetPoint("TOPLEFT", targetBg, "TOPLEFT", 8, -5)
+    targetInput:SetPoint("BOTTOMLEFT", targetBg, "BOTTOMLEFT", 8, 5)
+
+    local function GetCounterTarget()
+        return math.min(999, math.max(2, math.floor(tonumber(targetInput:GetText()) or 2)))
+    end
+
+    local stepper = CreateFrame("Frame", nil, targetBg)
+    stepper:SetWidth(18)
+    stepper:SetPoint("TOPRIGHT", targetBg, "TOPRIGHT", -2, -2)
+    stepper:SetPoint("BOTTOMRIGHT", targetBg, "BOTTOMRIGHT", -2, 2)
+
+    local function StepTarget(delta)
+        frame.counterTarget = tostring(math.min(999, math.max(2, GetCounterTarget() + delta)))
+        targetInput:SetText(frame.counterTarget)
+    end
+
+    local increase = ns.HeaderButton(stepper, {
+        text = "^",
+        fontSize = 9,
+        iconY = -1,
+        themed = true,
+        onClick = function() StepTarget(1) end,
+    })
+    increase:SetPoint("TOPLEFT", stepper, "TOPLEFT")
+    increase:SetPoint("BOTTOMRIGHT", stepper, "RIGHT")
+
+    local decrease = ns.HeaderButton(stepper, {
+        text = "v",
+        fontSize = 9,
+        themed = true,
+        onClick = function() StepTarget(-1) end,
+    })
+    decrease:SetPoint("TOPLEFT", stepper, "LEFT")
+    decrease:SetPoint("BOTTOMRIGHT", stepper, "BOTTOMRIGHT")
+
+    local function RefreshTargetStepper()
+        local value = GetCounterTarget()
+        local enabled = targetInput:IsEnabled()
+        increase:SetEnabled(enabled and value < 999)
+        decrease:SetEnabled(enabled and value > 2)
+        increase:SetAlpha(increase:IsEnabled() and 1 or 0.45)
+        decrease:SetAlpha(decrease:IsEnabled() and 1 or 0.45)
+    end
+
+    targetInput:SetScript("OnTextChanged", function(selfEdit, userInput)
         ApplyDialogEditBoxFont(selfEdit, GetFontSize())
+        if userInput then frame.counterTarget = selfEdit:GetText() end
+        RefreshTargetStepper()
     end)
-    local targetHint = frame:CreateFontString(nil, "OVERLAY")
-    targetHint:SetFont(ns.FONT_ROWS, math.max(7, GetFontSize() - 2), GetFontFlags())
-    targetHint:SetPoint("LEFT",  targetBg, "RIGHT", 8, 0)
-    targetHint:SetPoint("RIGHT", frame,    "RIGHT", -PAD, 0)
-    targetHint:SetJustifyH("LEFT")
-    targetHint:SetText("1 = checkbox   2+ = counter (e.g. 0/3)")
-    targetHint:SetTextColor(0.46, 0.58, 0.70)
     frame.targetLabel = targetLabel
     frame.targetBg    = targetBg
     frame.targetInput = targetInput
-    frame.targetHint  = targetHint
-    BindHelp(targetInput, "CustomTasks_TargetTooltip", "The number of listed quests required to complete this task. Use 1 for any quest, or the total number of IDs to require them all.")
+    ns.BindTooltip(targetInput, function()
+        return {
+            text = string.format("%s\n0/%d", L["CustomTasks_ProgressTargetTooltip"], GetCounterTarget()),
+            wrap = true,
+        }
+    end)
 
     local orderedQuestCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     ns.ThemeCheckButton(orderedQuestCheck)
@@ -504,48 +521,10 @@ local function EnsureCustomTaskDialog()
     frame.orderedQuestCheck = orderedQuestCheck
     BindHelp(orderedQuestCheck, "CustomTasks_OrderedQuestSequenceTooltip", "Preserves the entered quest-ID order and counts only consecutive completed steps. Target is set automatically to the number of unique IDs.")
 
-    local resetLabel = MakeSectionHeader(orderedQuestCheck, -12, Text("CustomTasks_ResetScheduleHeader", "Reset schedule"))
+    local resetLabel = MakeLabel(header, "BOTTOMLEFT", 0, 0, L["CustomTasks_ResetType"])
     frame.resetLabel = resetLabel
-
-    local function CreateResetCheckbox(anchorTo, anchorPt, xOff, yOff, labelText, value)
-        local cb = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
-        ns.ThemeCheckButton(cb)
-        cb:SetSize(20, 20)
-        cb:SetPoint("TOPLEFT", anchorTo, anchorPt, xOff, yOff)
-        local text = frame:CreateFontString(nil, "OVERLAY")
-        text:SetFont(ns.FONT_ROWS, math.max(8, GetFontSize() - 1), GetFontFlags())
-        text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-        text:SetText(labelText)
-        text:SetTextColor(0.84, 0.90, 0.96)
-        cb._text  = text
-        cb._value = value
-        cb:SetScript("OnClick", function(selfBtn)
-            if not selfBtn:GetChecked() then selfBtn:SetChecked(true) end
-            frame.resetType = selfBtn._value
-            if frame.RefreshResetChecks then frame:RefreshResetChecks() end
-            if frame.categoryDropdown then frame.categoryDropdown:Update() end
-            if frame.RefreshCategoryModuleState then frame:RefreshCategoryModuleState() end
-        end)
-        return cb
-    end
-
-
-    local weeklyCheck = CreateResetCheckbox(resetLabel, "BOTTOMLEFT", 0, -6, L["CustomTasks_ResetWeekly"] or "Weekly", "weekly")
-    local dailyCheck  = CreateResetCheckbox(weeklyCheck, "TOPLEFT", 0, 0, L["CustomTasks_ResetDaily"] or "Daily", "daily")
-    dailyCheck:ClearAllPoints()
-    dailyCheck:SetPoint("LEFT", weeklyCheck._text, "RIGHT", 14, 0)
-    frame.weeklyCheck = weeklyCheck
-    frame.dailyCheck  = dailyCheck
-    local noResetCheck = CreateResetCheckbox(dailyCheck, "TOPLEFT", 0, 0, L["CustomTasks_ResetNone"] or "No reset", "none")
-    noResetCheck:ClearAllPoints()
-    noResetCheck:SetPoint("LEFT", dailyCheck._text, "RIGHT", 14, 0)
-    frame.noResetCheck = noResetCheck
-    BindHelp(weeklyCheck, "CustomTasks_ResetWeeklyTooltip", "Clears this task at the regional weekly reset.")
-    BindHelp(dailyCheck, "CustomTasks_ResetDailyTooltip", "Clears this task at the regional daily reset.")
-    BindHelp(noResetCheck, "CustomTasks_ResetNoneTooltip", "Keeps this task completed until you manually change or delete it.")
-
-
-    local behaviorHeader = MakeSectionHeader(weeklyCheck, -12, Text("CustomTasks_BehaviorHeader", "Behavior & sharing"))
+    local behaviorHeader = MakeLabel(header, "BOTTOMLEFT", 0, 0, L["CustomTasks_BehaviorHeader"])
+    ns.RegisterThemedFontString(behaviorHeader, 0.38, 0.78, 0.86)
     frame.behaviorHeader = behaviorHeader
 
     local manualQuestCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
@@ -563,7 +542,6 @@ local function EnsureCustomTaskDialog()
         if frame.RefreshSmartState then frame:RefreshSmartState() end
     end)
     frame.manualQuestCheck = manualQuestCheck
-    frame.manualQuestHint  = frame:CreateFontString(nil, "OVERLAY")
     BindHelp(manualQuestCheck, "CustomTasks_ManualQuestClicksTooltip", "Allows a single-target quest task to be checked or unchecked manually when automatic quest detection is not enough.")
 
     local autoUpdateCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
@@ -580,7 +558,6 @@ local function EnsureCustomTaskDialog()
         frame.autoUpdateInstances = selfBtn:GetChecked() and true or false
     end)
     frame.autoUpdateCheck = autoUpdateCheck
-    frame.autoUpdateHint  = frame:CreateFontString(nil, "OVERLAY")
     BindHelp(autoUpdateCheck, "CustomTasks_AutoUpdateInstancesTooltip", "Updates this task while inside dungeons, raids, scenarios, and other instances.")
 
     local sharedTaskCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
@@ -645,32 +622,37 @@ local function EnsureCustomTaskDialog()
     frame.cityReminderCheck = cityReminderCheck
     BindHelp(cityReminderCheck, "CustomTasks_CityReminderTooltip", L["CustomTasks_CityReminderTooltip"])
 
-    local function CreateDialogButton(width, label, color, borderColor)
+    local function CreateDialogButton(label, color, borderColor)
         local btn = CreateFrame("Button", nil, frame, "BackdropTemplate")
-        btn:SetSize(width, 26)
         btn:SetBackdrop(MakeBackdrop())
-        btn:SetBackdropColor(color[1], color[2], color[3], 0.95)
-        btn:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], 1)
         local text = btn:CreateFontString(nil, "OVERLAY")
-        text:SetFont(ns.FONT_HEADERS, 10, GetFontFlags())
-        text:SetPoint("CENTER", btn, "CENTER", 0, 1)
+        SetFontForText(text, label, math.max(8, GetFontSize() - 1), GetFontFlags())
+        text:SetPoint("CENTER", btn)
         text:SetText(label)
         text:SetTextColor(0.92, 0.96, 1)
         btn._label = text
-        btn:SetScript("OnEnter", function(selfBtn)
-            selfBtn:SetBackdropColor(color[1]+0.04, color[2]+0.04, color[3]+0.04, 1)
-            selfBtn:SetBackdropBorderColor(1, 1, 1, 1)
-        end)
-        btn:SetScript("OnLeave", function(selfBtn)
-            selfBtn:SetBackdropColor(color[1], color[2], color[3], 0.95)
-            selfBtn:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], 1)
-        end)
+
+        local function RefreshStyle(self)
+            local hovered = self:IsMouseOver()
+            local theme = MR.db.profile.themeColorMode == "default" and ns.GetInterfaceTheme()
+            local fill = color or (theme and (hovered and theme.headerColor or theme.contentTint)) or ns.COLORS.bg
+            local edge = borderColor or (theme and (hovered and theme.selectedCardBorder or theme.contentBorder))
+            local r, g, b
+            if edge then r, g, b = unpack(edge) else r, g, b = ns.ResolveThemeColor(0.28, 0.34, 0.42) end
+            local lift = hovered and (color or not theme) and 0.04 or 0
+            self:SetBackdropColor(fill[1] + lift, fill[2] + lift, fill[3] + lift, 0.95)
+            self:SetBackdropBorderColor(r, g, b, hovered and 1 or 0.8)
+        end
+
+        ns.RegisterThemedState(btn, RefreshStyle)
+        btn:SetScript("OnEnter", RefreshStyle)
+        btn:SetScript("OnLeave", RefreshStyle)
         return btn
     end
 
-    local saveBtn   = CreateDialogButton(88, L["CustomTasks_Save"]   or "Save",   {0.10,0.26,0.20},{0.28,0.78,0.50})
-    local cancelBtn = CreateDialogButton(88, L["CustomTasks_Cancel"] or "Cancel", {0.10,0.12,0.16},{0.28,0.34,0.42})
-    local deleteBtn = CreateDialogButton(88, L["CustomTasks_Delete"] or "Delete", {0.22,0.08,0.08},{0.72,0.20,0.20})
+    local saveBtn = CreateDialogButton(L["CustomTasks_Save"], { 0.10, 0.26, 0.20 }, { 0.28, 0.78, 0.50 })
+    local cancelBtn = CreateDialogButton(L["CustomTasks_Cancel"])
+    local deleteBtn = CreateDialogButton(L["CustomTasks_Delete"], { 0.22, 0.08, 0.08 }, { 0.72, 0.20, 0.20 })
 
     saveBtn:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -PAD, PAD)
     cancelBtn:SetPoint("RIGHT", saveBtn, "LEFT", -8, 0)
@@ -689,119 +671,317 @@ local function EnsureCustomTaskDialog()
     BindHelp(deleteBtn, "CustomTasks_DeleteTooltip", "Permanently delete this custom task.")
 
 
-    function frame:RefreshSmartState()
-        local hasQuestIds    = self.questInput    and (self.questInput:GetText()    or ""):match("%d") ~= nil
-        local hasEncounterIds = self.encounterInput and (self.encounterInput:GetText() or ""):match("%d") ~= nil
-        local questIdCount = 0
-        local seenQuestIds = {}
-        if hasQuestIds then
-            for token in (self.questInput:GetText() or ""):gmatch("%d+") do
-                local questId = tonumber(token)
-                if questId and questId > 0 and not seenQuestIds[questId] then
-                    seenQuestIds[questId] = true
-                    questIdCount = questIdCount + 1
+    local function ChoiceGroup(field, choices, onSelect)
+        local group = {}
+        for _, choice in ipairs(choices) do
+            local button = CreateFrame("Button", nil, frame, "BackdropTemplate")
+            button:SetBackdrop(MakeBackdrop())
+            local label = button:CreateFontString(nil, "OVERLAY")
+            SetFontForText(label, choice.label, math.max(8, GetFontSize() - 1), GetFontFlags())
+            label:SetPoint("CENTER", button)
+            label:SetText(choice.label)
+            button._label = label
+            button.value = choice.value
+            function button:RefreshStyle()
+                local selected = frame[field] == self.value
+                local r, g, b = ns.ResolveThemeColor(0.28, 0.64, 0.65)
+                local theme = ns.GetInterfaceTheme and ns.GetInterfaceTheme()
+                if theme and MR.db.profile.themeColorMode == "default" then
+                    local active = selected or self:IsMouseOver()
+                    local fill = active and theme.headerColor or theme.contentTint
+                    r, g, b = unpack(active and theme.selectedCardBorder or theme.contentBorder)
+                    self:SetBackdropColor(fill[1], fill[2], fill[3], 1)
+                else
+                    local intensity = selected and 0.58 or (self:IsMouseOver() and 0.32 or 0.18)
+                    self:SetBackdropColor(0.05 + r * intensity, 0.05 + g * intensity, 0.05 + b * intensity, 1)
+                end
+                self:SetBackdropBorderColor(r, g, b, selected and 1 or 0.55)
+                self._label:SetTextColor(0.94, 0.96, 0.98, self:IsEnabled() and 1 or 0.55)
+            end
+            ns.RegisterThemedState(button, button.RefreshStyle)
+            button:SetScript("OnEnter", button.RefreshStyle)
+            button:SetScript("OnLeave", button.RefreshStyle)
+            button:SetScript("OnClick", function(self)
+                frame[field] = self.value
+                if onSelect then onSelect() end
+                frame:RefreshSmartState()
+            end)
+            group[#group + 1] = button
+        end
+        return group
+    end
+
+    local trackingChoices = ChoiceGroup("trackingMode", {
+        { value = "manual", label = L["CustomTasks_ModeManual"] },
+        { value = "quest", label = L["CustomTasks_ModeQuest"] },
+        { value = "encounter", label = L["CustomTasks_ModeEncounter"] },
+    })
+    local progressChoices = ChoiceGroup("displayProgressMode", {
+        { value = "checkbox", label = L["CustomTasks_ModeCheckbox"] },
+        { value = "counter", label = L["CustomTasks_ModeCounter"] },
+    }, function() frame.progressMode = frame.displayProgressMode end)
+    local resetChoices = ChoiceGroup("resetType", {
+        { value = "weekly", label = L["CustomTasks_WeeklyHeader"] },
+        { value = "daily", label = L["CustomTasks_DailyHeader"] },
+        { value = "none", label = L["CustomTasks_ResetNone"] },
+    }, function()
+        categoryDropdown:Update()
+        frame:RefreshCategoryModuleState()
+    end)
+    BindHelp(resetChoices[1], "CustomTasks_ResetWeeklyTooltip", "Clears this task at the regional weekly reset.")
+    BindHelp(resetChoices[2], "CustomTasks_ResetDailyTooltip", "Clears this task at the regional daily reset.")
+    BindHelp(resetChoices[3], "CustomTasks_ResetNoneTooltip", "Keeps this task completed until you manually change or delete it.")
+    frame.choiceGroups = { trackingChoices, progressChoices, resetChoices }
+
+    local progressDivider = frame:CreateTexture(nil, "ARTWORK")
+    local behaviorDivider = frame:CreateTexture(nil, "ARTWORK")
+    local footerDivider = frame:CreateTexture(nil, "ARTWORK")
+    ns.RegisterThemedTexture(progressDivider, 0.20, 0.44, 0.48, 0.34)
+    ns.RegisterThemedTexture(behaviorDivider, 0.20, 0.44, 0.48, 0.34)
+    ns.RegisterThemedTexture(footerDivider, 0.20, 0.44, 0.48, 0.34)
+
+    function frame:LayoutFields()
+        if self.moving then
+            self.layoutPending = true
+            return
+        end
+        self.layoutPending = nil
+        local width = 376
+        local contentWidth = width - 2 * PAD
+        local controlHeight = math.max(IH, GetFontSize() + 12)
+        local y = header:GetHeight() + 10
+        local labelWidth = math.max(categoryLabel:GetUnboundedStringWidth(), trackingLabel:GetUnboundedStringWidth(),
+            progressHeader:GetUnboundedStringWidth(), resetLabel:GetUnboundedStringWidth()) + 10
+        labelWidth = math.min(math.ceil(labelWidth), 145)
+
+        local function place(control, x, top)
+            control:ClearAllPoints()
+            control:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + x, -top)
+        end
+
+        local function divider(line)
+            place(line, 0, y)
+            line:SetSize(contentWidth, 1)
+            y = y + 8
+        end
+
+        local function inputRow(label, bg)
+            place(label, 0, y)
+            y = y + label:GetStringHeight() + 4
+            place(bg, 0, y)
+            bg:SetSize(contentWidth, controlHeight)
+            y = y + controlHeight + GAP
+        end
+
+        local function checkRow(left, right, rightX)
+            place(left, 0, y)
+            local rowHeight = math.max(20, left._text:GetStringHeight())
+            if right then
+                local leftWidth = 24 + left._text:GetStringWidth()
+                local rightWidth = 24 + right._text:GetStringWidth()
+                if leftWidth <= rightX and rightX + rightWidth <= contentWidth then
+                    place(right, rightX, y)
+                    rowHeight = math.max(rowHeight, right._text:GetStringHeight())
+                else
+                    place(right, 0, y + rowHeight + 2)
+                    rowHeight = rowHeight + 2 + math.max(20, right._text:GetStringHeight())
                 end
             end
+            y = y + rowHeight + 3
         end
 
-
-        if self.manualQuestCheck then
-            local manualQuestEnabled = hasQuestIds and not (self.orderedQuestSequence and questIdCount > 1)
-            if not manualQuestEnabled then
-                self.allowManualQuestClicks = false
+        local function choiceRow(label, choices, accessoryWidth)
+            local gapWidth = (#choices - 1) * 3
+            local minimumWidth = 0
+            for _, button in ipairs(choices) do
+                minimumWidth = math.max(minimumWidth, button._label:GetUnboundedStringWidth() + 8)
             end
-            if manualQuestEnabled then self.manualQuestCheck:Enable() else self.manualQuestCheck:Disable() end
-            self.manualQuestCheck:EnableMouse(true)
-            self.manualQuestCheck:SetChecked(manualQuestEnabled and self.allowManualQuestClicks == true or false)
-            if self.manualQuestCheck._text then
-                self.manualQuestCheck._text:SetAlpha(manualQuestEnabled and 1 or 0.50)
+            minimumWidth = minimumWidth * #choices + gapWidth
+            local minLabelWidth = math.ceil(label:GetUnboundedStringWidth()) + 10
+            local x = accessoryWidth and minLabelWidth or labelWidth
+            local inline = minLabelWidth <= x and minimumWidth <= contentWidth - x
+            if not inline then x = 0 end
+            local top = inline and y or y + label:GetStringHeight() + 4
+            local accessoryFits = accessoryWidth and minimumWidth + accessoryWidth <= contentWidth - x
+            local available = contentWidth - x - gapWidth - (accessoryFits and accessoryWidth or 0)
+            local buttonWidth = math.floor(available / #choices)
+            place(label, 0, inline and y + math.max(0, (controlHeight - label:GetStringHeight()) / 2) or y)
+            label:SetWidth(inline and x - 5 or contentWidth)
+            for index, button in ipairs(choices) do
+                place(button, x + (index - 1) * (buttonWidth + 3), top)
+                button:SetSize(buttonWidth, controlHeight)
+                button._label:SetWidth(buttonWidth - 4)
+                button._label:SetJustifyH("CENTER")
+                button._label:SetWordWrap(false)
+            end
+            y = top + controlHeight + GAP
+            return accessoryFits and top or nil
+        end
+
+        inputRow(nameLabel, nameBg)
+        local function alignedInput(label, bg)
+            if label:GetUnboundedStringWidth() > labelWidth - 6 then
+                inputRow(label, bg)
+                return
+            end
+            place(label, 0, y + math.max(0, (controlHeight - label:GetStringHeight()) / 2))
+            place(bg, labelWidth, y)
+            bg:SetSize(contentWidth - labelWidth, controlHeight)
+            y = y + controlHeight + GAP
+        end
+
+        alignedInput(categoryLabel, categoryBg)
+        categoryDropdown:SetHeight(controlHeight - 2)
+        if categorySeparateModuleCheck:IsShown() then checkRow(categorySeparateModuleCheck) end
+        y = y + 3
+        choiceRow(trackingLabel, trackingChoices)
+        if self.trackingMode == "quest" then
+            alignedInput(questLabel, questBg)
+            checkRow(orderedQuestCheck, manualQuestCheck, math.ceil(contentWidth / 2))
+        elseif self.trackingMode == "encounter" then
+            alignedInput(encounterLabel, encounterBg)
+            place(difficultyLabel, 0, y)
+            y = y + difficultyLabel:GetStringHeight() + 4
+            local x = 0
+            for _, button in ipairs(self.difficultyChecks) do
+                local optionWidth = 24 + button._text:GetStringWidth()
+                if x > 0 and x + optionWidth > contentWidth then
+                    y = y + 23
+                    x = 0
+                end
+                place(button, x, y)
+                x = x + optionWidth + 11
+            end
+            y = y + 22
+            place(diffHint, 0, y)
+            diffHint:SetWidth(contentWidth)
+            y = y + diffHint:GetStringHeight() + GAP
+        end
+
+        divider(progressDivider)
+        local isCounter = self.displayProgressMode == "counter"
+        local targetWidth = math.max(58, GetFontSize() * 3 + 24)
+        local targetLabelWidth = math.ceil(targetLabel:GetUnboundedStringWidth())
+        local progressLabelWidth = math.ceil(progressHeader:GetUnboundedStringWidth()) + 10
+        local choiceWidth = math.max(progressChoices[1]._label:GetUnboundedStringWidth(),
+            progressChoices[2]._label:GetUnboundedStringWidth()) * 2 + 19
+        local showTargetLabel = progressLabelWidth + choiceWidth + targetWidth + targetLabelWidth + 18 <= contentWidth
+        local targetTop = choiceRow(progressHeader, progressChoices,
+            targetWidth + (showTargetLabel and targetLabelWidth + 18 or 10))
+        targetLabel:SetShown(isCounter and (showTargetLabel or not targetTop))
+        if isCounter then
+            local top = targetTop or y
+            local targetX = contentWidth - targetWidth
+            local labelX = targetTop and targetX - targetLabelWidth - 8 or 0
+            place(targetLabel, labelX, top + math.max(0, (controlHeight - targetLabel:GetStringHeight()) / 2))
+            place(targetBg, targetX, top)
+            targetBg:SetSize(targetWidth, controlHeight)
+            targetInput:SetWidth(targetWidth - 30)
+            if not targetTop then y = y + controlHeight + GAP end
+        end
+        choiceRow(resetLabel, resetChoices)
+        divider(behaviorDivider)
+        place(behaviorHeader, 0, y)
+        y = y + behaviorHeader:GetStringHeight() + 5
+        local columnWidth = math.floor((contentWidth - 10) / 2)
+        local function sharingRow(left, right)
+            place(left, 0, y)
+            place(right, columnWidth + 10, y)
+            for _, button in ipairs({ left, right }) do
+                button._text:ClearAllPoints()
+                button._text:SetPoint("TOPLEFT", button, "TOPRIGHT", 2, -3)
+                button._text:SetWidth(columnWidth - 22)
+                button._text:SetJustifyH("LEFT")
+                button._text:SetWordWrap(true)
+            end
+            y = y + math.max(20, left._text:GetStringHeight(), right._text:GetStringHeight()) + 3
+        end
+        sharingRow(autoUpdateCheck, sharedTaskCheck)
+        sharingRow(cityReminderCheck, accountCompleteCheck)
+        y = y + 3
+        divider(footerDivider)
+        local footerButtons = { deleteBtn, cancelBtn, saveBtn }
+        local actionWidth = 74
+        for _, button in ipairs(footerButtons) do
+            actionWidth = math.max(actionWidth, math.ceil(button._label:GetUnboundedStringWidth()) + 18)
+        end
+        actionWidth = math.min(actionWidth, math.floor((contentWidth - 16) / 3))
+        for _, button in ipairs(footerButtons) do
+            button:SetSize(actionWidth, controlHeight)
+            button._label:SetWidth(actionWidth - 8)
+            button._label:SetJustifyH("CENTER")
+            button._label:SetWordWrap(false)
+        end
+        local height = math.ceil(y + controlHeight + PAD)
+        if self:GetWidth() ~= width or self:GetHeight() ~= height then self:SetSize(width, height) end
+    end
+
+    function frame:RefreshSmartState()
+        local isQuest = self.trackingMode == "quest"
+        local isEncounter = self.trackingMode == "encounter"
+        local questCount = 0
+        local seen = {}
+        for token in (self.questInput:GetText() or ""):gmatch("%d+") do
+            local id = tonumber(token)
+            if id > 0 and not seen[id] then
+                seen[id] = true
+                questCount = questCount + 1
             end
         end
 
-
-        if self.encounterInput then
-            local disableEncounter = hasQuestIds
-            self.encounterInput:SetEnabled(not disableEncounter)
-            self.encounterInput:EnableMouse(true)
-            self.encounterInput:SetAlpha(disableEncounter and 0.40 or 1)
-            if disableEncounter then self.encounterInput:SetText("") end
-        end
-        if self.encounterLabel then self.encounterLabel:SetAlpha(hasQuestIds and 0.40 or 1) end
-
-
-        if self.questInput then
-            local disableQuest = hasEncounterIds and not hasQuestIds
-            self.questInput:SetEnabled(not disableQuest)
-            self.questInput:EnableMouse(true)
-            self.questInput:SetAlpha(disableQuest and 0.40 or 1)
-        end
-        if self.questLabel then self.questLabel:SetAlpha(hasEncounterIds and not hasQuestIds and 0.40 or 1) end
-
-
-        local orderedEnabled = hasQuestIds and questIdCount > 1
-        if self.orderedQuestCheck then
-            if orderedEnabled then self.orderedQuestCheck:Enable() else self.orderedQuestCheck:Disable() end
-            self.orderedQuestCheck:EnableMouse(true)
-            if not orderedEnabled then
-                self.orderedQuestSequence = false
-            end
-            self.orderedQuestCheck:SetChecked(orderedEnabled and self.orderedQuestSequence == true or false)
-            self.orderedQuestCheck:SetAlpha(orderedEnabled and 1 or 0.40)
-            if self.orderedQuestCheck._text then
-                self.orderedQuestCheck._text:SetAlpha(orderedEnabled and 1 or 0.40)
-            end
+        local ordered = isQuest and questCount > 1 and self.orderedQuestSequence
+        local showManual = isQuest and questCount > 0 and not ordered
+        self.displayProgressMode = ordered and "counter" or (self.progressMode or "checkbox")
+        local isCounter = self.displayProgressMode == "counter"
+        questLabel:SetShown(isQuest)
+        questBg:SetShown(isQuest)
+        orderedQuestCheck:SetShown(isQuest)
+        orderedQuestText:SetShown(isQuest)
+        orderedQuestCheck:SetEnabled(questCount > 1)
+        orderedQuestCheck:EnableMouse(true)
+        orderedQuestCheck:SetChecked(ordered)
+        orderedQuestText:SetAlpha(questCount > 1 and 1 or 0.45)
+        manualQuestCheck:SetShown(isQuest)
+        manualQuestText:SetShown(isQuest)
+        manualQuestCheck:SetEnabled(showManual)
+        manualQuestCheck:EnableMouse(true)
+        manualQuestCheck:SetChecked(showManual and self.allowManualQuestClicks)
+        manualQuestText:SetAlpha(showManual and 1 or 0.45)
+        encounterLabel:SetShown(isEncounter)
+        encounterBg:SetShown(isEncounter)
+        difficultyLabel:SetShown(isEncounter)
+        diffHint:SetShown(isEncounter)
+        for _, button in ipairs(self.difficultyChecks) do
+            button:SetShown(isEncounter)
+            button._text:SetShown(isEncounter)
         end
 
-        local enableTarget = hasQuestIds and not self.orderedQuestSequence
-        if self.targetInput then
-            self.targetInput:SetEnabled(enableTarget)
-            self.targetInput:EnableMouse(true)
-            self.targetInput:SetAlpha(enableTarget and 1 or 0.40)
-            if self.orderedQuestSequence and questIdCount > 0 then
-                self.targetInput:SetText(tostring(questIdCount))
-            end
+        local target = ordered and tostring(questCount) or self.counterTarget
+        if target and targetInput:GetText() ~= target then targetInput:SetText(target) end
+        targetBg:SetShown(isCounter)
+        targetInput:SetEnabled(not ordered)
+        RefreshTargetStepper()
+        targetInput:SetAlpha(ordered and 0.55 or 1)
+        for _, button in ipairs(progressChoices) do
+            button:SetEnabled(not ordered)
         end
-        if self.targetBg    then self.targetBg:SetAlpha(enableTarget and 1 or 0.40) end
-        if self.targetLabel then self.targetLabel:SetAlpha(enableTarget and 1 or 0.40) end
-        if self.targetHint  then self.targetHint:SetAlpha(enableTarget and 1 or 0.40) end
 
-
-        local enableDiff = hasEncounterIds and not hasQuestIds
-        if self.difficultyLabel then self.difficultyLabel:SetAlpha(enableDiff and 1 or 0.40) end
-        if self.diffHint        then self.diffHint:SetAlpha(enableDiff and 1 or 0.40) end
-        if self.difficultyChecks then
-            for _, cb in ipairs(self.difficultyChecks) do
-                if enableDiff then cb:Enable() else cb:Disable() end
-                cb:EnableMouse(true)
-                cb:SetAlpha(enableDiff and 1 or 0.40)
-                if cb._text then cb._text:SetAlpha(enableDiff and 1 or 0.40) end
+        for _, group in ipairs(self.choiceGroups) do
+            for _, button in ipairs(group) do
+                button:RefreshStyle()
             end
         end
-
         local isShared = self.taskScope == "shared"
-        if self.accountCompleteCheck then
-            if isShared then
-                self.accountCompleteCheck:Enable()
-            else
-                self.accountWideComplete = false
-                self.accountCompleteCheck:SetChecked(false)
-                self.accountCompleteCheck:Disable()
-            end
-            self.accountCompleteCheck:EnableMouse(true)
-            if self.accountCompleteCheck._text then
-                self.accountCompleteCheck._text:SetAlpha(isShared and 1 or 0.40)
-            end
+        accountCompleteCheck:SetEnabled(isShared)
+        accountCompleteCheck:EnableMouse(true)
+        accountCompleteCheck:SetChecked(isShared and self.accountWideComplete)
+        accountCompleteText:SetAlpha(isShared and 1 or 0.40)
+        local layoutKey = tostring(self.trackingMode) .. ":" .. self.displayProgressMode
+        if self.layoutKey ~= layoutKey then
+            self.layoutKey = layoutKey
+            self:LayoutFields()
         end
     end
-
-    function frame:RefreshResetChecks()
-        local isDaily = self.resetType == "daily"
-        local isNone = self.resetType == "none"
-        if self.weeklyCheck then self.weeklyCheck:SetChecked(not isDaily and not isNone) end
-        if self.dailyCheck  then self.dailyCheck:SetChecked(isDaily) end
-        if self.noResetCheck then self.noResetCheck:SetChecked(isNone) end
-    end
-
 
     function frame:Commit()
         local text = self.input:GetText() or ""
@@ -814,11 +994,31 @@ local function EnsureCustomTaskDialog()
             return
         end
 
-        local maxValue = math.floor(tonumber(self.targetInput:GetText() or "") or 1)
-        if maxValue < 1 then maxValue = 1 elseif maxValue > 999 then maxValue = 999 end
+        local isQuest = self.trackingMode == "quest"
+        local isEncounter = self.trackingMode == "encounter"
+        local idsInput = isQuest and self.questInput or (isEncounter and self.encounterInput)
+        if idsInput then
+            local hasId = false
+            for token in idsInput:GetText():gmatch("%d+") do
+                if tonumber(token) > 0 then hasId = true break end
+            end
+            if not hasId then
+                if UIErrorsFrame and UIErrorsFrame.AddMessage then
+                    UIErrorsFrame:AddMessage(L[isQuest and "CustomTasks_QuestIdRequired" or "CustomTasks_EncounterIdRequired"], 1, 0.25, 0.25)
+                end
+                idsInput:SetFocus()
+                return
+            end
+        end
+
+        local questIds = isQuest and self.questInput:GetText() or ""
+        local encounterIds = isEncounter and self.encounterInput:GetText() or ""
+        local ordered = isQuest and self.orderedQuestCheck:GetChecked() or false
+        local manualClicks = isQuest and self.manualQuestCheck:GetChecked() or false
+        local maxValue = self.displayProgressMode == "counter" and GetCounterTarget() or 1
 
         local encounterDifficulties = nil
-        if self.difficultyChecks then
+        if isEncounter then
             local allChecked = true
             for _, cb in ipairs(self.difficultyChecks) do
                 if not cb:GetChecked() then allChecked = false break end
@@ -836,9 +1036,9 @@ local function EnsureCustomTaskDialog()
         local saved
         local savedTaskId = self.taskId
         if self.taskId then
-            saved, savedTaskId = MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete, self.orderedQuestSequence, category, remindInCity)
+            saved, savedTaskId = MR:UpdateCustomTask(self.taskId, text, self.resetType, maxValue, questIds, manualClicks, encounterIds, self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.originalTaskScope, self.accountWideComplete, ordered, category, remindInCity)
         else
-            savedTaskId = MR:AddCustomTask(text, self.resetType, maxValue, self.questInput:GetText() or "", self.allowManualQuestClicks, self.encounterInput and self.encounterInput:GetText() or "", self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete, self.orderedQuestSequence, category, remindInCity)
+            savedTaskId = MR:AddCustomTask(text, self.resetType, maxValue, questIds, manualClicks, encounterIds, self.autoUpdateInstances, encounterDifficulties, self.taskScope, self.accountWideComplete, ordered, category, remindInCity)
             saved = savedTaskId ~= nil
         end
         if saved and category ~= "" and MR.SetCustomTaskCategorySeparateModule then
@@ -856,7 +1056,6 @@ local function EnsureCustomTaskDialog()
     targetInput:SetScript("OnEnterPressed",   function() frame:Commit() end)
     categoryInput:SetScript("OnEnterPressed", function() frame:Commit() end)
 
-    if frame.RefreshSmartState then frame:RefreshSmartState() end
     MR.customTaskDialog = frame
     ApplyCustomTaskDialogTheme(frame)
     return frame
@@ -868,6 +1067,7 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
     taskScope = taskScope == "shared" and "shared" or "character"
     local task = taskId and self.GetCustomTaskById and self:GetCustomTaskById(taskId, taskScope) or nil
 
+    dialog.loadingTask = true
     dialog.taskId = task and task.id or nil
     dialog.taskScope = (task and task.scope) or taskScope
     dialog.originalTaskScope = dialog.taskScope
@@ -877,7 +1077,12 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
     dialog.categoryInput:SetText((task and task.category) or "")
     dialog.questInput:SetText((task and task.questIds and table.concat(task.questIds, ", ")) or "")
     dialog.encounterInput:SetText((task and task.encounterIds and table.concat(task.encounterIds, ", ")) or "")
-    dialog.targetInput:SetText(tostring((task and task.max) or 1))
+    dialog.trackingMode = dialog.questInput:GetText() ~= "" and "quest"
+        or (dialog.encounterInput:GetText() ~= "" and "encounter" or "manual")
+    local taskMax = tonumber(task and task.max) or 1
+    dialog.progressMode = taskMax > 1 and "counter" or "checkbox"
+    dialog.counterTarget = tostring(math.max(2, taskMax))
+    dialog.targetInput:SetText(dialog.counterTarget)
     dialog.allowManualQuestClicks = task and task.allowManualQuestClicks or false
     dialog.orderedQuestSequence = task and task.orderedQuestSequence or false
     dialog.autoUpdateInstances = task and task.autoUpdateInstances or false
@@ -903,12 +1108,7 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
         end
     end
     dialog.deleteBtn:SetShown(task ~= nil)
-    if dialog.RefreshResetChecks then
-        dialog:RefreshResetChecks()
-    end
-    if dialog.RefreshSmartState then
-        dialog:RefreshSmartState()
-    end
+    dialog.loadingTask = false
     if dialog.categoryDropdown then
         dialog.categoryDropdown:Update()
     end
@@ -916,6 +1116,7 @@ function MR:ShowCustomTaskDialog(taskId, presetResetType, taskScope)
         dialog:RefreshCategoryModuleState()
     end
     ApplyCustomTaskDialogTheme(dialog)
+    dialog:RefreshSmartState()
     dialog:Show()
     dialog.input:SetFocus()
     dialog.input:HighlightText(0, -1)

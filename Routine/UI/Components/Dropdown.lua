@@ -119,8 +119,10 @@ function ns.CreateDropdown(parent, opts)
 
     local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
     button:SetSize(opts.width or 130, opts.height or 18)
-    button:SetBackdrop(ns.MakeBackdrop())
-    ns.HookBackdropFrame(button, "inset")
+    if not opts.arrowOnly then
+        button:SetBackdrop(ns.MakeBackdrop())
+        ns.HookBackdropFrame(button, "inset")
+    end
 
     local label = button:CreateFontString(nil, "OVERLAY")
     label:SetFont(ns.FONT_ROWS, GetFontSize(), ns.GetFontFlags())
@@ -153,8 +155,10 @@ function ns.CreateDropdown(parent, opts)
         local alpha = GetAlpha()
         local styledArrow = ns.ApplyDropdownArrow(arrowArt, alpha)
         caret:SetShown(not styledArrow)
-        SetBackdropColor(self, hovered and HOVER_BG or BUTTON_BG, alpha)
-        SetThemeBorderColor(self, hovered and style.hoverBorder or style.buttonBorder, alpha)
+        if not opts.arrowOnly then
+            SetBackdropColor(self, hovered and HOVER_BG or BUTTON_BG, alpha)
+            SetThemeBorderColor(self, hovered and style.hoverBorder or style.buttonBorder, alpha)
+        end
         label:SetTextColor(0.94, 0.96, 0.98, alpha)
         SetThemeTextColor(caret, style.caret, alpha)
     end
@@ -333,10 +337,12 @@ function ns.CreateDropdown(parent, opts)
         local options = GetOptions()
         local selectedKey = opts.getSelected and opts.getSelected()
         label:SetText("")
-        for _, option in ipairs(options) do
-            if OptionKey(option) == selectedKey then
-                label:SetText(OptionLabel(option))
-                break
+        if not opts.arrowOnly then
+            for _, option in ipairs(options) do
+                if OptionKey(option) == selectedKey then
+                    label:SetText(OptionLabel(option))
+                    break
+                end
             end
         end
         self:ApplyFonts()
@@ -358,7 +364,8 @@ function ns.CreateDropdown(parent, opts)
         local scrollPadding = needsScroll and 10 or 0
         self:ApplyFonts()
 
-        local rowWidth = math.max(self:GetWidth(), opts.minMenuWidth or 130)
+        local menuAnchor = opts.menuAnchor or self
+        local rowWidth = math.max(menuAnchor:GetWidth(), opts.minMenuWidth or 130)
         if opts.dynamicMenuWidth then
             for _, option in ipairs(options) do
                 rowWidth = math.max(rowWidth, (#OptionLabel(option) * fontSize * 0.58) + 34)
@@ -367,7 +374,7 @@ function ns.CreateDropdown(parent, opts)
         end
 
         popup:ClearAllPoints()
-        popup:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, -4)
+        popup:SetPoint("TOPLEFT", menuAnchor, "BOTTOMLEFT", 0, -4)
         local contentHeight = (#options * (rowHeight + rowSpacing)) - rowSpacing
         popup:SetSize(rowWidth + scrollPadding, (visibleRows * (rowHeight + rowSpacing)) - rowSpacing + 6)
         local alpha = GetAlpha()
